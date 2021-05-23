@@ -17,12 +17,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
 
-	let mut cube_view = views::CubeView::new(&engine.gl_ctx)?;
+	let cube_view = views::CubeView::new(&engine.gl_ctx)?;
+	let mut perf_view = views::PerfView::new(&engine.gl_ctx)?;
 
 
 
 	let mut uniforms = Uniforms {
 		projection_view: Mat4::ident(),
+		ui_projection_view: Mat4::ident(),
 	};
 
 	let mut aspect = 1.0f32;
@@ -154,11 +156,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 					* Mat4::translate(Vec3::from_z(-zoom))
 					* camera_orientation.inverse()
 					* Mat4::translate(-camera_pos)
+			},
+
+			ui_projection_view: {
+				Mat4::scale(Vec3::new(1.0 / aspect, 1.0, 1.0))
 			}
 		};
 
 		uniform_buffer.upload(&[uniforms], gl::BufferUsage::Stream);
 
+
+		perf_view.update(&instrumenter, aspect);
 
 
 		unsafe {
@@ -169,6 +177,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		let mut view_ctx = views::ViewContext::new(&engine.gl_ctx, &mut instrumenter);
 
 		cube_view.draw(&mut view_ctx);
+		perf_view.draw(&mut view_ctx);
 
 		instrumenter.end_frame();
 		engine.window.gl_swap_window();
@@ -184,6 +193,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[derive(Copy, Clone, Debug)]
 struct Uniforms {
 	projection_view: Mat4,
+	ui_projection_view: Mat4,
 	// NOTE: align to Vec4s
 }
 
