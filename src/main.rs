@@ -1,7 +1,7 @@
 use toybox::prelude::*;
 use std::error::Error;
 
-
+mod views;
 
 fn main() -> Result<(), Box<dyn Error>> {
 	std::env::set_var("RUST_BACKTRACE", "1");
@@ -17,10 +17,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
 
+	let mut cube_view = views::CubeView::new(&engine.gl_ctx)?;
+
+
+
 	let mut uniforms = Uniforms {
 		projection_view: Mat4::ident(),
 	};
-
 
 	let mut aspect = 1.0f32;
 	let mut zoom = 12.0f32;
@@ -28,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut yaw = 0.0f32;
 	let mut pitch = -PI / 5.0;
 
-	let mut camera_pos = Vec3::new(0.0, 2.0, 0.0);
+	let mut camera_pos = Vec3::new(0.0, 0.0, 0.0);
 	let mut forward_pressed = false;
 	let mut back_pressed = false;
 	let mut left_pressed = false;
@@ -163,6 +166,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 			gl::raw::Clear(gl::raw::COLOR_BUFFER_BIT | gl::raw::DEPTH_BUFFER_BIT);
 		}
 
+		let mut view_ctx = views::ViewContext::new(&engine.gl_ctx, &mut instrumenter);
+
+		cube_view.draw(&mut view_ctx);
 
 		instrumenter.end_frame();
 		engine.window.gl_swap_window();
