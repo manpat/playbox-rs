@@ -1,0 +1,9 @@
+[package]
+name = "playbox-rs"
+version = "0.1.0"
+edition = "2018"
+
+
+[dependencies]
+toybox = { path = "../toybox-rs" }
+# toybox = { git = "https://github.com/manpat/toybox-rs.git" }
