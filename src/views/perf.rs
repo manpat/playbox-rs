@@ -47,8 +47,7 @@ impl PerfView {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 
-			origin: Vec2::new(size - aspect, size - 1.0),
-			transform: Mat2::scale(Vec2::splat(size)),
+			transform: Mat2x3::scale_translate(Vec2::splat(size), Vec2::new(size - aspect, size - 1.0)),
 		};
 
 
@@ -66,7 +65,7 @@ impl PerfView {
 		}
 
 
-		builder.origin.x += 2.1 * size;
+		builder.transform = Mat2x3::scale_translate(Vec2::splat(size), Vec2::new(size - aspect + 2.1 * size, size - 1.0));
 
 		let total_angle = (2.0 * PI) / summary.total_triangles as f32;
 		let mut current_angle = 0.0;
@@ -109,8 +108,7 @@ struct Builder2D {
 	vertices: Vec<ColorVertex2D>,
 	indices: Vec<u16>,
 
-	origin: Vec2,
-	transform: Mat2,
+	transform: Mat2x3,
 }
 
 impl Builder2D {
@@ -130,12 +128,12 @@ impl Builder2D {
 
 		let index_start = self.vertices.len() as u32;
 
-		self.vertices.push(ColorVertex2D::new(self.origin, color));
+		self.vertices.push(ColorVertex2D::new(self.transform.column_z(), color));
 
 		for vertex_idx in 0..=num_triangles {
 			let angle = vertex_idx as f32 * inc + start_angle;
 			let offset = self.transform * Vec2::from_angle(angle);
-			self.vertices.push(ColorVertex2D::new(self.origin + offset, color));
+			self.vertices.push(ColorVertex2D::new(offset, color));
 		}
 
 		for triangle in 0..num_triangles {

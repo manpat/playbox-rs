@@ -4,8 +4,6 @@ use gl::vertex::ColorVertex;
 pub struct CubeView {
 	shader: gl::Shader,
 	vao: gl::Vao,
-	vertex_buffer: gl::Buffer<ColorVertex>,
-	index_buffer: gl::Buffer<u16>,
 	num_elements: u32,
 }
 
@@ -18,8 +16,8 @@ impl CubeView {
 
 		let vao = gl.new_vao();
 
-		let vertex_buffer = gl.new_buffer();
-		let index_buffer = gl.new_buffer();
+		let vertex_buffer = gl.new_buffer::<ColorVertex>();
+		let index_buffer = gl.new_buffer::<u16>();
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);
@@ -49,8 +47,6 @@ impl CubeView {
 		Ok(CubeView {
 			shader,
 			vao,
-			vertex_buffer,
-			index_buffer,
 			num_elements: indices.len() as u32,
 		})
 	}
