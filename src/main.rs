@@ -29,12 +29,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut perf_view = views::PerfView::new(&engine.gl_ctx)?;
 
 
-	let mut uniforms = Uniforms {
-		projection_view: Mat4::identity(),
-		ui_projection_view: Mat4::identity(),
-	};
-
-
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
 
@@ -60,11 +54,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		player_controller.update(&mut engine.input, &mut player, &mut camera);
 
-		let camera_yaw_mat = Mat4::rotate_y(player.yaw);
-
-		uniforms = Uniforms {
+		let uniforms = Uniforms {
 			projection_view: {
-				let camera_orientation = camera_yaw_mat * Mat4::rotate_x(camera.pitch);
+				let camera_orientation = Mat4::rotate_y(player.yaw) * Mat4::rotate_x(camera.pitch);
 
 				Mat4::perspective(PI/3.0, camera.aspect, 0.1, 1000.0)
 					* Mat4::translate(Vec3::from_z(-camera.zoom))
