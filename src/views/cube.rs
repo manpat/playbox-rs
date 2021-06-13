@@ -53,11 +53,10 @@ impl CubeView {
 
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
+		let _section = ctx.perf.scoped_section("cube");
+
 		ctx.gl.bind_vao(self.vao);
 		ctx.gl.bind_shader(self.shader);
-
-		ctx.perf.start_section("cube");
 		ctx.gl.draw_indexed(gl::DrawMode::Triangles, self.num_elements);
-		ctx.perf.end_section();
 	}
 }

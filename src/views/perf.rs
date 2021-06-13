@@ -89,16 +89,16 @@ impl PerfView {
 
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
+		let _section = ctx.perf.scoped_section("perf");
+
 		if self.num_elements == 0 {
 			return
 		}
 
-		ctx.perf.start_section("perf");
 		ctx.gl.bind_vao(self.vao);
 		ctx.gl.bind_shader(self.shader);
 
 		ctx.gl.draw_indexed(gl::DrawMode::Triangles, self.num_elements);
-		ctx.perf.end_section();
 	}
 }
 
