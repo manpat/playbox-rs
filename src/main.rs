@@ -3,6 +3,7 @@ use std::error::Error;
 
 mod views;
 mod model;
+mod controller;
 
 fn main() -> Result<(), Box<dyn Error>> {
 	std::env::set_var("RUST_BACKTRACE", "1");
@@ -17,18 +18,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	use toybox::input;
 
-	let mut debug_ctx = engine.input.new_context("Debug");
-	let quit_action = debug_ctx.new_action(input::action::Action::new_trigger("Test Trigger", input::raw::Scancode::Escape));
-	let test_state_action = debug_ctx.new_action(input::action::Action::new_state("Test State", input::raw::Scancode::W));
-	let test_click_action = debug_ctx.new_action(input::action::Action::new_state("Left Mouse", input::raw::MouseButton::Left));
-	let test_mouse_action = debug_ctx.new_action(input::action::Action::new_pointer("Test Pointer"));
-	let debug_ctx = debug_ctx.build();
-	engine.input.enter_context(debug_ctx);
-
-	let mut debug2_ctx = engine.input.new_context("Debug2");
-	let test_mouse_action2 = debug2_ctx.new_action(input::action::Action::new_mouse("Test Mouse", 1.0));
-	let debug2_ctx = debug2_ctx.build();
-	// engine.input.enter_context(debug2_ctx);
+	let mut global_input_ctx = engine.input.new_context("Global");
+	let quit_action = global_input_ctx.new_trigger("Quit", input::raw::Scancode::Escape);
+	let toggle_wireframe_action = global_input_ctx.new_trigger("Toggle Wireframe", input::raw::Scancode::Z);
+	let global_input_ctx = global_input_ctx.build();
+	engine.input.enter_context(global_input_ctx);
 
 
 	let cube_view = views::CubeView::new(&engine.gl_ctx)?;
@@ -44,16 +38,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
 
-	let mut forward_pressed = false;
-	let mut back_pressed = false;
-	let mut left_pressed = false;
-	let mut right_pressed = false;
-	let mut shift_pressed = false;
+	let player_controller = controller::PlayerController::new(&mut engine.input);
 
 	// let mut left_down = false;
 	// let mut right_down = false;
 
-	// let mut wireframe_enabled = false;
+	let mut wireframe_enabled = false;
 
 	// let mut mouse_world_pos = Vec2::zero();
 
@@ -64,10 +54,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 			break 'main
 		}
 
-		let input_state = engine.input.frame_state().clone();
-		dbg!(&input_state);
+		dbg!(engine.input.frame_state());
 
-		if input_state.active(quit_action) {
+		if engine.input.frame_state().active(quit_action) {
 			break 'main
 		}
 
@@ -154,37 +143,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 		// 	}
 		// }
 
-		if input_state.entered(test_click_action) {
-			engine.input.enter_context(debug2_ctx);
+		if engine.input.frame_state().active(toggle_wireframe_action) {
+			wireframe_enabled = !wireframe_enabled;
+			engine.gl_ctx.set_wireframe(wireframe_enabled);
 		}
 
-		if input_state.left(test_click_action) {
-			engine.input.leave_context(debug2_ctx);
-		}
-
-
-		if let Some(mouse) = input_state.mouse(test_mouse_action2) {
-			player.yaw += mouse.x * 0.5;
-			camera.pitch = (camera.pitch + mouse.y as f32 * 0.5).clamp(-PI, PI);
-		}
-
+		player_controller.update(&mut engine.input, &mut player, &mut camera);
 
 		let camera_yaw_mat = Mat4::rotate_y(player.yaw);
-
-		let move_speed = match shift_pressed {
-			true => 15.0,
-			false => 5.0,
-		};
-
-		let player_move_fwd = camera_yaw_mat * Vec3::from_z(-move_speed / 60.0);
-		let player_move_right = camera_yaw_mat * Vec3::from_x(move_speed / 60.0);
-
-		if forward_pressed { player.position += player_move_fwd }
-		if back_pressed { player.position -= player_move_fwd }
-		if left_pressed { player.position -= player_move_right }
-		if right_pressed { player.position += player_move_right }
-
-
 
 		uniforms = Uniforms {
 			projection_view: {
