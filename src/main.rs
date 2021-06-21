@@ -23,7 +23,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let toggle_wireframe_action = global_input_ctx.new_trigger("Toggle Wireframe", input::raw::Scancode::Z);
 	let play_sound_action = global_input_ctx.new_trigger("Play Sound", input::raw::Scancode::Num1);
 	let play_stereo_sound_action = global_input_ctx.new_trigger("Play Stereo Sound", input::raw::Scancode::Num2);
-	let play_ogg_sound_action = global_input_ctx.new_trigger("Play Ogg Sound", input::raw::Scancode::Num3);
+	let play_static_stream_sound_action = global_input_ctx.new_trigger("Play Static Streamed Sound", input::raw::Scancode::Num3);
+	let play_file_stream_sound_action = global_input_ctx.new_trigger("Play File Streamed Sound", input::raw::Scancode::Num4);
 	let global_input_ctx = global_input_ctx.build();
 	engine.input.enter_context(global_input_ctx);
 
@@ -49,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 				(x * freq / framerate as f32 * PI).sin() * envelope
 			});
 
-		let buffer = toybox::audio::buffer::Buffer::from_mono_samples(samples);
+		let buffer = toybox::audio::Buffer::from_mono_samples(samples);
 		engine.audio.register_buffer(buffer)
 	};
 
@@ -75,15 +76,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 			})
 			.flat_map(|sample| [sample, -sample]);
 
-		let buffer = toybox::audio::buffer::Buffer::from_stereo_samples(samples);
+		let buffer = toybox::audio::Buffer::from_stereo_samples(samples);
 		engine.audio.register_buffer(buffer)
 	};
 
-
-	let ogg_sound_id = {
+	let static_ogg_sound_id = {
 		let raw_data = include_bytes!("../assets/forest.ogg");
-		let buffer = toybox::audio::buffer::Buffer::from_vorbis(raw_data)?;
-		engine.audio.register_buffer(buffer)
+		let stream = toybox::audio::Stream::from_vorbis_static(raw_data)?;
+		engine.audio.register_stream(stream)
+	};
+
+	let file_ogg_sound_id = {
+		let stream = toybox::audio::Stream::from_vorbis_file("assets/forest.ogg")?;
+		engine.audio.register_stream(stream)
 	};
 
 
@@ -122,8 +127,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 			engine.audio.play_one_shot(stereo_sound_id);
 		}
 
-		if engine.input.frame_state().active(play_ogg_sound_action) {
-			engine.audio.play_one_shot(ogg_sound_id);
+		if engine.input.frame_state().active(play_static_stream_sound_action) {
+			engine.audio.play_one_shot(static_ogg_sound_id);
+		}
+
+		if engine.input.frame_state().active(play_file_stream_sound_action) {
+			engine.audio.play_one_shot(file_ogg_sound_id);
 		}
 
 		{
