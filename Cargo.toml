@@ -5,5 +5,5 @@ edition = "2018"
 
 
 [dependencies]
-toybox = { path = "../toybox-rs" }
-# toybox = { git = "https://github.com/manpat/toybox-rs.git" }
+# toybox = { path = "../toybox-rs" }
+toybox = { git = "https://github.com/manpat/toybox-rs.git" }
