@@ -1,8 +1,10 @@
 pub mod perf;
 pub mod cube;
+pub mod player;
 
 pub use perf::*;
 pub use cube::*;
+pub use player::*;
 
 use toybox::prelude::*;
 use toybox::perf::Instrumenter;

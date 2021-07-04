@@ -3,6 +3,7 @@ use toybox::prelude::*;
 pub struct Camera {
 	pub zoom: f32,
 	pub pitch: f32,
+	pub yaw: f32,
 	pub aspect: f32,
 }
 
@@ -11,6 +12,7 @@ impl Camera {
 		Camera {
 			zoom: 12.0f32,
 			pitch: -PI/5.0,
+			yaw: 0.0,
 			aspect: 1.0,
 		}
 	}

@@ -4,16 +4,18 @@ use toybox::input::raw::{Scancode, MouseButton};
 
 use crate::model::{Player, Camera};
 
-pub struct PlayerController {
-	camera_rotate_context: ContextID,
-	mouse_action: ActionID,
+const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, 0.0);
 
+
+pub struct PlayerController {
 	forward_action: ActionID,
 	back_action: ActionID,
 	left_action: ActionID,
 	right_action: ActionID,
 	shift_action: ActionID,
-	rotate_camera_action: ActionID,
+	mouse_action: ActionID,
+
+	move_speed: f32,
 }
 
 impl PlayerController {
@@ -24,57 +26,71 @@ impl PlayerController {
 		let left_action = movement_context.new_state("Left", Scancode::A);
 		let right_action = movement_context.new_state("Right", Scancode::D);
 		let shift_action = movement_context.new_state("Sprint", Scancode::LShift);
-		let rotate_camera_action = movement_context.new_state("Rotate Camera", MouseButton::Left);
+		let mouse_action = movement_context.new_mouse("Mouse", 1.0);
 		let movement_context = movement_context.build();
-
-		let mut camera_rotate_context = input.new_context("Camera");
-		let mouse_action = camera_rotate_context.new_mouse("Mouse", 1.0);
-		let camera_rotate_context = camera_rotate_context.build();
 
 		input.enter_context(movement_context);
 
 		PlayerController {
-			camera_rotate_context,
-			mouse_action,
-
 			forward_action,
 			back_action,
 			left_action,
 			right_action,
 			shift_action,
-			rotate_camera_action,
+			mouse_action,
+
+			move_speed: 0.0,
 		}
 	}
 
-	pub fn update(&self, input: &mut InputSystem, player: &mut Player, camera: &mut Camera) {
-		if input.frame_state().entered(self.rotate_camera_action) {
-			input.enter_context(self.camera_rotate_context);
-		}
-
-		if input.frame_state().left(self.rotate_camera_action) {
-			input.leave_context(self.camera_rotate_context);
-		}
-
+	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &mut Camera) {
 		let frame_state = input.frame_state();
 
 		if let Some(mouse) = frame_state.mouse(self.mouse_action) {
-			player.yaw += mouse.x * 0.5;
-			camera.pitch = (camera.pitch + mouse.y as f32 * 0.5).clamp(-PI, PI);
+			let (pitch_min, pitch_max) = CAMERA_PITCH_LIMIT;
+
+			camera.yaw += mouse.x * 0.5;
+			camera.pitch = (camera.pitch + mouse.y as f32 * 0.5).clamp(pitch_min, pitch_max);
 		}
 
-		let camera_yaw_mat = Mat4::rotate_y(player.yaw);
+		let move_fwd = Vec3::from_z(-1.0);
+		let move_right = Vec3::from_x(1.0);
 
-		let move_speed = match frame_state.active(self.shift_action) {
-			true => 15.0,
-			false => 5.0,
-		};
+		let mut move_vector = Vec3::zero();
 
-		let player_move_fwd = camera_yaw_mat * Vec3::from_z(-move_speed / 60.0);
-		let player_move_right = camera_yaw_mat * Vec3::from_x(move_speed / 60.0);
+		if frame_state.active(self.forward_action) { move_vector += move_fwd }
+		if frame_state.active(self.back_action) { move_vector -= move_fwd }
+		if frame_state.active(self.left_action) { move_vector -= move_right }
+		if frame_state.active(self.right_action) { move_vector += move_right }
 
-		if frame_state.active(self.forward_action) { player.position += player_move_fwd }
-		if frame_state.active(self.back_action) { player.position -= player_move_fwd }
-		if frame_state.active(self.left_action) { player.position -= player_move_right }
-		if frame_state.active(self.right_action) { player.position += player_move_right }
+		let move_vector_length = move_vector.length();
+		if move_vector_length > 0.1 {
+			let camera_yaw_mat = Mat3x4::rotate_y(camera.yaw);
+
+			let move_direction = move_vector / move_vector_length;
+			let target_move_direction = camera_yaw_mat * move_direction;
+			let target_yaw = target_move_direction.to_xz().to_angle() + PI/2.0; // WHY?
+
+			let mut angle_diff = target_yaw - player.yaw;
+			if angle_diff > PI {
+				angle_diff -= 2.0 * PI;
+			} else if angle_diff < -PI {
+				angle_diff += 2.0 * PI;
+			}
+
+			player.yaw += angle_diff * 3.0 / 60.0;
+
+			let base_move_speed = match frame_state.active(self.shift_action) {
+				true => 15.0,
+				false => 5.0,
+			};
+
+			self.move_speed += (base_move_speed - self.move_speed) * 4.0 / 60.0;
+
+		} else {
+			self.move_speed *= 0.8;
+		}
+
+		player.position += Mat3x4::rotate_y(player.yaw) * move_fwd * (self.move_speed / 60.0);
 	}
 }
