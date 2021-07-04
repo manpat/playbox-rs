@@ -87,13 +87,13 @@ impl GlobalController {
 
 		let static_ogg_sound_id = {
 			let raw_data = include_bytes!("../../assets/forest.ogg");
-			let stream = audio::Stream::from_vorbis_static(raw_data)?;
-			engine.audio.register_stream(stream)
+			let stream = audio::FileStream::from_vorbis_static(raw_data)?;
+			engine.audio.register_file_stream(stream)
 		};
 
 		let file_ogg_sound_id = {
-			let stream = audio::Stream::from_vorbis_file("assets/forest.ogg")?;
-			engine.audio.register_stream(stream)
+			let stream = audio::FileStream::from_vorbis_file("assets/forest.ogg")?;
+			engine.audio.register_file_stream(stream)
 		};
 
 

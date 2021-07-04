@@ -51,7 +51,7 @@ impl PlayerView {
 			ColorVertex::new(body_transform * Vec3::new( 1.0,-1.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
 			ColorVertex::new(body_transform * Vec3::new(-1.0,-1.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
 
-			ColorVertex::new(/*body_transform * Vec3::new(0.0, 1.0, 0.0) +*/ self.player_hat_pos, Vec3::new(1.0, 0.0, 1.0)),
+			ColorVertex::new(self.player_hat_pos, Vec3::new(1.0, 0.0, 1.0)),
 		];
 
 		let indices = [
