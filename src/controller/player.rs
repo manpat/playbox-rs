@@ -1,44 +1,36 @@
 use toybox::prelude::*;
-use toybox::input::{ContextID, ActionID, InputSystem};
-use toybox::input::raw::{Scancode, MouseButton};
+use toybox::input::InputSystem;
+use toybox::input::raw::Scancode;
 
 use crate::model::{Player, Camera};
 
 const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, 0.0);
 
 
-pub struct PlayerController {
-	forward_action: ActionID,
-	back_action: ActionID,
-	left_action: ActionID,
-	right_action: ActionID,
-	shift_action: ActionID,
-	mouse_action: ActionID,
+toybox::declare_input_context! {
+	struct PlayerActions "Player Control" {
+		state forward { "Forward" [Scancode::W] }
+		state back { "Back" [Scancode::S] }
+		state left { "Left" [Scancode::A] }
+		state right { "Right" [Scancode::D] }
+		state shift { "Sprint" [Scancode::LShift] }
+		mouse mouse { "Mouse" [1.0] }
+	}
+}
 
+
+pub struct PlayerController {
+	actions: PlayerActions,
 	move_speed: f32,
 }
 
 impl PlayerController {
 	pub fn new(input: &mut InputSystem) -> PlayerController {
-		let mut movement_context = input.new_context("Player Movement");
-		let forward_action = movement_context.new_state("Forward", Scancode::W);
-		let back_action = movement_context.new_state("Back", Scancode::S);
-		let left_action = movement_context.new_state("Left", Scancode::A);
-		let right_action = movement_context.new_state("Right", Scancode::D);
-		let shift_action = movement_context.new_state("Sprint", Scancode::LShift);
-		let mouse_action = movement_context.new_mouse("Mouse", 1.0);
-		let movement_context = movement_context.build();
-
-		input.enter_context(movement_context);
+		let actions = PlayerActions::new(input);
+		input.enter_context(actions.context_id());
 
 		PlayerController {
-			forward_action,
-			back_action,
-			left_action,
-			right_action,
-			shift_action,
-			mouse_action,
-
+			actions,
 			move_speed: 0.0,
 		}
 	}
@@ -46,7 +38,7 @@ impl PlayerController {
 	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &mut Camera) {
 		let frame_state = input.frame_state();
 
-		if let Some(mouse) = frame_state.mouse(self.mouse_action) {
+		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {
 			let (pitch_min, pitch_max) = CAMERA_PITCH_LIMIT;
 
 			camera.yaw += mouse.x * 0.5;
@@ -58,10 +50,10 @@ impl PlayerController {
 
 		let mut move_vector = Vec3::zero();
 
-		if frame_state.active(self.forward_action) { move_vector += move_fwd }
-		if frame_state.active(self.back_action) { move_vector -= move_fwd }
-		if frame_state.active(self.left_action) { move_vector -= move_right }
-		if frame_state.active(self.right_action) { move_vector += move_right }
+		if frame_state.active(self.actions.forward) { move_vector += move_fwd }
+		if frame_state.active(self.actions.back) { move_vector -= move_fwd }
+		if frame_state.active(self.actions.left) { move_vector -= move_right }
+		if frame_state.active(self.actions.right) { move_vector += move_right }
 
 		let move_vector_length = move_vector.length();
 		if move_vector_length > 0.1 {
@@ -80,7 +72,7 @@ impl PlayerController {
 
 			player.yaw += angle_diff * 3.0 / 60.0;
 
-			let base_move_speed = match frame_state.active(self.shift_action) {
+			let base_move_speed = match frame_state.active(self.actions.shift) {
 				true => 15.0,
 				false => 5.0,
 			};

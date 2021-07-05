@@ -1,16 +1,22 @@
 use toybox::prelude::*;
-use toybox::input::{ContextID, ActionID};
-use toybox::input::raw::{Scancode, MouseButton};
+use toybox::input::raw::Scancode;
 use toybox::audio::{self, SoundAssetID};
 
 
+toybox::declare_input_context! {
+	struct GlobalActions "Global" {
+		trigger quit { "Quit" [Scancode::Escape] }
+		trigger toggle_wireframe { "Toggle Wireframe" [Scancode::Z] }
+		trigger play_sound { "Play Sound" [Scancode::Num1] }
+		trigger play_stereo_sound { "Play Stereo Sound" [Scancode::Num2] }
+		trigger play_static_stream_sound { "Play Static Streamed Sound" [Scancode::Num3] }
+		trigger play_file_stream_sound { "Play File Streamed Sound" [Scancode::Num4] }
+	}
+}
+
+
 pub struct GlobalController {
-	quit_action: ActionID,
-	toggle_wireframe_action: ActionID,
-	play_sound_action: ActionID,
-	play_stereo_sound_action: ActionID,
-	play_static_stream_sound_action: ActionID,
-	play_file_stream_sound_action: ActionID,
+	actions: GlobalActions,
 
 	pluck_sound_id: SoundAssetID,
 	stereo_sound_id: SoundAssetID,
@@ -23,16 +29,8 @@ pub struct GlobalController {
 
 impl GlobalController {
 	pub fn new(engine: &mut toybox::Engine) -> Result<GlobalController, Box<dyn Error>> {
-		let mut global_input_ctx = engine.input.new_context("Global");
-		let quit_action = global_input_ctx.new_trigger("Quit", Scancode::Escape);
-		let toggle_wireframe_action = global_input_ctx.new_trigger("Toggle Wireframe", Scancode::Z);
-		let play_sound_action = global_input_ctx.new_trigger("Play Sound", Scancode::Num1);
-		let play_stereo_sound_action = global_input_ctx.new_trigger("Play Stereo Sound", Scancode::Num2);
-		let play_static_stream_sound_action = global_input_ctx.new_trigger("Play Static Streamed Sound", Scancode::Num3);
-		let play_file_stream_sound_action = global_input_ctx.new_trigger("Play File Streamed Sound", Scancode::Num4);
-		let global_input_ctx = global_input_ctx.build();
-
-		engine.input.enter_context(global_input_ctx);
+		let actions = GlobalActions::new(&mut engine.input);
+		engine.input.enter_context(actions.context_id());
 
 		let pluck_sound_id = {
 			let framerate = 44100;
@@ -98,12 +96,7 @@ impl GlobalController {
 
 
 		Ok(GlobalController {
-			quit_action,
-			toggle_wireframe_action,
-			play_sound_action,
-			play_stereo_sound_action,
-			play_static_stream_sound_action,
-			play_file_stream_sound_action,
+			actions,
 
 			pluck_sound_id,
 			stereo_sound_id,
@@ -116,28 +109,28 @@ impl GlobalController {
 	}
 
 	pub fn update(&mut self, engine: &mut toybox::Engine) {
-		if engine.input.frame_state().active(self.quit_action) {
+		if engine.input.frame_state().active(self.actions.quit) {
 			self.should_quit = true
 		}
 
-		if engine.input.frame_state().active(self.toggle_wireframe_action) {
+		if engine.input.frame_state().active(self.actions.toggle_wireframe) {
 			self.wireframe_enabled = !self.wireframe_enabled;
 			engine.gl_ctx.set_wireframe(self.wireframe_enabled);
 		}
 
-		if engine.input.frame_state().active(self.play_sound_action) {
+		if engine.input.frame_state().active(self.actions.play_sound) {
 			engine.audio.play_one_shot(self.pluck_sound_id);
 		}
 
-		if engine.input.frame_state().active(self.play_stereo_sound_action) {
+		if engine.input.frame_state().active(self.actions.play_stereo_sound) {
 			engine.audio.play_one_shot(self.stereo_sound_id);
 		}
 
-		if engine.input.frame_state().active(self.play_static_stream_sound_action) {
+		if engine.input.frame_state().active(self.actions.play_static_stream_sound) {
 			engine.audio.play_one_shot(self.static_ogg_sound_id);
 		}
 
-		if engine.input.frame_state().active(self.play_file_stream_sound_action) {
+		if engine.input.frame_state().active(self.actions.play_file_stream_sound) {
 			engine.audio.play_one_shot(self.file_ogg_sound_id);
 		}
 
