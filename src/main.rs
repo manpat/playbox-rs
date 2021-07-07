@@ -10,21 +10,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut engine = toybox::Engine::new("playbox")?;
 
-	engine.gl_ctx.add_shader_import("global", include_str!("shaders/global.common.glsl"));
+	dbg!(&engine.gfx.capabilities());
 
-	let uniform_buffer = engine.gl_ctx.new_buffer();
-	engine.gl_ctx.bind_uniform_buffer(0, uniform_buffer);
+	engine.gfx.add_shader_import("global", include_str!("shaders/global.common.glsl"));
+
+	let uniform_buffer = engine.gfx.new_buffer();
+	engine.gfx.bind_uniform_buffer(0, uniform_buffer);
 
 
-	let cube_view = views::CubeView::new(&engine.gl_ctx)?;
-	let mut perf_view = views::PerfView::new(&engine.gl_ctx)?;
-	let mut player_view = views::PlayerView::new(&engine.gl_ctx)?;
+	let cube_view = views::CubeView::new(&engine.gfx)?;
+	let mut perf_view = views::PerfView::new(&engine.gfx)?;
+	let mut player_view = views::PlayerView::new(&engine.gfx)?;
+	let mut debug_view = views::DebugView::new(&engine.gfx)?;
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
+	let mut debug_model = model::Debug::new();
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input);
+	let mut debug_controller = controller::DebugController::new(&mut engine.input);
 
 
 	for input_context in engine.input.contexts() {
@@ -44,8 +49,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 			break 'main
 		}
 
+		debug_controller.update(&mut engine.input, &mut debug_model);
+
 		{
-			let Vec2{x, y} = engine.gl_ctx.canvas_size().to_vec2();
+			let Vec2{x, y} = engine.gfx.canvas_size().to_vec2();
 			camera.aspect = x / y;
 		}
 
@@ -66,22 +73,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 			}
 		};
 
-		uniform_buffer.upload(&[uniforms], gl::BufferUsage::Stream);
+		uniform_buffer.upload(&[uniforms], gfx::BufferUsage::Stream);
 
 
 		perf_view.update(&engine.instrumenter, camera.aspect);
+		debug_view.update(&debug_model);
 		player_view.update(&player);
 
 		unsafe {
-			gl::raw::ClearColor(0.1, 0.1, 0.1, 1.0);
-			gl::raw::Clear(gl::raw::COLOR_BUFFER_BIT | gl::raw::DEPTH_BUFFER_BIT);
+			gfx::raw::ClearColor(0.1, 0.1, 0.1, 1.0);
+			gfx::raw::Clear(gfx::raw::COLOR_BUFFER_BIT | gfx::raw::DEPTH_BUFFER_BIT);
 		}
 
-		let mut view_ctx = views::ViewContext::new(&engine.gl_ctx, &mut engine.instrumenter);
+		let mut view_ctx = views::ViewContext::new(&engine.gfx, &mut engine.instrumenter);
 
 		cube_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);
 		perf_view.draw(&mut view_ctx);
+		debug_view.draw(&mut view_ctx);
 
 		engine.end_frame();
 	}

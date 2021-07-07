@@ -1,23 +1,23 @@
 use toybox::prelude::*;
-use gl::vertex::ColorVertex;
+use gfx::vertex::ColorVertex;
 
 pub struct CubeView {
-	shader: gl::Shader,
-	vao: gl::Vao,
+	shader: gfx::Shader,
+	vao: gfx::Vao,
 	num_elements: u32,
 }
 
 impl CubeView {
-	pub fn new(gl: &gl::Context) -> Result<CubeView, Box<dyn Error>> {
-		let shader = gl.new_shader(&[
-			(gl::raw::VERTEX_SHADER, include_str!("../shaders/color_3d.vert.glsl")),
-			(gl::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
+	pub fn new(gfx: &gfx::Context) -> Result<CubeView, Box<dyn Error>> {
+		let shader = gfx.new_shader(&[
+			(gfx::raw::VERTEX_SHADER, include_str!("../shaders/color_3d.vert.glsl")),
+			(gfx::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
 		])?;
 
-		let vao = gl.new_vao();
+		let vao = gfx.new_vao();
 
-		let vertex_buffer = gl.new_buffer::<ColorVertex>();
-		let index_buffer = gl.new_buffer::<u16>();
+		let vertex_buffer = gfx.new_buffer::<ColorVertex>();
+		let index_buffer = gfx.new_buffer::<u16>();
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);
@@ -41,8 +41,8 @@ impl CubeView {
 			4, 3, 0,
 		];
 
-		vertex_buffer.upload(&vertices, gl::BufferUsage::Static);
-		index_buffer.upload(&indices, gl::BufferUsage::Static);
+		vertex_buffer.upload(&vertices, gfx::BufferUsage::Static);
+		index_buffer.upload(&indices, gfx::BufferUsage::Static);
 
 		Ok(CubeView {
 			shader,
@@ -55,8 +55,8 @@ impl CubeView {
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("cube");
 
-		ctx.gl.bind_vao(self.vao);
-		ctx.gl.bind_shader(self.shader);
-		ctx.gl.draw_indexed(gl::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.bind_vao(self.vao);
+		ctx.gfx.bind_shader(self.shader);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
 	}
 }

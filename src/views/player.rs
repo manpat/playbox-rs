@@ -1,13 +1,13 @@
 use toybox::prelude::*;
-use gl::vertex::ColorVertex;
+use gfx::vertex::ColorVertex;
 
 use crate::model::Player;
 
 pub struct PlayerView {
-	shader: gl::Shader,
-	vao: gl::Vao,
-	vertex_buffer: gl::Buffer<ColorVertex>,
-	index_buffer: gl::Buffer<u16>,
+	shader: gfx::Shader,
+	vao: gfx::Vao,
+	vertex_buffer: gfx::Buffer<ColorVertex>,
+	index_buffer: gfx::Buffer<u16>,
 	num_elements: u32,
 
 	player_hat_pos: Vec3,
@@ -15,16 +15,16 @@ pub struct PlayerView {
 }
 
 impl PlayerView {
-	pub fn new(gl: &gl::Context) -> Result<PlayerView, Box<dyn Error>> {
-		let shader = gl.new_shader(&[
-			(gl::raw::VERTEX_SHADER, include_str!("../shaders/color_3d.vert.glsl")),
-			(gl::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
+	pub fn new(gfx: &gfx::Context) -> Result<PlayerView, Box<dyn Error>> {
+		let shader = gfx.new_shader(&[
+			(gfx::raw::VERTEX_SHADER, include_str!("../shaders/color_3d.vert.glsl")),
+			(gfx::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
 		])?;
 
-		let vao = gl.new_vao();
+		let vao = gfx.new_vao();
 
-		let vertex_buffer = gl.new_buffer();
-		let index_buffer = gl.new_buffer();
+		let vertex_buffer = gfx.new_buffer();
+		let index_buffer = gfx.new_buffer();
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);
@@ -64,8 +64,8 @@ impl PlayerView {
 			4, 3, 0,
 		];
 
-		self.vertex_buffer.upload(&vertices, gl::BufferUsage::Dynamic);
-		self.index_buffer.upload(&indices, gl::BufferUsage::Dynamic);
+		self.vertex_buffer.upload(&vertices, gfx::BufferUsage::Dynamic);
+		self.index_buffer.upload(&indices, gfx::BufferUsage::Dynamic);
 
 		self.num_elements = indices.len() as u32;
 
@@ -79,8 +79,8 @@ impl PlayerView {
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("player");
 
-		ctx.gl.bind_vao(self.vao);
-		ctx.gl.bind_shader(self.shader);
-		ctx.gl.draw_indexed(gl::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.bind_vao(self.vao);
+		ctx.gfx.bind_shader(self.shader);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
 	}
 }

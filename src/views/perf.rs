@@ -1,26 +1,26 @@
 use toybox::prelude::*;
 use toybox::perf::Instrumenter;
-use gl::vertex::ColorVertex2D;
+use gfx::vertex::ColorVertex2D;
 
 pub struct PerfView {
-	shader: gl::Shader,
-	vao: gl::Vao,
-	vertex_buffer: gl::Buffer<ColorVertex2D>,
-	index_buffer: gl::Buffer<u16>,
+	shader: gfx::Shader,
+	vao: gfx::Vao,
+	vertex_buffer: gfx::Buffer<ColorVertex2D>,
+	index_buffer: gfx::Buffer<u16>,
 	num_elements: u32,
 }
 
 impl PerfView {
-	pub fn new(gl: &gl::Context) -> Result<PerfView, Box<dyn Error>> {
-		let shader = gl.new_shader(&[
-			(gl::raw::VERTEX_SHADER, include_str!("../shaders/color_2d.vert.glsl")),
-			(gl::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
+	pub fn new(gfx: &gfx::Context) -> Result<PerfView, Box<dyn Error>> {
+		let shader = gfx.new_shader(&[
+			(gfx::raw::VERTEX_SHADER, include_str!("../shaders/color_2d.vert.glsl")),
+			(gfx::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
 		])?;
 
-		let vao = gl.new_vao();
+		let vao = gfx.new_vao();
 
-		let vertex_buffer = gl.new_buffer();
-		let index_buffer = gl.new_buffer();
+		let vertex_buffer = gfx.new_buffer();
+		let index_buffer = gfx.new_buffer();
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);
@@ -51,11 +51,11 @@ impl PerfView {
 		};
 
 
-		let total_angle = (2.0 * PI) / summary.total_time_ms as f32;
+		let total_angle = (2.0 * PI) / summary.total_cpu_time_ms as f32;
 		let mut current_angle = 0.0;
 
 		for (idx, section) in summary.sections.iter().enumerate() {
-			let section_angle = section.time_ms as f32 * total_angle;
+			let section_angle = section.cpu_time_ms as f32 * total_angle;
 
 			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.7, 0.7);
 
@@ -66,6 +66,22 @@ impl PerfView {
 
 
 		builder.transform = Mat2x3::scale_translate(Vec2::splat(size), Vec2::new(size - aspect + 2.1 * size, size - 1.0));
+
+		let total_angle = (2.0 * PI) / summary.total_gpu_time_ms as f32;
+		let mut current_angle = 0.0;
+
+		for (idx, section) in summary.sections.iter().enumerate() {
+			let section_angle = section.gpu_time_ms as f32 * total_angle;
+
+			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.7, 0.7);
+
+			builder.build_wedge(current_angle, current_angle + section_angle, color);
+
+			current_angle += section_angle;
+		}
+
+
+		builder.transform = Mat2x3::scale_translate(Vec2::splat(size), Vec2::new(size - aspect + 4.2 * size, size - 1.0));
 
 		let total_angle = (2.0 * PI) / summary.total_triangles as f32;
 		let mut current_angle = 0.0;
@@ -81,8 +97,8 @@ impl PerfView {
 		}
 
 
-		self.vertex_buffer.upload(&builder.vertices, gl::BufferUsage::Static);
-		self.index_buffer.upload(&builder.indices, gl::BufferUsage::Static);
+		self.vertex_buffer.upload(&builder.vertices, gfx::BufferUsage::Static);
+		self.index_buffer.upload(&builder.indices, gfx::BufferUsage::Static);
 
 		self.num_elements = builder.indices.len() as _;
 	}
@@ -95,10 +111,10 @@ impl PerfView {
 			return
 		}
 
-		ctx.gl.bind_vao(self.vao);
-		ctx.gl.bind_shader(self.shader);
+		ctx.gfx.bind_vao(self.vao);
+		ctx.gfx.bind_shader(self.shader);
 
-		ctx.gl.draw_indexed(gl::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
 	}
 }
 

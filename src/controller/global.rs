@@ -115,7 +115,7 @@ impl GlobalController {
 
 		if engine.input.frame_state().active(self.actions.toggle_wireframe) {
 			self.wireframe_enabled = !self.wireframe_enabled;
-			engine.gl_ctx.set_wireframe(self.wireframe_enabled);
+			engine.gfx.set_wireframe(self.wireframe_enabled);
 		}
 
 		if engine.input.frame_state().active(self.actions.play_sound) {
