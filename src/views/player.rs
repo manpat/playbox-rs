@@ -36,7 +36,7 @@ impl PlayerView {
 			index_buffer,
 			num_elements: 0,
 
-			player_hat_pos: Vec3::new(0.0, 1.0, 0.0),
+			player_hat_pos: Vec3::new(0.0, 2.0, 0.0),
 			player_vel: Vec3::zero(),
 		})
 	}
@@ -46,10 +46,10 @@ impl PlayerView {
 		let body_transform = Mat3x4::rotate_y_translate(player.yaw, player.position);
 
 		let vertices = [
-			ColorVertex::new(body_transform * Vec3::new(-1.0,-1.0,-1.0), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex::new(body_transform * Vec3::new( 1.0,-1.0,-1.0), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex::new(body_transform * Vec3::new( 1.0,-1.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex::new(body_transform * Vec3::new(-1.0,-1.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex::new(body_transform * Vec3::new(-1.0, 0.0,-1.0), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex::new(body_transform * Vec3::new( 1.0, 0.0,-1.0), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex::new(body_transform * Vec3::new( 1.0, 0.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex::new(body_transform * Vec3::new(-1.0, 0.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
 
 			ColorVertex::new(self.player_hat_pos, Vec3::new(1.0, 0.0, 1.0)),
 		];

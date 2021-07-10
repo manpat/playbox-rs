@@ -1,11 +1,13 @@
 pub mod perf;
 pub mod cube;
 pub mod player;
+pub mod scene;
 pub mod debug;
 
 pub use perf::*;
 pub use cube::*;
 pub use player::*;
+pub use scene::*;
 pub use debug::*;
 
 use toybox::prelude::*;

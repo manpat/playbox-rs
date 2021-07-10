@@ -4,7 +4,7 @@ use toybox::input::raw::Scancode;
 
 use crate::model::{Player, Camera};
 
-const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, 0.0);
+const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, -PI/16.0);
 
 
 toybox::declare_input_context! {

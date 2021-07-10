@@ -20,7 +20,7 @@ impl DebugView {
 		let vao = gfx.new_vao();
 
 		let vertex_buffer = gfx.new_buffer::<ColorVertex2D>();
-		let index_buffer = gfx.new_buffer::<u16>();
+		let mut index_buffer = gfx.new_buffer::<u16>();
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);
