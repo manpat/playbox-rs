@@ -17,27 +17,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut uniform_buffer = engine.gfx.new_buffer();
 	engine.gfx.bind_uniform_buffer(0, uniform_buffer);
 
-	let scene_data = std::fs::read("assets/scene.toy")?;
-	let scene = toy::load(&scene_data)?;
-
-	let cube_view = views::CubeView::new(&engine.gfx)?;
-	let mut perf_view = views::PerfView::new(&engine.gfx)?;
-	let mut player_view = views::PlayerView::new(&engine.gfx)?;
-	let mut debug_view = views::DebugView::new(&engine.gfx)?;
-	let scene_view = views::SceneView::new(&engine.gfx, &scene)?;
-
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
 	let mut debug_model = model::Debug::new();
+	let mut scene = model::Scene::new()?;
+
+	let mut perf_view = views::PerfView::new(&engine.gfx)?;
+	let mut player_view = views::PlayerView::new(&engine.gfx)?;
+	let mut debug_view = views::DebugView::new(&engine.gfx)?;
+	let mut scene_view = views::SceneView::new(&engine.gfx, &scene)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input);
 	let mut debug_controller = controller::DebugController::new(&mut engine.input);
 
 
-	for input_context in engine.input.contexts() {
-		dbg!(input_context);
-	}
+	// for input_context in engine.input.contexts() {
+	// 	dbg!(input_context);
+	// }
 
 	'main: loop {
 		engine.process_events();
@@ -82,6 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		perf_view.update(&engine.instrumenter, camera.aspect);
 		debug_view.update(&debug_model);
 		player_view.update(&player);
+		scene_view.update(&scene);
 
 		unsafe {
 			gfx::raw::ClearColor(0.1, 0.1, 0.1, 1.0);
@@ -90,7 +88,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		let mut view_ctx = views::ViewContext::new(&engine.gfx, &mut engine.instrumenter);
 
-		cube_view.draw(&mut view_ctx);
 		scene_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);
 		perf_view.draw(&mut view_ctx);

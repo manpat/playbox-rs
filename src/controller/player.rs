@@ -69,6 +69,7 @@ impl PlayerController {
 			} else if angle_diff < -PI {
 				angle_diff += 2.0 * PI;
 			}
+			// TODO(pat.m): make this stable - if player is spinning, stay spinning in that direction
 
 			player.yaw += angle_diff * 3.0 / 60.0;
 
