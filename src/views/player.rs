@@ -46,8 +46,8 @@ impl PlayerView {
 		let body_transform = Mat3x4::rotate_y_translate(player.yaw, player.position);
 
 		let vertices = [
-			ColorVertex::new(body_transform * Vec3::new(-1.0, 0.0,-1.0), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex::new(body_transform * Vec3::new( 1.0, 0.0,-1.0), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex::new(body_transform * Vec3::new(-1.0, 0.0,-1.0), Vec3::new(1.0, 0.5, 1.0)),
+			ColorVertex::new(body_transform * Vec3::new( 1.0, 0.0,-1.0), Vec3::new(1.0, 0.5, 1.0)),
 			ColorVertex::new(body_transform * Vec3::new( 1.0, 0.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
 			ColorVertex::new(body_transform * Vec3::new(-1.0, 0.0, 1.0), Vec3::new(1.0, 1.0, 1.0)),
 

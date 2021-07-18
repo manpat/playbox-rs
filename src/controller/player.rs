@@ -57,7 +57,7 @@ impl PlayerController {
 
 		if move_direction.length() > 0.1 {
 			let Vec3{x: target_x, z: target_z, ..} = move_direction;
-			let target_yaw = (-target_z).atan2(target_x);
+			let target_yaw = (-target_z).atan2(target_x) - PI/2.0;
 
 			let mut angle_diff = angle_difference(target_yaw, player.yaw);
 			let angle_diff_2 = angle_diff - self.prev_angle_diff;
@@ -84,7 +84,7 @@ impl PlayerController {
 			self.prev_angle_diff = 0.0;
 		}
 
-		player.position += Quat::from_yaw(player.yaw - PI/2.0).forward() * (self.move_speed / 60.0);
+		player.position += Quat::from_yaw(player.yaw).forward() * (self.move_speed / 60.0);
 	}
 }
 
