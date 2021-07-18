@@ -49,8 +49,8 @@ impl SceneView {
 		})
 	}
 
-	pub fn update(&mut self, scene: &model::Scene) {
-		self.gem_view.update(scene);
+	pub fn update(&mut self, scene: &model::Scene, blob_shadows: &mut model::BlobShadowModel) {
+		self.gem_view.update(scene, blob_shadows);
 	}
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {

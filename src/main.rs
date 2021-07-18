@@ -23,10 +23,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut debug_model = model::Debug::new();
 	let mut scene = model::Scene::new()?;
 
+	let mut blob_shadow_model = model::BlobShadowModel::new();
+
 	let mut perf_view = views::PerfView::new(&engine.gfx)?;
 	let mut player_view = views::PlayerView::new(&engine.gfx)?;
 	let mut debug_view = views::DebugView::new(&engine.gfx)?;
 	let mut scene_view = views::SceneView::new(&engine.gfx, &scene)?;
+	let mut blob_shadow_view = views::BlobShadowView::new(&engine.gfx)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input);
@@ -68,11 +71,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		uniform_buffer.upload(&[uniforms], gfx::BufferUsage::Stream);
 
+		blob_shadow_model.clear();
 
 		perf_view.update(&engine.instrumenter, engine.gfx.aspect());
 		debug_view.update(&debug_model);
 		player_view.update(&player);
-		scene_view.update(&scene);
+		scene_view.update(&scene, &mut blob_shadow_model);
+		blob_shadow_view.update(&blob_shadow_model);
 
 		engine.gfx.set_clear_color(Color::grey(0.1));
 		engine.gfx.clear(gfx::ClearMode::ALL);
@@ -81,6 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		scene_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);
+		blob_shadow_view.draw(&mut view_ctx);
 
 		if debug_model.active {
 			perf_view.draw(&mut view_ctx);
