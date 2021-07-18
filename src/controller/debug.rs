@@ -11,6 +11,8 @@ toybox::declare_input_context! {
 
 toybox::declare_input_context! {
 	struct ActiveActions "Active Debug" {
+		trigger reset_gems { "Reset Gems" [Scancode::F1] }
+
 		state left_mouse { "Interact" [MouseButton::Left] }
 		pointer mouse { "Mouse" }
 	}
@@ -34,7 +36,7 @@ impl DebugController {
 		}
 	}
 
-	pub fn update(&self, input: &mut InputSystem, model: &mut model::Debug) {
+	pub fn update(&self, input: &mut InputSystem, debug_model: &mut model::Debug, scene: &mut model::Scene) {
 		let currently_active = input.is_context_active(self.active_actions.context_id());
 
 		if input.frame_state().active(self.actions.toggle_active) {
@@ -44,11 +46,17 @@ impl DebugController {
 				input.enter_context(self.active_actions.context_id());
 			}
 
-			model.active = !currently_active;
+			debug_model.active = !currently_active;
 		}
 
 		if let Some(pos) = input.frame_state().mouse(self.active_actions.mouse) {
-			model.mouse_pos = pos;
+			debug_model.mouse_pos = pos;
+		}
+
+		if input.frame_state().active(self.active_actions.reset_gems) {
+			for gem in scene.gems.iter_mut() {
+				gem.state = model::scene::GemState::Idle;
+			}
 		}
 	}
 }

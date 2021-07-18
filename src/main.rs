@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input);
-	let mut gem_controller = controller::GemController::new();
+	let mut gem_controller = controller::GemController::new(&mut engine.audio)?;
 	let debug_controller = controller::DebugController::new(&mut engine.input);
 
 	'main: loop {
@@ -46,9 +46,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 			break 'main
 		}
 
-		debug_controller.update(&mut engine.input, &mut debug_model);
+		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene);
 		player_controller.update(&mut engine.input, &mut player, &mut camera);
-		gem_controller.update(&player, &mut scene);
+		gem_controller.update(&mut engine.audio, &player, &mut scene);
 
 		let uniforms = Uniforms {
 			projection_view: {
@@ -81,8 +81,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		scene_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);
-		perf_view.draw(&mut view_ctx);
-		debug_view.draw(&mut view_ctx);
+
+		if debug_model.active {
+			perf_view.draw(&mut view_ctx);
+			debug_view.draw(&mut view_ctx);
+		}
 
 		engine.end_frame();
 	}

@@ -77,7 +77,7 @@ impl GemView {
 					}
 
 					GemState::Collecting(t) => {
-						let float_away = t.ease_back_in(0.0, 8.0);
+						let float_away = t.ease_back_in(0.0, 6.0);
 						let pos = gem.position + Vec3::from_y((anim_phase*2.0).sin() * 0.4 + float_away);
 						let rot = *anim_phase;
 						Some(Mat3x4::rotate_y_translate(rot, pos))
