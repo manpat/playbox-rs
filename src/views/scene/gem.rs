@@ -61,23 +61,45 @@ impl GemView {
 	}
 
 	pub fn update(&mut self, scene: &model::Scene) {
+		use model::scene::GemState;
+
 		for GemViewData{anim_phase} in self.gem_view_data.iter_mut() {
 			*anim_phase += 1.0 / 60.0;
 		}
 
 		let instances: Vec<_> = scene.gems.iter().zip(&self.gem_view_data)
-			.filter(|(gem, _)| gem.active)
-			.map(|(gem, GemViewData{anim_phase})| {
-				let pos = gem.position + Vec3::from_y(anim_phase.sin() * 0.3);
-				let rot = *anim_phase;
-				Mat3x4::rotate_y_translate(rot, pos)
+			.filter_map(|(gem, GemViewData{anim_phase})| {
+				match gem.state {
+					GemState::Idle => {
+						let pos = gem.position + Vec3::from_y((anim_phase*2.0).sin() * 0.4);
+						let rot = *anim_phase;
+						Some(Mat3x4::rotate_y_translate(rot, pos))
+					}
+
+					GemState::Collecting(t) => {
+						let float_away = t.ease_back_in(0.0, 8.0);
+						let pos = gem.position + Vec3::from_y((anim_phase*2.0).sin() * 0.4 + float_away);
+						let rot = *anim_phase;
+						Some(Mat3x4::rotate_y_translate(rot, pos))
+					}
+
+					GemState::Collected => None,
+				}
 			})
 			.collect();
 
-		self.instance_buffer.upload(&instances, gfx::BufferUsage::Dynamic);
+		self.num_instances = instances.len() as u32;
+
+		if !instances.is_empty() {
+			self.instance_buffer.upload(&instances, gfx::BufferUsage::Dynamic);
+		}
 	}
 
 	pub fn draw(&self, gfx: &gfx::Context) {
+		if self.num_instances == 0 {
+			return
+		}
+
 		gfx.bind_vao(self.vao);
 		gfx.bind_shader(self.shader);
 		gfx.bind_shader_storage_buffer(0, self.instance_buffer);

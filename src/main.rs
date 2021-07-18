@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
 	let mut debug_model = model::Debug::new();
-	let scene = model::Scene::new()?;
+	let mut scene = model::Scene::new()?;
 
 	let mut perf_view = views::PerfView::new(&engine.gfx)?;
 	let mut player_view = views::PlayerView::new(&engine.gfx)?;
@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input);
+	let mut gem_controller = controller::GemController::new();
 	let debug_controller = controller::DebugController::new(&mut engine.input);
 
 	'main: loop {
@@ -47,6 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		debug_controller.update(&mut engine.input, &mut debug_model);
 		player_controller.update(&mut engine.input, &mut player, &mut camera);
+		gem_controller.update(&player, &mut scene);
 
 		let uniforms = Uniforms {
 			projection_view: {

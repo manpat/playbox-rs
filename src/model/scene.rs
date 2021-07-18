@@ -16,7 +16,7 @@ impl Scene {
 			.filter(|e| e.name.starts_with("GEM_"))
 			.map(|e| Gem {
 				position: e.position,
-				active: true,
+				state: GemState::Idle,
 			})
 			.collect();
 
@@ -29,7 +29,14 @@ impl Scene {
 
 
 #[derive(Debug, Copy, Clone)]
+pub enum GemState {
+	Idle,
+	Collecting(f32),
+	Collected,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct Gem {
 	pub position: Vec3,
-	pub active: bool,
+	pub state: GemState,
 }

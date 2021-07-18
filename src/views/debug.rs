@@ -50,10 +50,10 @@ impl DebugView {
 		}
 
 		let vertices = [
-			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.04,-0.04), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new( 0.04,-0.04), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new( 0.04, 0.04), Vec3::new(1.0, 1.0, 1.0)),
-			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.04, 0.04), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.02,-0.02), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new( 0.02,-0.02), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new( 0.02, 0.02), Vec3::new(1.0, 1.0, 1.0)),
+			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.02, 0.02), Vec3::new(1.0, 1.0, 1.0)),
 		];
 
 		self.vertex_buffer.upload(&vertices, gfx::BufferUsage::Dynamic);
