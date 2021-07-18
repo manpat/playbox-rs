@@ -9,7 +9,7 @@ impl Player {
 	pub fn new() -> Player {
 		Player {
 			position: Vec3::zero(),
-			yaw: 0.0,
+			yaw: PI/2.0, // along -z
 		}
 	}
 }

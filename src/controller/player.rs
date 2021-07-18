@@ -22,6 +22,7 @@ toybox::declare_input_context! {
 pub struct PlayerController {
 	actions: PlayerActions,
 	move_speed: f32,
+	prev_angle_diff: f32,
 }
 
 impl PlayerController {
@@ -32,6 +33,7 @@ impl PlayerController {
 		PlayerController {
 			actions,
 			move_speed: 0.0,
+			prev_angle_diff: 0.0,
 		}
 	}
 
@@ -41,49 +43,60 @@ impl PlayerController {
 		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {
 			let (pitch_min, pitch_max) = CAMERA_PITCH_LIMIT;
 
-			camera.yaw += mouse.x * 0.5;
+			camera.yaw -= mouse.x * 0.5;
 			camera.pitch = (camera.pitch + mouse.y as f32 * 0.5).clamp(pitch_min, pitch_max);
 		}
 
-		let move_fwd = Vec3::from_z(-1.0);
-		let move_right = Vec3::from_x(1.0);
+		let camera_orientation = Quat::from_yaw(camera.yaw);
+		let mut move_direction = Vec3::zero();
 
-		let mut move_vector = Vec3::zero();
+		if frame_state.active(self.actions.forward) { move_direction += camera_orientation.forward() }
+		if frame_state.active(self.actions.back) { move_direction -= camera_orientation.forward() }
+		if frame_state.active(self.actions.left) { move_direction -= camera_orientation.right() }
+		if frame_state.active(self.actions.right) { move_direction += camera_orientation.right() }
 
-		if frame_state.active(self.actions.forward) { move_vector += move_fwd }
-		if frame_state.active(self.actions.back) { move_vector -= move_fwd }
-		if frame_state.active(self.actions.left) { move_vector -= move_right }
-		if frame_state.active(self.actions.right) { move_vector += move_right }
+		if move_direction.length() > 0.1 {
+			let Vec3{x: target_x, z: target_z, ..} = move_direction;
+			let target_yaw = (-target_z).atan2(target_x);
 
-		let move_vector_length = move_vector.length();
-		if move_vector_length > 0.1 {
-			let camera_yaw_mat = Mat3x4::rotate_y(camera.yaw);
+			let mut angle_diff = angle_difference(target_yaw, player.yaw);
+			let angle_diff_2 = angle_diff - self.prev_angle_diff;
 
-			let move_direction = move_vector / move_vector_length;
-			let target_move_direction = camera_yaw_mat * move_direction;
-			let target_yaw = target_move_direction.to_xz().to_angle() + PI/2.0; // WHY?
-
-			let mut angle_diff = target_yaw - player.yaw;
-			if angle_diff > PI {
-				angle_diff -= 2.0 * PI;
-			} else if angle_diff < -PI {
-				angle_diff += 2.0 * PI;
+			// Make sure rotation is stable - smooth out second order derivative
+			if angle_diff_2 > PI {
+				angle_diff -= TAU;
+			} else if angle_diff_2 < -PI {
+				angle_diff += TAU;
 			}
-			// TODO(pat.m): make this stable - if player is spinning, stay spinning in that direction
 
-			player.yaw += angle_diff * 3.0 / 60.0;
+			player.yaw += angle_diff * 4.0 / 60.0;
 
 			let base_move_speed = match frame_state.active(self.actions.shift) {
-				true => 15.0,
-				false => 5.0,
+				true => 18.0,
+				false => 10.0,
 			};
 
 			self.move_speed += (base_move_speed - self.move_speed) * 4.0 / 60.0;
+			self.prev_angle_diff = angle_diff;
 
 		} else {
 			self.move_speed *= 0.8;
+			self.prev_angle_diff = 0.0;
 		}
 
-		player.position += Mat3x4::rotate_y(player.yaw) * move_fwd * (self.move_speed / 60.0);
+		player.position += Quat::from_yaw(player.yaw - PI/2.0).forward() * (self.move_speed / 60.0);
 	}
+}
+
+
+fn angle_difference(a: f32, b: f32) -> f32 {
+	let mut angle_diff = (a - b) % TAU;
+
+	if angle_diff > PI {
+		angle_diff -= TAU;
+	} else if angle_diff < -PI {
+		angle_diff += TAU;
+	}
+
+	angle_diff
 }

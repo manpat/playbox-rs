@@ -16,10 +16,10 @@ pub struct PlayerView {
 
 impl PlayerView {
 	pub fn new(gfx: &gfx::Context) -> Result<PlayerView, Box<dyn Error>> {
-		let shader = gfx.new_shader(&[
-			(gfx::raw::VERTEX_SHADER, include_str!("../shaders/color_3d.vert.glsl")),
-			(gfx::raw::FRAGMENT_SHADER, include_str!("../shaders/flat_color.frag.glsl")),
-		])?;
+		let shader = gfx.new_simple_shader(
+			crate::shaders::COLOR_3D_VERT,
+			crate::shaders::FLAT_COLOR_FRAG,
+		)?;
 
 		let vao = gfx.new_vao();
 
