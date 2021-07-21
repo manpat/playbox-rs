@@ -24,10 +24,9 @@ impl GemController {
 			match gem.state {
 				GemState::Idle => {
 					let dist = (gem.position - ply_pos).to_xz().length();
-					if dist < 2.0 {
+					if dist < 2.5 {
 						gem.state = GemState::Collecting(0.0);
 						audio.play_one_shot(self.chime_sound);
-						println!("GEM");
 					}
 				}
 
