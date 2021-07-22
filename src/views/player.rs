@@ -8,7 +8,6 @@ pub struct PlayerView {
 	vao: gfx::Vao,
 	vertex_buffer: gfx::Buffer<ColorVertex>,
 	index_buffer: gfx::Buffer<u16>,
-	num_elements: u32,
 
 	player_hat_pos: Vec3,
 	player_vel: Vec3,
@@ -34,7 +33,6 @@ impl PlayerView {
 			vao,
 			vertex_buffer,
 			index_buffer,
-			num_elements: 0,
 
 			player_hat_pos: Vec3::new(0.0, 2.0, 0.0),
 			player_vel: Vec3::zero(),
@@ -67,8 +65,6 @@ impl PlayerView {
 		self.vertex_buffer.upload(&vertices, gfx::BufferUsage::Dynamic);
 		self.index_buffer.upload(&indices, gfx::BufferUsage::Dynamic);
 
-		self.num_elements = indices.len() as u32;
-
 		let position_diff = player.position.to_xz() - self.player_hat_pos.to_xz();
 		self.player_vel *= 0.92;
 		self.player_vel += position_diff.to_x0z() * 0.05;
@@ -81,6 +77,6 @@ impl PlayerView {
 
 		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
 	}
 }

@@ -53,24 +53,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 		player_controller.update(&mut engine.input, &mut player, &mut camera);
 		gem_controller.update(&mut engine.audio, &player, &mut scene);
 
-		let uniforms = Uniforms {
-			projection_view: {
-				let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
-				let camera_orientation = camera_orientation.to_mat4();
-
-				Mat4::perspective(PI/3.0, engine.gfx.aspect(), 0.1, 1000.0)
-					* Mat4::translate(Vec3::from_z(-camera.zoom))
-					* camera_orientation
-					* Mat4::translate(-player.position)
-			},
-
-			ui_projection_view: {
-				Mat4::scale(Vec3::new(1.0 / engine.gfx.aspect(), 1.0, 1.0))
-			}
-		};
-
-		uniform_buffer.upload(&[uniforms], gfx::BufferUsage::Stream);
-
 		blob_shadow_model.clear();
 
 		perf_view.update(&engine.instrumenter, engine.gfx.aspect());
@@ -81,6 +63,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		engine.gfx.set_clear_color(Color::grey(0.1));
 		engine.gfx.clear(gfx::ClearMode::ALL);
+
+		let uniforms = build_uniforms(&player, &camera, engine.gfx.aspect());
+		uniform_buffer.upload(&[uniforms], gfx::BufferUsage::Stream);
 
 		let mut view_ctx = views::ViewContext::new(&engine.gfx, &mut engine.instrumenter);
 
@@ -110,3 +95,21 @@ struct Uniforms {
 	// NOTE: align to Vec4s
 }
 
+
+fn build_uniforms(player: &model::Player, camera: &model::Camera, aspect: f32) -> Uniforms {
+	Uniforms {
+		projection_view: {
+			let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
+			let camera_orientation = camera_orientation.to_mat4();
+
+			Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
+				* Mat4::translate(Vec3::from_z(-camera.zoom))
+				* camera_orientation
+				* Mat4::translate(-player.position)
+		},
+
+		ui_projection_view: {
+			Mat4::scale(Vec3::new(1.0 / aspect, 1.0, 1.0))
+		}
+	}
+}

@@ -4,9 +4,8 @@ use crate::model;
 pub struct BlobShadowView {
 	shader: gfx::Shader,
 	vao: gfx::Vao,
+	index_buffer: gfx::Buffer<u16>,
 	instance_buffer: gfx::Buffer<Mat3x4>,
-	num_elements: u32,
-	num_instances: u32,
 }
 
 impl BlobShadowView {
@@ -23,6 +22,7 @@ impl BlobShadowView {
 		let vertices: Vec<_> = (0..36)
 			.map(|idx| gfx::ColorVertex::new(Vec3::from_y_angle(idx as f32 / 36.0 * TAU) / 2.0, Vec3::zero()))
 			.collect();
+
 		let indices: Vec<u16> = (0..36)
 			.flat_map(|idx| [0, idx, (idx+1) % 36])
 			.collect();
@@ -37,9 +37,8 @@ impl BlobShadowView {
 		Ok(BlobShadowView {
 			shader,
 			vao,
+			index_buffer,
 			instance_buffer,
-			num_elements: indices.len() as u32,
-			num_instances: 0,
 		})
 	}
 
@@ -52,21 +51,17 @@ impl BlobShadowView {
 			})
 			.collect();
 
-		self.num_instances = instances.len() as u32;
-
-		if !instances.is_empty() {
-			self.instance_buffer.upload(&instances, gfx::BufferUsage::Dynamic);
-		}
+		self.instance_buffer.upload(&instances, gfx::BufferUsage::Dynamic);
 	}
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
-		if self.num_instances == 0 {
+		if self.instance_buffer.is_empty() {
 			return
 		}
 
 		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
 		ctx.gfx.bind_shader_storage_buffer(0, self.instance_buffer);
-		ctx.gfx.draw_instances_indexed(gfx::DrawMode::Triangles, self.num_elements, self.num_instances);
+		ctx.gfx.draw_instances_indexed(gfx::DrawMode::Triangles, self.index_buffer.len(), self.instance_buffer.len());
 	}
 }

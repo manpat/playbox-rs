@@ -5,7 +5,7 @@ pub struct DebugView {
 	shader: gfx::Shader,
 	vao: gfx::Vao,
 	vertex_buffer: gfx::Buffer<ColorVertex2D>,
-	num_elements: u32,
+	index_buffer: gfx::Buffer<u16>,
 
 	active: bool,
 }
@@ -36,7 +36,7 @@ impl DebugView {
 			shader,
 			vao,
 			vertex_buffer,
-			num_elements: indices.len() as u32,
+			index_buffer,
 
 			active: false,
 		})
@@ -69,6 +69,6 @@ impl DebugView {
 
 		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
 	}
 }

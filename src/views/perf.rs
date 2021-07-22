@@ -7,7 +7,6 @@ pub struct PerfView {
 	vao: gfx::Vao,
 	vertex_buffer: gfx::Buffer<ColorVertex2D>,
 	index_buffer: gfx::Buffer<u16>,
-	num_elements: u32,
 }
 
 impl PerfView {
@@ -30,7 +29,6 @@ impl PerfView {
 			vao,
 			vertex_buffer,
 			index_buffer,
-			num_elements: 0,
 		})
 	}
 
@@ -99,22 +97,20 @@ impl PerfView {
 
 		self.vertex_buffer.upload(&builder.vertices, gfx::BufferUsage::Static);
 		self.index_buffer.upload(&builder.indices, gfx::BufferUsage::Static);
-
-		self.num_elements = builder.indices.len() as _;
 	}
 
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("perf");
 
-		if self.num_elements == 0 {
+		if self.index_buffer.is_empty() {
 			return
 		}
 
 		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
 
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
 	}
 }
 

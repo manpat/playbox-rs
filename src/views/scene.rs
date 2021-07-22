@@ -8,7 +8,7 @@ mod gem;
 pub struct SceneView {
 	shader: gfx::Shader,
 	vao: gfx::Vao,
-	num_elements: u32,
+	index_buffer: gfx::Buffer<u16>,
 
 	gem_view: gem::GemView,
 }
@@ -43,7 +43,7 @@ impl SceneView {
 		Ok(SceneView {
 			shader,
 			vao,
-			num_elements: indices.len() as u32,
+			index_buffer,
 
 			gem_view: gem::GemView::new(gfx, scene)?,
 		})
@@ -58,7 +58,7 @@ impl SceneView {
 
 		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.num_elements);
+		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
 
 		self.gem_view.draw(&ctx.gfx);
 	}

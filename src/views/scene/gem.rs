@@ -12,8 +12,7 @@ pub struct GemView {
 	shader: gfx::Shader,
 	vao: gfx::Vao,
 	instance_buffer: gfx::Buffer<Mat3x4>,
-	num_elements: u32,
-	num_instances: u32,
+	index_buffer: gfx::Buffer<u16>,
 
 	gem_view_data: Vec<GemViewData>,
 }
@@ -53,8 +52,7 @@ impl GemView {
 			shader,
 			vao,
 			instance_buffer,
-			num_elements: indices.len() as u32,
-			num_instances: scene.gems.len() as u32,
+			index_buffer,
 
 			gem_view_data,
 		})
@@ -89,8 +87,6 @@ impl GemView {
 			})
 			.collect();
 
-		self.num_instances = instances.len() as u32;
-
 		if !instances.is_empty() {
 			self.instance_buffer.upload(&instances, gfx::BufferUsage::Dynamic);
 		}
@@ -101,13 +97,13 @@ impl GemView {
 	}
 
 	pub fn draw(&self, gfx: &gfx::Context) {
-		if self.num_instances == 0 {
+		if self.instance_buffer.is_empty() {
 			return
 		}
 
 		gfx.bind_vao(self.vao);
 		gfx.bind_shader(self.shader);
 		gfx.bind_shader_storage_buffer(0, self.instance_buffer);
-		gfx.draw_instances_indexed(gfx::DrawMode::Triangles, self.num_elements, self.num_instances);
+		gfx.draw_instances_indexed(gfx::DrawMode::Triangles, self.index_buffer.len(), self.instance_buffer.len());
 	}
 }
