@@ -1,3 +1,5 @@
+#![feature(array_chunks)]
+
 use toybox::prelude::*;
 use std::error::Error;
 
@@ -5,6 +7,9 @@ mod views;
 mod model;
 mod controller;
 mod shaders;
+mod mesh;
+
+mod intersect;
 
 fn main() -> Result<(), Box<dyn Error>> {
 	std::env::set_var("RUST_BACKTRACE", "1");
@@ -50,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		}
 
 		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene);
-		player_controller.update(&mut engine.input, &mut player, &mut camera);
+		player_controller.update(&mut engine.input, &mut player, &mut camera, &scene);
 		gem_controller.update(&mut engine.audio, &player, &mut scene);
 
 		blob_shadow_model.clear();
@@ -59,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		debug_view.update(&debug_model);
 		player_view.update(&player);
 		scene_view.update(&scene, &mut blob_shadow_model);
-		blob_shadow_view.update(&blob_shadow_model);
+		blob_shadow_view.update(&blob_shadow_model, &scene);
 
 		engine.gfx.set_clear_color(Color::grey(0.1));
 		engine.gfx.clear(gfx::ClearMode::ALL);

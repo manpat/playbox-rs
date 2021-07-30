@@ -2,12 +2,11 @@ use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
 
 use crate::model::Player;
+use crate::mesh::Mesh;
 
 pub struct PlayerView {
 	shader: gfx::Shader,
-	vao: gfx::Vao,
-	vertex_buffer: gfx::Buffer<ColorVertex>,
-	index_buffer: gfx::Buffer<u16>,
+	mesh: Mesh<ColorVertex>,
 
 	player_hat_pos: Vec3,
 	player_vel: Vec3,
@@ -20,19 +19,11 @@ impl PlayerView {
 			crate::shaders::FLAT_COLOR_FRAG,
 		)?;
 
-		let vao = gfx.new_vao();
-
-		let vertex_buffer = gfx.new_buffer();
-		let index_buffer = gfx.new_buffer();
-
-		vao.bind_vertex_buffer(0, vertex_buffer);
-		vao.bind_index_buffer(index_buffer);
+		let mesh = Mesh::new(gfx);
 
 		Ok(PlayerView {
 			shader,
-			vao,
-			vertex_buffer,
-			index_buffer,
+			mesh,
 
 			player_hat_pos: Vec3::new(0.0, 2.0, 0.0),
 			player_vel: Vec3::zero(),
@@ -62,12 +53,11 @@ impl PlayerView {
 			4, 3, 0,
 		];
 
-		self.vertex_buffer.upload(&vertices, gfx::BufferUsage::Dynamic);
-		self.index_buffer.upload(&indices, gfx::BufferUsage::Dynamic);
+		self.mesh.upload_separate(&vertices, &indices);
 
-		let position_diff = player.position.to_xz() - self.player_hat_pos.to_xz();
+		let position_diff = player.position - self.player_hat_pos + Vec3::from_y(2.0);
 		self.player_vel *= 0.92;
-		self.player_vel += position_diff.to_x0z() * 0.05;
+		self.player_vel += position_diff * 0.05;
 		self.player_hat_pos += self.player_vel;
 	}
 
@@ -75,8 +65,7 @@ impl PlayerView {
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("player");
 
-		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
+		self.mesh.draw(&ctx.gfx, gfx::DrawMode::Triangles);
 	}
 }

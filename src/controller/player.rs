@@ -2,7 +2,8 @@ use toybox::prelude::*;
 use toybox::input::InputSystem;
 use toybox::input::raw::Scancode;
 
-use crate::model::{Player, Camera};
+use crate::model::{self, Player, Camera};
+use crate::intersect::{Ray, scene_raycast};
 
 const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, -PI/16.0);
 
@@ -37,7 +38,7 @@ impl PlayerController {
 		}
 	}
 
-	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &mut Camera) {
+	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &mut Camera, scene: &model::Scene) {
 		let frame_state = input.frame_state();
 
 		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {
@@ -85,6 +86,16 @@ impl PlayerController {
 		}
 
 		player.position += Quat::from_yaw(player.yaw).forward() * (self.move_speed / 60.0);
+
+		let ray = Ray {
+			position: player.position + Vec3::from_y(2.0),
+			direction: Vec3::from_y(-1.0)
+		};
+
+		let scene = scene.main_scene();
+		if let Some(hit_pos) = scene_raycast(&scene, &ray) {
+			player.position.y += (hit_pos.y - player.position.y) / 4.0;
+		}
 	}
 }
 

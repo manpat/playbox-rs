@@ -23,7 +23,7 @@ impl GemController {
 		for gem in scene.gems.iter_mut() {
 			match gem.state {
 				GemState::Idle => {
-					let dist = (gem.position - ply_pos).to_xz().length();
+					let dist = (gem.position - ply_pos).length();
 					if dist < 2.5 {
 						gem.state = GemState::Collecting(0.0);
 						audio.play_one_shot(self.chime_sound);

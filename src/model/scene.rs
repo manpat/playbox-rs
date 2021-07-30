@@ -25,6 +25,11 @@ impl Scene {
 			gems,
 		})
 	}
+
+	pub fn main_scene(&self) -> toy::SceneRef<'_> {
+		self.source_data.find_scene("main")
+			.expect("missing main scene")
+	}
 }
 
 

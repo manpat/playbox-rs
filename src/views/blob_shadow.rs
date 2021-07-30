@@ -1,10 +1,10 @@
 pub use toybox::prelude::*;
 use crate::model;
+use crate::mesh::Mesh;
 
 pub struct BlobShadowView {
 	shader: gfx::Shader,
-	vao: gfx::Vao,
-	index_buffer: gfx::Buffer<u16>,
+	mesh: Mesh<gfx::ColorVertex>,
 	instance_buffer: gfx::Buffer<Mat3x4>,
 }
 
@@ -15,10 +15,6 @@ impl BlobShadowView {
 			crate::shaders::FLAT_COLOR_FRAG,
 		)?;
 
-		let instance_buffer = gfx.new_buffer::<Mat3x4>();
-		let mut vertex_buffer = gfx.new_buffer::<gfx::ColorVertex>();
-		let mut index_buffer = gfx.new_buffer::<u16>();
-
 		let vertices: Vec<_> = (0..36)
 			.map(|idx| gfx::ColorVertex::new(Vec3::from_y_angle(idx as f32 / 36.0 * TAU) / 2.0, Vec3::zero()))
 			.collect();
@@ -27,26 +23,32 @@ impl BlobShadowView {
 			.flat_map(|idx| [0, idx, (idx+1) % 36])
 			.collect();
 
-		vertex_buffer.upload(&vertices, gfx::BufferUsage::Static);
-		index_buffer.upload(&indices, gfx::BufferUsage::Static);
+		let instance_buffer = gfx.new_buffer::<Mat3x4>();
 
-		let vao = gfx.new_vao();
-		vao.bind_vertex_buffer(0, vertex_buffer);
-		vao.bind_index_buffer(index_buffer);
+		let mut mesh = Mesh::new(gfx);
+		mesh.upload_separate(&vertices, &indices);
 
 		Ok(BlobShadowView {
 			shader,
-			vao,
-			index_buffer,
+			mesh,
 			instance_buffer,
 		})
 	}
 
-	pub fn update(&mut self, blob_shadow_model: &model::BlobShadowModel) {
+	pub fn update(&mut self, blob_shadow_model: &model::BlobShadowModel, scene: &model::Scene) {
+		use crate::intersect::{Ray, scene_raycast};
+
+		let scene = scene.main_scene();
+
 		let instances: Vec<_> = blob_shadow_model.shadow_casters.iter()
-			.map(|caster| {
-				let pos = Vec3{y: 0.01, ..caster.position};
-				let scale = caster.scale / (1.0 + caster.position.y).max(1.0);
+			.filter_map(|caster| {
+				let ray = Ray { position: caster.position, direction: Vec3::from_y(-1.0) };
+				let result = scene_raycast(&scene, &ray)?;
+				Some((caster, result))
+			})
+			.map(|(caster, raycast_pos)| {
+				let pos = raycast_pos + Vec3::from_y(0.01);
+				let scale = caster.scale / (1.0 + caster.position.y - raycast_pos.y).max(1.0);
 				Mat3x4::scale_translate(Vec3::splat(scale), pos)
 			})
 			.collect();
@@ -59,9 +61,8 @@ impl BlobShadowView {
 			return
 		}
 
-		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
 		ctx.gfx.bind_shader_storage_buffer(0, self.instance_buffer);
-		ctx.gfx.draw_instances_indexed(gfx::DrawMode::Triangles, self.index_buffer.len(), self.instance_buffer.len());
+		self.mesh.draw_instanced(&ctx.gfx, gfx::DrawMode::Triangles, self.instance_buffer.len());
 	}
 }

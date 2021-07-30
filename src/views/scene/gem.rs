@@ -2,7 +2,10 @@ use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
 
 use crate::model;
+use crate::mesh::{Mesh, MeshData};
+
 use super::build_entity_transformed;
+
 
 struct GemViewData {
 	anim_phase: f32,
@@ -10,9 +13,8 @@ struct GemViewData {
 
 pub struct GemView {
 	shader: gfx::Shader,
-	vao: gfx::Vao,
+	mesh: Mesh<ColorVertex>,
 	instance_buffer: gfx::Buffer<Mat3x4>,
-	index_buffer: gfx::Buffer<u16>,
 
 	gem_view_data: Vec<GemViewData>,
 }
@@ -27,20 +29,13 @@ impl GemView {
 
 		let gem_prototype = scene.source_data.find_entity("GEM_prototype").unwrap();
 
-		let mut vertices = Vec::new();
-		let mut indices = Vec::new();
-		build_entity_transformed(&mut vertices, &mut indices, gem_prototype, Mat3x4::identity());
+		let mut mesh_data = MeshData::new();
+		build_entity_transformed(&mut mesh_data.vertices, &mut mesh_data.indices, gem_prototype, Mat3x4::identity());
+
+		let mut mesh = Mesh::new(gfx);
+		mesh.upload(&mesh_data);
 
 		let instance_buffer = gfx.new_buffer::<Mat3x4>();
-		let mut vertex_buffer = gfx.new_buffer::<ColorVertex>();
-		let mut index_buffer = gfx.new_buffer::<u16>();
-
-		vertex_buffer.upload(&vertices, gfx::BufferUsage::Static);
-		index_buffer.upload(&indices, gfx::BufferUsage::Static);
-
-		let vao = gfx.new_vao();
-		vao.bind_vertex_buffer(0, vertex_buffer);
-		vao.bind_index_buffer(index_buffer);
 
 		let gem_view_data = (0..scene.gems.len())
 			.map(|idx| GemViewData {
@@ -50,9 +45,8 @@ impl GemView {
 
 		Ok(GemView {
 			shader,
-			vao,
+			mesh,
 			instance_buffer,
-			index_buffer,
 
 			gem_view_data,
 		})
@@ -101,9 +95,9 @@ impl GemView {
 			return
 		}
 
-		gfx.bind_vao(self.vao);
 		gfx.bind_shader(self.shader);
 		gfx.bind_shader_storage_buffer(0, self.instance_buffer);
-		gfx.draw_instances_indexed(gfx::DrawMode::Triangles, self.index_buffer.len(), self.instance_buffer.len());
+
+		self.mesh.draw_instanced(gfx, gfx::DrawMode::Triangles, self.instance_buffer.len());
 	}
 }

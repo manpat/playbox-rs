@@ -2,13 +2,13 @@ use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
 
 use crate::model;
+use crate::mesh::{Mesh, MeshData};
 
 mod gem;
 
 pub struct SceneView {
 	shader: gfx::Shader,
-	vao: gfx::Vao,
-	index_buffer: gfx::Buffer<u16>,
+	mesh: Mesh<ColorVertex>,
 
 	gem_view: gem::GemView,
 }
@@ -20,30 +20,19 @@ impl SceneView {
 			crate::shaders::FLAT_COLOR_FRAG,
 		)?;
 
-		let vao = gfx.new_vao();
-
-		let mut vertex_buffer = gfx.new_buffer::<ColorVertex>();
-		let mut index_buffer = gfx.new_buffer::<u16>();
-
-		vao.bind_vertex_buffer(0, vertex_buffer);
-		vao.bind_index_buffer(index_buffer);
-
-		let mut vertices = Vec::new();
-		let mut indices = Vec::new();
-
-		let main_scene = scene.source_data.find_scene("main").unwrap();
+		let mut mesh_data = MeshData::new();
+		let main_scene = scene.main_scene();
 
 		for entity in main_scene.entities().filter(|e| !e.name.contains('_')) {
-			build_entity_transformed(&mut vertices, &mut indices, entity, entity.transform());
+			build_entity_transformed(&mut mesh_data.vertices, &mut mesh_data.indices, entity, entity.transform());
 		}
 
-		vertex_buffer.upload(&vertices, gfx::BufferUsage::Static);
-		index_buffer.upload(&indices, gfx::BufferUsage::Static);
+		let mut mesh = Mesh::new(gfx);
+		mesh.upload(&mesh_data);
 
 		Ok(SceneView {
 			shader,
-			vao,
-			index_buffer,
+			mesh,
 
 			gem_view: gem::GemView::new(gfx, scene)?,
 		})
@@ -56,9 +45,8 @@ impl SceneView {
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("scene");
 
-		ctx.gfx.bind_vao(self.vao);
 		ctx.gfx.bind_shader(self.shader);
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
+		self.mesh.draw(&ctx.gfx, gfx::DrawMode::Triangles);
 
 		self.gem_view.draw(&ctx.gfx);
 	}
