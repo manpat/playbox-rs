@@ -15,6 +15,8 @@ toybox::declare_input_context! {
 		state left { "Left" [Scancode::A] }
 		state right { "Right" [Scancode::D] }
 		state shift { "Sprint" [Scancode::LShift] }
+		trigger zoom_out { "Zoom Out" [Scancode::Minus] }
+		trigger zoom_in { "Zoom In" [Scancode::Equals] }
 		mouse mouse { "Mouse" [1.0] }
 	}
 }
@@ -24,6 +26,8 @@ pub struct PlayerController {
 	actions: PlayerActions,
 	move_speed: f32,
 	prev_angle_diff: f32,
+
+	next_foot_update: usize,
 }
 
 impl PlayerController {
@@ -35,6 +39,7 @@ impl PlayerController {
 			actions,
 			move_speed: 0.0,
 			prev_angle_diff: 0.0,
+			next_foot_update: 0,
 		}
 	}
 
@@ -46,6 +51,12 @@ impl PlayerController {
 
 			camera.yaw -= mouse.x * 0.5;
 			camera.pitch = (camera.pitch + mouse.y as f32 * 0.5).clamp(pitch_min, pitch_max);
+		}
+
+		if frame_state.active(self.actions.zoom_out) {
+			camera.zoom *= 1.2;
+		} else if frame_state.active(self.actions.zoom_in) {
+			camera.zoom /= 1.2;
 		}
 
 		let camera_orientation = Quat::from_yaw(camera.yaw);
@@ -86,16 +97,67 @@ impl PlayerController {
 		}
 
 		player.position += Quat::from_yaw(player.yaw).forward() * (self.move_speed / 60.0);
-
 		let ray = Ray {
 			position: player.position + Vec3::from_y(2.0),
 			direction: Vec3::from_y(-1.0)
 		};
 
-		let scene = scene.main_scene();
-		if let Some(hit_pos) = scene_raycast(&scene, &ray) {
+		let main_scene = scene.main_scene();
+		if let Some(hit_pos) = scene_raycast(&main_scene, &ray) {
 			player.position.y += (hit_pos.y - player.position.y) / 4.0;
 		}
+
+		self.update_feet(player, scene);
+
+		let feet_center = player.feet_positions.iter().sum::<Vec3>() / player.feet_positions.len() as f32;
+		let body_height = 1.5;
+		let body_target_pos = feet_center + Vec3::from_y(body_height);
+		player.body_position += (body_target_pos - player.body_position) * 0.3;
+
+		// if (feet_center-player.position).to_xz().length() > 1.0 {
+		// 	player.position += (feet_center - player.position) * 0.08;
+		// }
+	}
+
+	fn update_feet(&mut self, player: &mut Player, scene: &model::Scene) {
+		let player_ori = Quat::from_yaw(player.yaw);
+
+		let player_fwd = player_ori.forward();
+		let player_right = player_ori.right();
+
+		let feet_center = player.feet_positions.iter().sum::<Vec3>() / player.feet_positions.len() as f32;
+
+		let diff = player.position - feet_center;
+		if diff.length() < 1.5 {
+			return
+		}
+
+		let player_gait = 0.8;
+
+		let feet_offsets = [
+			-player_right * player_gait,
+			player_right * player_gait,
+		];
+
+		let foot_pos = &mut player.feet_positions[self.next_foot_update];
+		let foot_offset = feet_offsets[self.next_foot_update];
+
+		let target_pos = player.position + foot_offset;
+		let diff = target_pos - *foot_pos;
+
+		let ray = Ray {
+			position: target_pos + player_fwd*1.5 + Vec3::from_y(2.0),
+			direction: Vec3::from_y(-1.0)
+		};
+
+		let scene = scene.main_scene();
+		if let Some(hit_pos) = scene_raycast(&scene, &ray) {
+			if (hit_pos-feet_center).length() < 6.0 {
+				*foot_pos = hit_pos;
+			}
+		}
+
+		self.next_foot_update = (self.next_foot_update+1) % player.feet_positions.len();
 	}
 }
 

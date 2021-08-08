@@ -16,8 +16,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut engine = toybox::Engine::new("playbox")?;
 
-	dbg!(&engine.gfx.capabilities());
-
 	engine.gfx.add_shader_import("global", shaders::GLOBAL_COMMON);
 
 	let mut uniform_buffer = engine.gfx.new_buffer();
@@ -62,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		perf_view.update(&engine.instrumenter, engine.gfx.aspect());
 		debug_view.update(&debug_model);
-		player_view.update(&player);
+		player_view.update(&player, &mut blob_shadow_model);
 		scene_view.update(&scene, &mut blob_shadow_model);
 		blob_shadow_view.update(&blob_shadow_model, &scene);
 
@@ -110,7 +108,7 @@ fn build_uniforms(player: &model::Player, camera: &model::Camera, aspect: f32) -
 			Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
 				* Mat4::translate(Vec3::from_z(-camera.zoom))
 				* camera_orientation
-				* Mat4::translate(-player.position)
+				* Mat4::translate(-player.position-Vec3::from_y(2.0))
 		},
 
 		ui_projection_view: {
