@@ -5,8 +5,6 @@ use toybox::input::raw::Scancode;
 use crate::model::{self, Player, Camera};
 use crate::intersect::{Ray, scene_raycast};
 
-const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, -PI/16.0);
-
 
 toybox::declare_input_context! {
 	struct PlayerActions "Player Control" {
@@ -15,9 +13,6 @@ toybox::declare_input_context! {
 		state left { "Left" [Scancode::A] }
 		state right { "Right" [Scancode::D] }
 		state shift { "Sprint" [Scancode::LShift] }
-		trigger zoom_out { "Zoom Out" [Scancode::Minus] }
-		trigger zoom_in { "Zoom In" [Scancode::Equals] }
-		mouse mouse { "Mouse" [1.0] }
 	}
 }
 
@@ -43,21 +38,8 @@ impl PlayerController {
 		}
 	}
 
-	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &mut Camera, scene: &model::Scene) {
+	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &Camera, scene: &model::Scene) {
 		let frame_state = input.frame_state();
-
-		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {
-			let (pitch_min, pitch_max) = CAMERA_PITCH_LIMIT;
-
-			camera.yaw -= mouse.x * 0.5;
-			camera.pitch = (camera.pitch + mouse.y as f32 * 0.5).clamp(pitch_min, pitch_max);
-		}
-
-		if frame_state.active(self.actions.zoom_out) {
-			camera.zoom *= 1.2;
-		} else if frame_state.active(self.actions.zoom_in) {
-			camera.zoom /= 1.2;
-		}
 
 		let camera_orientation = Quat::from_yaw(camera.yaw);
 		let mut move_direction = Vec3::zero();
