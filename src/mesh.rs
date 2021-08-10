@@ -113,6 +113,19 @@ pub struct ColorMeshBuilder<'md> {
 	color: Color,
 }
 
+impl<'md> ColorMeshBuilder<'md> {
+	pub fn new(data: &'md mut MeshData<ColorVertex>) -> Self {
+		ColorMeshBuilder {
+			data,
+			color: Color::white(),
+		}
+	}
+
+	pub fn set_color(&mut self, color: impl Into<Color>) {
+		self.color = color.into();
+	}
+}
+
 impl<'md> PolyBuilder3D for ColorMeshBuilder<'md> {
 	// type OnPlane = GenericMeshBuilderOnPlane<'md, Self>;
 
@@ -131,7 +144,7 @@ impl<'md> PolyBuilder3D for ColorMeshBuilder<'md> {
 
 impl ColoredPolyBuilder for ColorMeshBuilder<'_> {
 	fn set_color(&mut self, color: impl Into<Color>) {
-		self.color = color.into();
+		self.set_color(color);
 	}
 }
 
@@ -219,12 +232,80 @@ impl ColoredPolyBuilder for ColorMeshBuilder<'_> {
 // impl<Builder> PolyBuilder3DExt for Builder
 // 	where Builder: PolyBuilder2D
 // {
-// 	fn cuboid(&mut self, center: Vec3, size: Vec3) {
+// 	// fn cuboid(&mut self, center: Vec3, size: Vec3) {
 
-// 	}
+// 	// }
 
-// 	fn cylinder(&mut self, center: Vec3, size: Vec3) {
+// 	// fn cylinder(&mut self, center: Vec3, size: Vec3) {
 
-// 	}
+// 	// }
 // }
+
+
+
+pub mod geom {
+	use super::*;
+
+	// pub struct Cuboid {
+	// 	basis: Mat3x4,
+	// }
+
+	// impl Cuboid {
+	// 	pub fn unit() -> Cuboid {
+	// 		Cuboid {
+	// 			basis: Mat3x4::identity(),
+	// 		}
+	// 	}
+
+
+	// 	pub fn build<MB: PolyBuilder3D>(&self, mb: &mut MB) {
+	// 		let verts = [
+
+	// 		];
+
+	// 		let indices = [
+			
+	// 		];
+
+	// 		mb.extend_3d(verts, indices);
+	// 	}
+	// }
+
+	pub struct Tetrahedron {
+		basis: Mat3x4,
+	}
+
+	impl Tetrahedron {
+		pub fn from_matrix(basis: Mat3x4) -> Tetrahedron {
+			Tetrahedron {basis}
+		}
+
+		pub fn unit() -> Tetrahedron {
+			Tetrahedron::from_matrix(Mat3x4::identity())
+		}
+
+
+		pub fn build<MB: PolyBuilder3D>(&self, mb: &mut MB) {
+			let [ux, uy, uz, translation] = self.basis.columns();
+
+			let verts = [
+				translation + ux,
+				translation + ux*(TAU/3.0).cos() + uz*(TAU/3.0).sin(),
+				translation + ux*(TAU/3.0).cos() - uz*(TAU/3.0).sin(),
+				translation + uy,
+			];
+
+			let indices = [
+				0, 1, 2,
+
+				3, 0, 1,
+				3, 1, 2,
+				3, 2, 0,
+			];
+
+			mb.extend_3d(verts, indices);
+		}
+	}
+}
+
 

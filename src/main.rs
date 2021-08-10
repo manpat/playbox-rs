@@ -33,6 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut debug_view = views::DebugView::new(&engine.gfx)?;
 	let mut scene_view = views::SceneView::new(&engine.gfx, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&engine.gfx)?;
+	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&engine.gfx)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input);
@@ -65,6 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		player_view.update(&player, &mut blob_shadow_model);
 		scene_view.update(&scene, &mut blob_shadow_model);
 		blob_shadow_view.update(&blob_shadow_model, &scene);
+		mesh_builder_test_view.update();
 
 		engine.gfx.set_clear_color(Color::grey(0.1));
 		engine.gfx.clear(gfx::ClearMode::ALL);
@@ -77,11 +79,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 		scene_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);
 		blob_shadow_view.draw(&mut view_ctx);
+		mesh_builder_test_view.draw(&mut view_ctx);
 
 		if debug_model.active {
 			perf_view.draw(&mut view_ctx);
 			debug_view.draw(&mut view_ctx);
 		}
+			
+		mesh_builder_test_view.draw_2d(&mut view_ctx);
 
 		engine.end_frame();
 	}
