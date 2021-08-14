@@ -60,6 +60,11 @@ impl<V: gfx::Vertex> MeshData<V> {
 		}
 	}
 
+	pub fn clear(&mut self) {
+		self.vertices.clear();
+		self.indices.clear();
+	}
+
 	pub fn extend(&mut self, vs: impl IntoIterator<Item=V>, is: impl IntoIterator<Item=u16>) {
 		let index_start = self.vertices.len() as u16;
 		self.vertices.extend(vs);
@@ -71,6 +76,7 @@ impl<V: gfx::Vertex> MeshData<V> {
 // Traits
 pub trait PolyBuilder2D {
 	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>);
+	fn build(&mut self, geom: impl BuildableGeometry2D) where Self: Sized { geom.build(self) }
 }
 
 pub trait PolyBuilder3D {
@@ -78,6 +84,8 @@ pub trait PolyBuilder3D {
 
 	fn extend_3d(&mut self, vs: impl IntoIterator<Item=Vec3>, is: impl IntoIterator<Item=u16>);
 	// fn on_plane(&mut self, uvw: Mat2x3) -> Self::OnPlane;
+
+	fn build(&mut self, geom: impl BuildableGeometry3D) where Self: Sized { geom.build(self) }
 }
 
 pub trait ColoredPolyBuilder {
@@ -86,25 +94,48 @@ pub trait ColoredPolyBuilder {
 
 
 // Generic Plane Builder
-// pub struct GenericMeshBuilderOnPlane<'mb, MB: PolyBuilder3D> {
-// 	builder_3d: &'mb mut MB,
-// 	uvw: Mat2x3,
-// }
+pub struct GenericMeshBuilderOnPlane<'mb, MB: PolyBuilder3D> {
+	builder_3d: &'mb mut MB,
+	uvw: Mat3,
+}
 
-// impl<MB: PolyBuilder3D> PolyBuilder2D for GenericMeshBuilderOnPlane<'_, MB> {
-// 	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
-// 		let vertices_3d = vs.into_iter().map(|v2| self.uvw * v2);
-// 		self.builder_3d.extend_3d(vertices_3d, is);
-// 	}
-// }
 
-// impl<B> ColoredPolyBuilder for GenericMeshBuilderOnPlane<'_, B>
-// 	where B: PolyBuilder3D + ColoredPolyBuilder
-// {
-// 	fn set_color(&mut self, color: impl Into<Color>) {
-// 		self.builder_3d.set_color(color);
-// 	}
-// }
+impl<'mb, MB: PolyBuilder3D> GenericMeshBuilderOnPlane<'mb, MB> {
+	pub fn new(builder_3d: &'mb mut MB, uvw: Mat3) -> Self {
+		// let (ix, iy, iz) = i.to_tuple();
+		// let (jx, jy, jz) = j.to_tuple();
+		// let (tx, ty, tz) = origin.to_tuple();
+
+		// let u = Vec3::new(ix, jx, tx);
+		// let v = Vec3::new(iy, jy, ty);
+		// let w = Vec3::new(iz, jz, tz);
+
+		GenericMeshBuilderOnPlane {
+			builder_3d,
+			uvw,
+		}
+	}
+}
+
+impl<MB: PolyBuilder3D> PolyBuilder2D for GenericMeshBuilderOnPlane<'_, MB> {
+	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
+		let uvw = self.uvw;
+		
+		let vertices_3d = vs.into_iter().map(move |v2| {
+			uvw * v2.extend(1.0)
+		});
+
+		self.builder_3d.extend_3d(vertices_3d, is);
+	}
+}
+
+impl<MB> ColoredPolyBuilder for GenericMeshBuilderOnPlane<'_, MB>
+	where MB: PolyBuilder3D + ColoredPolyBuilder
+{
+	fn set_color(&mut self, color: impl Into<Color>) {
+		self.builder_3d.set_color(color);
+	}
+}
 
 
 // ColorVertex
@@ -151,22 +182,36 @@ impl ColoredPolyBuilder for ColorMeshBuilder<'_> {
 
 
 // ColorVertex2D
-// pub struct Color2DMeshBuilder<'md> {
-// 	data: &'md mut MeshData<ColorVertex2D>,
-// 	color: Color,
-// }
+pub struct ColorMeshBuilder2D<'md> {
+	data: &'md mut MeshData<ColorVertex2D>,
+	color: Color,
+}
 
-// impl<'md> PolyBuilder2D for Color2DMeshBuilder<'md> {
-// 	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
-// 		self.data.extend(vs.into_iter().map(|v| ColorVertex2D::new(v, self.color)), is);
-// 	}
-// }
+impl<'md> ColorMeshBuilder2D<'md> {
+	pub fn new(data: &'md mut MeshData<ColorVertex2D>) -> Self {
+		ColorMeshBuilder2D {
+			data,
+			color: Color::white(),
+		}
+	}
 
-// impl<'md> ColoredPolyBuilder for Color2DMeshBuilder<'md> {
-// 	fn set_color(&mut self, color: impl Into<Color>) {
-// 		self.color = color.into();
-// 	}
-// }
+	pub fn set_color(&mut self, color: impl Into<Color>) {
+		self.color = color.into();
+	}
+}
+
+impl<'md> PolyBuilder2D for ColorMeshBuilder2D<'md> {
+	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
+		let color = self.color.into();
+		self.data.extend(vs.into_iter().map(|v| ColorVertex2D::new(v, color)), is);
+	}
+}
+
+impl<'md> ColoredPolyBuilder for ColorMeshBuilder2D<'md> {
+	fn set_color(&mut self, color: impl Into<Color>) {
+		self.set_color(color);
+	}
+}
 
 
 // Generic
@@ -242,6 +287,28 @@ impl ColoredPolyBuilder for ColorMeshBuilder<'_> {
 // }
 
 
+pub trait BuildableGeometry3D {
+	fn build<MB: PolyBuilder3D>(&self, mb: &mut MB);
+}
+
+pub trait BuildableGeometry2D {
+	fn build<MB: PolyBuilder2D>(&self, mb: &mut MB);
+}
+
+
+impl<G: BuildableGeometry2D> BuildableGeometry2D for &G {
+	fn build<MB: PolyBuilder2D>(&self, mb: &mut MB) {
+		(*self).build(mb);
+	}
+}
+
+impl<G: BuildableGeometry3D> BuildableGeometry3D for &G {
+	fn build<MB: PolyBuilder3D>(&self, mb: &mut MB) {
+		(*self).build(mb);
+	}
+}
+
+
 
 pub mod geom {
 	use super::*;
@@ -271,6 +338,44 @@ pub mod geom {
 	// 	}
 	// }
 
+
+	pub struct Quad {
+		basis: Mat2x3,
+	}
+
+	impl Quad {
+		pub fn from_matrix(basis: Mat2x3) -> Quad {
+			Quad {basis}
+		}
+
+		pub fn unit() -> Quad {
+			Quad::from_matrix(Mat2x3::identity())
+		}
+	}
+
+	impl BuildableGeometry2D for Quad {
+		fn build<MB: PolyBuilder2D>(&self, mb: &mut MB) {
+			let [ux, uy, translation] = self.basis.columns();
+			let (hx, hy) = (ux/2.0, uy/2.0);
+
+			let verts = [
+				translation - hx - hy,
+				translation - hx + hy,
+				translation + hx + hy,
+				translation + hx - hy,
+			];
+
+			let indices = [
+				0, 1, 2,
+				0, 2, 3,
+			];
+
+			mb.extend_2d(verts, indices);
+		}
+	}
+
+
+
 	pub struct Tetrahedron {
 		basis: Mat3x4,
 	}
@@ -283,9 +388,10 @@ pub mod geom {
 		pub fn unit() -> Tetrahedron {
 			Tetrahedron::from_matrix(Mat3x4::identity())
 		}
+	}
 
-
-		pub fn build<MB: PolyBuilder3D>(&self, mb: &mut MB) {
+	impl BuildableGeometry3D for Tetrahedron {
+		fn build<MB: PolyBuilder3D>(&self, mb: &mut MB) {
 			let [ux, uy, uz, translation] = self.basis.columns();
 
 			let verts = [
