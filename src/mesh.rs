@@ -80,11 +80,7 @@ pub trait PolyBuilder2D {
 }
 
 pub trait PolyBuilder3D {
-	// type OnPlane : PolyBuilder2D;
-
 	fn extend_3d(&mut self, vs: impl IntoIterator<Item=Vec3>, is: impl IntoIterator<Item=u16>);
-	// fn on_plane(&mut self, uvw: Mat2x3) -> Self::OnPlane;
-
 	fn build(&mut self, geom: impl BuildableGeometry3D) where Self: Sized { geom.build(self) }
 }
 
@@ -102,14 +98,6 @@ pub struct GenericMeshBuilderOnPlane<'mb, MB: PolyBuilder3D> {
 
 impl<'mb, MB: PolyBuilder3D> GenericMeshBuilderOnPlane<'mb, MB> {
 	pub fn new(builder_3d: &'mb mut MB, uvw: Mat3) -> Self {
-		// let (ix, iy, iz) = i.to_tuple();
-		// let (jx, jy, jz) = j.to_tuple();
-		// let (tx, ty, tz) = origin.to_tuple();
-
-		// let u = Vec3::new(ix, jx, tx);
-		// let v = Vec3::new(iy, jy, ty);
-		// let w = Vec3::new(iz, jz, tz);
-
 		GenericMeshBuilderOnPlane {
 			builder_3d,
 			uvw,
@@ -155,22 +143,17 @@ impl<'md> ColorMeshBuilder<'md> {
 	pub fn set_color(&mut self, color: impl Into<Color>) {
 		self.color = color.into();
 	}
+
+	pub fn on_plane(&mut self, uvw: Mat3) -> GenericMeshBuilderOnPlane<'_, Self> {
+		GenericMeshBuilderOnPlane::new(self, uvw)
+	}
 }
 
-impl<'md> PolyBuilder3D for ColorMeshBuilder<'md> {
-	// type OnPlane = GenericMeshBuilderOnPlane<'md, Self>;
-
+impl PolyBuilder3D for ColorMeshBuilder<'_> {
 	fn extend_3d(&mut self, vs: impl IntoIterator<Item=Vec3>, is: impl IntoIterator<Item=u16>) {
 		let color = self.color.into();
 		self.data.extend(vs.into_iter().map(|v| ColorVertex::new(v, color)), is);
 	}
-
-	// fn on_plane(&mut self, uvw: Mat2x3) -> Self::OnPlane {
-	// 	Self::OnPlane {
-	// 		builder_3d: self,
-	// 		uvw,
-	// 	}
-	// }
 }
 
 impl ColoredPolyBuilder for ColorMeshBuilder<'_> {
@@ -200,14 +183,14 @@ impl<'md> ColorMeshBuilder2D<'md> {
 	}
 }
 
-impl<'md> PolyBuilder2D for ColorMeshBuilder2D<'md> {
+impl PolyBuilder2D for ColorMeshBuilder2D<'_> {
 	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
 		let color = self.color.into();
 		self.data.extend(vs.into_iter().map(|v| ColorVertex2D::new(v, color)), is);
 	}
 }
 
-impl<'md> ColoredPolyBuilder for ColorMeshBuilder2D<'md> {
+impl ColoredPolyBuilder for ColorMeshBuilder2D<'_> {
 	fn set_color(&mut self, color: impl Into<Color>) {
 		self.set_color(color);
 	}
@@ -238,53 +221,6 @@ impl<'md> ColoredPolyBuilder for ColorMeshBuilder2D<'md> {
 
 
 // Geo
-
-// pub trait PolyBuilder2DExt {
-// 	fn circle(&mut self, center: Vec2, radius: f32);
-// 	fn quad(&mut self, center: Vec2, size: Vec2);
-// 	fn polygon(&mut self, center: Vec2, num_edges: usize, radius: f32, rotation: f32);
-// 	fn wedge(&mut self, center: Vec2, num_edges: usize, radius: f32, rotation: f32);
-// }
-
-
-// impl<Builder> PolyBuilder2DExt for Builder
-// 	where Builder: PolyBuilder2D
-// {
-// 	fn circle(&mut self, center: Vec2, radius: f32) {
-
-// 	}
-
-// 	fn quad(&mut self, center: Vec2, size: Vec2) {
-
-// 	}
-
-// 	fn polygon(&mut self, center: Vec2, num_edges: usize, radius: f32, rotation: f32) {
-
-// 	}
-
-// 	fn wedge(&mut self, center: Vec2, num_edges: usize, radius: f32, rotation: f32) {
-
-// 	}
-// }
-
-
-// pub trait PolyBuilder3DExt {
-// 	fn cuboid(&mut self, center: Vec3, size: Vec3);
-// 	fn cylinder(&mut self, center: Vec3, size: Vec3);
-// }
-
-
-// impl<Builder> PolyBuilder3DExt for Builder
-// 	where Builder: PolyBuilder2D
-// {
-// 	// fn cuboid(&mut self, center: Vec3, size: Vec3) {
-
-// 	// }
-
-// 	// fn cylinder(&mut self, center: Vec3, size: Vec3) {
-
-// 	// }
-// }
 
 
 pub trait BuildableGeometry3D {

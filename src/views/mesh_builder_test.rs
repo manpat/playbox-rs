@@ -68,7 +68,7 @@ impl MeshBuilderTestView {
 				Vec3::new(2.0, 0.05, 5.0),
 			]);
 
-			let mut pmb = mesh::GenericMeshBuilderOnPlane::new(&mut mb, plane);
+			let mut pmb = mb.on_plane(plane);
 			pmb.set_color(Color::rgb(0.5, 0.5, 0.9));
 			pmb.build(geom::Quad::unit());
 			pmb.build(geom::Quad::from_matrix(Mat2x3::rotate_translate(
@@ -82,7 +82,7 @@ impl MeshBuilderTestView {
 				Vec3::new(2.0, 0.2, 5.0),
 			]);
 
-			let mut pmb = mesh::GenericMeshBuilderOnPlane::new(&mut mb, plane);
+			let mut pmb = mb.on_plane(plane);
 			pmb.set_color(Color::rgb(0.5, 0.8, 0.9));
 			pmb.build(geom::Quad::unit());
 			pmb.build(geom::Quad::from_matrix(Mat2x3::rotate_translate(
