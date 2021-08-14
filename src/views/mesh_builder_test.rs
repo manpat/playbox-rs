@@ -70,7 +70,7 @@ impl MeshBuilderTestView {
 
 			let mut pmb = mb.on_plane(plane);
 			pmb.set_color(Color::rgb(0.5, 0.5, 0.9));
-			pmb.build(geom::Quad::unit());
+			pmb.build(geom::Polygon::unit(6));
 			pmb.build(geom::Quad::from_matrix(Mat2x3::rotate_translate(
 				TAU * self.time/5.0,
 				3.0 * Vec2::from_angle(TAU * self.time / 4.0)
@@ -84,7 +84,7 @@ impl MeshBuilderTestView {
 
 			let mut pmb = mb.on_plane(plane);
 			pmb.set_color(Color::rgb(0.5, 0.8, 0.9));
-			pmb.build(geom::Quad::unit());
+			pmb.build(geom::Polygon::unit(5));
 			pmb.build(geom::Quad::from_matrix(Mat2x3::rotate_translate(
 				-TAU * self.time/5.0,
 				3.0 * Vec2::from_angle(TAU * self.time / 4.0)
@@ -94,7 +94,7 @@ impl MeshBuilderTestView {
 		{
 			let mut mb = mesh::ColorMeshBuilder2D::new(&mut self.mesh_data_2d);
 			mb.set_color(Color::rgb(0.6, 1.0, 0.3));
-			// mb.build(geom::Quad::unit());
+			mb.build(geom::Polygon::unit(7));
 			mb.build(geom::Quad::from_matrix(Mat2x3::scale_translate(Vec2::splat(0.2), Vec2::new(1.0, 0.2))));
 		}
 

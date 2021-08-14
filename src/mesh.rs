@@ -77,11 +77,27 @@ impl<V: gfx::Vertex> MeshData<V> {
 pub trait PolyBuilder2D {
 	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>);
 	fn build(&mut self, geom: impl BuildableGeometry2D) where Self: Sized { geom.build(self) }
+
+	fn extend_2d_fan(&mut self, num_vertices: u32, vs: impl IntoIterator<Item=Vec2>) {
+		if num_vertices < 3 {
+			return
+		}
+
+		self.extend_2d(vs, (0..num_vertices as u16-2).flat_map(|i| [0, i+1, i+2]));
+	}
 }
 
 pub trait PolyBuilder3D {
 	fn extend_3d(&mut self, vs: impl IntoIterator<Item=Vec3>, is: impl IntoIterator<Item=u16>);
 	fn build(&mut self, geom: impl BuildableGeometry3D) where Self: Sized { geom.build(self) }
+
+	fn extend_3d_fan(&mut self, num_vertices: u32, vs: impl IntoIterator<Item=Vec3>) {
+		if num_vertices < 3 {
+			return
+		}
+
+		self.extend_3d(vs, (0..num_vertices as u16-2).flat_map(|i| [0, i+1, i+2]));
+	}
 }
 
 pub trait ColoredPolyBuilder {
@@ -294,19 +310,48 @@ pub mod geom {
 			let [ux, uy, translation] = self.basis.columns();
 			let (hx, hy) = (ux/2.0, uy/2.0);
 
-			let verts = [
+			mb.extend_2d_fan(4, [
 				translation - hx - hy,
 				translation - hx + hy,
 				translation + hx + hy,
 				translation + hx - hy,
-			];
+			]);
+		}
+	}
 
-			let indices = [
-				0, 1, 2,
-				0, 2, 3,
-			];
 
-			mb.extend_2d(verts, indices);
+	pub struct Polygon {
+		basis: Mat2x3,
+		num_faces: u32,
+	}
+
+	impl Polygon {
+		pub fn from_matrix(num_faces: u32, basis: Mat2x3) -> Polygon {
+			Polygon {basis, num_faces}
+		}
+
+		pub fn unit(num_faces: u32) -> Polygon {
+			Polygon::from_matrix(num_faces, Mat2x3::identity())
+		}
+	}
+
+	impl BuildableGeometry2D for Polygon {
+		fn build<MB: PolyBuilder2D>(&self, mb: &mut MB) {
+			if self.num_faces < 3 {
+				return
+			}
+
+			let [ux, uy, translation] = self.basis.columns();
+			let uxy = Mat2::from_columns([ux/2.0, uy/2.0]);
+
+			let angle_increment = TAU / (self.num_faces as f32);
+			let vertices = (0..self.num_faces)
+				.map(|i| {
+					let angle = angle_increment * i as f32;
+					translation + uxy * Vec2::from_angle(angle)
+				});
+
+			mb.extend_2d_fan(self.num_faces, vertices);
 		}
 	}
 
