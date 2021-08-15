@@ -7,7 +7,6 @@ mod views;
 mod model;
 mod controller;
 mod shaders;
-mod mesh;
 
 mod intersect;
 

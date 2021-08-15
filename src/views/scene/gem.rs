@@ -1,8 +1,8 @@
 use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
+use gfx::mesh::{Mesh, MeshData};
 
 use crate::model;
-use crate::mesh::{Mesh, MeshData};
 
 use super::build_entity_transformed;
 

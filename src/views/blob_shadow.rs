@@ -1,6 +1,6 @@
 pub use toybox::prelude::*;
+use gfx::mesh::Mesh;
 use crate::model;
-use crate::mesh::Mesh;
 
 pub struct BlobShadowView {
 	shader: gfx::Shader,

@@ -1,8 +1,8 @@
 use toybox::prelude::*;
 use gfx::vertex::{ColorVertex, ColorVertex2D};
+use gfx::mesh::*;
 
 use crate::model;
-use crate::mesh::{self, geom, Mesh, MeshData};
 
 pub struct MeshBuilderTestView {
 	shader_3d: gfx::Shader,
@@ -48,15 +48,11 @@ impl MeshBuilderTestView {
 	}
 
 	pub fn update(&mut self) {
-		use crate::mesh::PolyBuilder2D;
-		use crate::mesh::PolyBuilder3D;
-		use crate::mesh::ColoredPolyBuilder;
-
 		self.mesh_data_2d.clear();
 		self.mesh_data_3d.clear();
 
 		{
-			let mut mb = mesh::ColorMeshBuilder::new(&mut self.mesh_data_3d);
+			let mut mb = ColorMeshBuilder::new(&mut self.mesh_data_3d);
 			mb.set_color(Color::rgb(1.0, 0.5, 0.2));
 
 			mb.build(geom::Tetrahedron::unit());
@@ -92,9 +88,9 @@ impl MeshBuilderTestView {
 		}
 
 		{
-			let mut mb = mesh::ColorMeshBuilder2D::new(&mut self.mesh_data_2d);
+			let mut mb = ColorMeshBuilder2D::new(&mut self.mesh_data_2d);
 			mb.set_color(Color::rgb(0.6, 1.0, 0.3));
-			mb.build(geom::Polygon::unit(7));
+			// mb.build(geom::Polygon::unit(7));
 			mb.build(geom::Quad::from_matrix(Mat2x3::scale_translate(Vec2::splat(0.2), Vec2::new(1.0, 0.2))));
 		}
 
