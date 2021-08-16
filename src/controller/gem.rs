@@ -17,7 +17,7 @@ impl GemController {
 		})
 	}
 
-	pub fn update(&mut self, audio: &mut audio::AudioSystem, player: &model::Player, scene: &mut model::Scene) {
+	pub fn update(&mut self, audio: &mut audio::AudioSystem, scene: &mut model::Scene, player: &model::Player) {
 		let ply_pos = player.position;
 
 		for gem in scene.gems.iter_mut() {

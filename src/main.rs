@@ -53,16 +53,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 			break 'main
 		}
 
-		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene);
-		camera_controller.update(&mut engine.input, &mut camera, &player);
-		player_controller.update(&mut engine.input, &mut player, &camera, &scene);
-		gem_controller.update(&mut engine.audio, &player, &mut scene);
-
 		blob_shadow_model.clear();
+
+		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene);
+		camera_controller.update(&engine.input, &mut camera, &player);
+		player_controller.update(&engine.input, &mut player, &mut blob_shadow_model, &camera, &scene);
+		gem_controller.update(&mut engine.audio, &mut scene, &player);
 
 		perf_view.update(&engine.instrumenter, engine.gfx.aspect());
 		debug_view.update(&debug_model);
-		player_view.update(&player, &mut blob_shadow_model);
+		player_view.update(&player);
 		scene_view.update(&scene, &mut blob_shadow_model);
 		blob_shadow_view.update(&blob_shadow_model, &scene);
 		mesh_builder_test_view.update();

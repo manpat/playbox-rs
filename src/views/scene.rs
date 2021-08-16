@@ -24,7 +24,7 @@ impl SceneView {
 		let main_scene = scene.main_scene();
 
 		for entity in main_scene.entities().filter(|e| !e.name.contains('_')) {
-			build_entity_transformed(&mut mesh_data.vertices, &mut mesh_data.indices, entity, entity.transform());
+			build_entity_transformed(&mut mesh_data, entity, entity.transform());
 		}
 
 		let mut mesh = Mesh::new(gfx);
@@ -54,24 +54,20 @@ impl SceneView {
 
 
 
-fn build_entity_transformed(vertices: &mut Vec<ColorVertex>, indices: &mut Vec<u16>,
+fn build_entity_transformed(mesh_data: &mut MeshData<ColorVertex>,
 	entity: toy::EntityRef<'_>, transform: Mat3x4)
 {
-	let mesh_data = entity.mesh_data().unwrap();
+	let ent_mesh_data = entity.mesh_data().unwrap();
+	let color_data = ent_mesh_data.color_data(None).unwrap();
 
-	let color_data = mesh_data.color_data(None).unwrap();
-
-	let ent_vertices = mesh_data.positions.iter()
+	let ent_vertices = ent_mesh_data.positions.iter()
 		.zip(&color_data.data)
 		.map(move |(&p, &col)| {
 			let p = transform * p;
 			ColorVertex::new(p, col.to_vec3())
 		});
 
-	let vertex_base = vertices.len() as u16;
-
-	vertices.extend(ent_vertices);
-	indices.extend(mesh_data.indices.iter().map(|&i| vertex_base + i));
+	mesh_data.extend(ent_vertices, ent_mesh_data.indices.iter().cloned());
 }
 
 

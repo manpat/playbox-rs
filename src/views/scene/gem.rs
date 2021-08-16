@@ -30,7 +30,7 @@ impl GemView {
 		let gem_prototype = scene.source_data.find_entity("GEM_prototype").unwrap();
 
 		let mut mesh_data = MeshData::new();
-		build_entity_transformed(&mut mesh_data.vertices, &mut mesh_data.indices, gem_prototype, Mat3x4::identity());
+		build_entity_transformed(&mut mesh_data, gem_prototype, Mat3x4::identity());
 
 		let mut mesh = Mesh::new(gfx);
 		mesh.upload(&mesh_data);

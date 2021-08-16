@@ -31,7 +31,7 @@ impl CameraController {
 		}
 	}
 
-	pub fn update(&mut self, input: &mut InputSystem, camera: &mut Camera, player: &Player) {
+	pub fn update(&mut self, input: &InputSystem, camera: &mut Camera, player: &Player) {
 		let frame_state = input.frame_state();
 
 		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {

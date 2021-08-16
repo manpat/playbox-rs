@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use toybox::input::InputSystem;
 use toybox::input::raw::Scancode;
 
-use crate::model::{self, Player, Camera};
+use crate::model::{self, Player, Camera, BlobShadowModel};
 use crate::intersect::{Ray, scene_raycast};
 
 
@@ -38,7 +38,7 @@ impl PlayerController {
 		}
 	}
 
-	pub fn update(&mut self, input: &mut InputSystem, player: &mut Player, camera: &Camera, scene: &model::Scene) {
+	pub fn update(&mut self, input: &InputSystem, player: &mut Player, blob_shadows: &mut BlobShadowModel, camera: &Camera, scene: &model::Scene) {
 		let frame_state = input.frame_state();
 
 		let camera_orientation = Quat::from_yaw(camera.yaw);
@@ -95,6 +95,8 @@ impl PlayerController {
 		let body_height = 1.5;
 		let body_target_pos = feet_center + Vec3::from_y(body_height);
 		player.body_position += (body_target_pos - player.body_position) * 0.3;
+		
+		blob_shadows.add(player.body_position, 2.0);
 
 		// if (feet_center-player.position).to_xz().length() > 1.0 {
 		// 	player.position += (feet_center - player.position) * 0.08;
@@ -125,8 +127,6 @@ impl PlayerController {
 		let foot_offset = feet_offsets[self.next_foot_update];
 
 		let target_pos = player.position + foot_offset;
-		let diff = target_pos - *foot_pos;
-
 		let ray = Ray {
 			position: target_pos + player_fwd*1.5 + Vec3::from_y(2.0),
 			direction: Vec3::from_y(-1.0)

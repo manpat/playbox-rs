@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
 use gfx::mesh::*;
 
-use crate::model::{Player, BlobShadowModel};
+use crate::model::Player;
 
 pub struct PlayerView {
 	shader: gfx::Shader,
@@ -33,7 +33,7 @@ impl PlayerView {
 	}
 
 
-	pub fn update(&mut self, player: &Player, blob_shadows: &mut BlobShadowModel) {
+	pub fn update(&mut self, player: &Player) {
 		let body_transform = Mat3x4::rotate_y_translate(player.yaw, player.body_position);
 
 		let foot_size = 0.7;
@@ -75,8 +75,6 @@ impl PlayerView {
 		self.player_vel *= 0.92;
 		self.player_vel += position_diff * 0.05;
 		self.player_hat_pos += self.player_vel;
-
-		blob_shadows.add(player.body_position, 2.0);
 	}
 
 
