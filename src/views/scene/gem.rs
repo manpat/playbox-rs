@@ -35,7 +35,7 @@ impl GemView {
 		let mut mesh = Mesh::new(gfx);
 		mesh.upload(&mesh_data);
 
-		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Dynamic);
+		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Stream);
 
 		let gem_view_data = (0..scene.gems.len())
 			.map(|idx| GemViewData {

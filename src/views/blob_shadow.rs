@@ -23,7 +23,7 @@ impl BlobShadowView {
 			.flat_map(|idx| [0, idx, (idx+1) % 36])
 			.collect();
 
-		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Dynamic);
+		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Stream);
 
 		let mut mesh = Mesh::new(gfx);
 		mesh.upload_separate(&vertices, &indices);
