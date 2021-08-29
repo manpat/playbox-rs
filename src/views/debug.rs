@@ -19,8 +19,8 @@ impl DebugView {
 
 		let vao = gfx.new_vao();
 
-		let vertex_buffer = gfx.new_buffer::<ColorVertex2D>();
-		let mut index_buffer = gfx.new_buffer::<u16>();
+		let vertex_buffer = gfx.new_buffer::<ColorVertex2D>(gfx::BufferUsage::Dynamic);
+		let mut index_buffer = gfx.new_buffer::<u16>(gfx::BufferUsage::Static);
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);
@@ -30,7 +30,7 @@ impl DebugView {
 			0, 2, 3,
 		];
 
-		index_buffer.upload(&indices, gfx::BufferUsage::Static);
+		index_buffer.upload(&indices);
 
 		Ok(DebugView {
 			shader,
@@ -56,7 +56,7 @@ impl DebugView {
 			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.02, 0.02), Vec3::new(1.0, 1.0, 1.0)),
 		];
 
-		self.vertex_buffer.upload(&vertices, gfx::BufferUsage::Dynamic);
+		self.vertex_buffer.upload(&vertices);
 	}
 
 

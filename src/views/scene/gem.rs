@@ -35,7 +35,7 @@ impl GemView {
 		let mut mesh = Mesh::new(gfx);
 		mesh.upload(&mesh_data);
 
-		let instance_buffer = gfx.new_buffer::<Mat3x4>();
+		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Dynamic);
 
 		let gem_view_data = (0..scene.gems.len())
 			.map(|idx| GemViewData {
@@ -82,7 +82,7 @@ impl GemView {
 			.collect();
 
 		if !instances.is_empty() {
-			self.instance_buffer.upload(&instances, gfx::BufferUsage::Dynamic);
+			self.instance_buffer.upload(&instances);
 		}
 
 		for inst in instances.iter() {

@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	engine.gfx.add_shader_import("global", shaders::GLOBAL_COMMON);
 
-	let mut uniform_buffer = engine.gfx.new_buffer();
+	let mut uniform_buffer = engine.gfx.new_buffer(gfx::BufferUsage::Stream);
 	engine.gfx.bind_uniform_buffer(0, uniform_buffer);
 
 	let mut player = model::Player::new();
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		engine.gfx.clear(gfx::ClearMode::ALL);
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
-		uniform_buffer.upload(&[uniforms], gfx::BufferUsage::Stream);
+		uniform_buffer.upload(&[uniforms]);
 
 		let mut view_ctx = views::ViewContext::new(&engine.gfx, &mut engine.instrumenter);
 
