@@ -4,6 +4,7 @@ use crate::model::{self, scene::GemState};
 
 pub struct GemController {
 	chime_sound: audio::SoundAssetID,
+	gem_sound_bus: audio::BusID,
 }
 
 
@@ -13,20 +14,24 @@ impl GemController {
 			chime_sound: {
 				let source = audio::FileStream::from_vorbis_file("assets/chime.ogg")?;
 				audio.register_file_stream(source)
-			}
+			},
+
+			gem_sound_bus: {
+				let bus = audio.new_bus("Gems");
+				audio.get_bus_mut(bus).unwrap().set_gain(0.5);
+				bus
+			},
 		})
 	}
 
 	pub fn update(&mut self, audio: &mut audio::AudioSystem, scene: &mut model::Scene, player: &model::Player) {
-		let ply_pos = player.position;
-
 		for gem in scene.gems.iter_mut() {
 			match gem.state {
 				GemState::Idle => {
-					let dist = (gem.position - ply_pos).length();
+					let dist = (gem.position - player.position).length();
 					if dist < 2.5 {
 						gem.state = GemState::Collecting(0.0);
-						audio.play_one_shot(self.chime_sound);
+						audio.start_sound(self.gem_sound_bus, self.chime_sound);
 					}
 				}
 

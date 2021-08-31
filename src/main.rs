@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&engine.gfx)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
-	let mut player_controller = controller::PlayerController::new(&mut engine.input);
+	let mut player_controller = controller::PlayerController::new(&mut engine.input, &mut engine.audio);
 	let mut camera_controller = controller::CameraController::new(&mut engine.input);
 	let mut gem_controller = controller::GemController::new(&mut engine.audio)?;
 	let debug_controller = controller::DebugController::new(&mut engine.input);
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene);
 		camera_controller.update(&engine.input, &mut camera, &player);
-		player_controller.update(&engine.input, &mut player, &mut blob_shadow_model, &camera, &scene);
+		player_controller.update(&engine.input, &mut engine.audio, &mut player, &mut blob_shadow_model, &camera, &scene);
 		gem_controller.update(&mut engine.audio, &mut scene, &player);
 
 		perf_view.update(&engine.instrumenter, engine.gfx.aspect());

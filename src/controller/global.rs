@@ -23,6 +23,8 @@ pub struct GlobalController {
 	static_ogg_sound_id: SoundAssetID,
 	file_ogg_sound_id: SoundAssetID,
 
+	soundbus: audio::BusID,
+
 	should_quit: bool,
 	wireframe_enabled: bool,
 }
@@ -95,6 +97,15 @@ impl GlobalController {
 		};
 
 
+		let soundbus_bottom = engine.audio.new_bus("Global Bottom");
+		let soundbus_top = engine.audio.new_bus("Global Top");
+
+		engine.audio.get_bus_mut(soundbus_top).unwrap()
+			.set_gain(0.1);
+
+		engine.audio.get_bus_mut(soundbus_bottom).unwrap()
+			.set_send_bus(soundbus_top);
+
 		Ok(GlobalController {
 			actions,
 
@@ -103,37 +114,41 @@ impl GlobalController {
 			static_ogg_sound_id,
 			file_ogg_sound_id,
 
+			soundbus: soundbus_bottom,
+
 			should_quit: false,
 			wireframe_enabled: false,
 		})
 	}
 
 	pub fn update(&mut self, engine: &mut toybox::Engine) {
-		if engine.input.frame_state().active(self.actions.quit) {
+		let input_state = engine.input.frame_state();
+		let bus = engine.audio.get_bus_mut(self.soundbus).unwrap();
+
+		if input_state.active(self.actions.quit) {
 			self.should_quit = true
 		}
 
-		if engine.input.frame_state().active(self.actions.toggle_wireframe) {
+		if input_state.active(self.actions.toggle_wireframe) {
 			self.wireframe_enabled = !self.wireframe_enabled;
 			engine.gfx.set_wireframe(self.wireframe_enabled);
 		}
 
-		if engine.input.frame_state().active(self.actions.play_sound) {
-			engine.audio.play_one_shot(self.pluck_sound_id);
+		if input_state.active(self.actions.play_sound) {
+			bus.start_sound(self.pluck_sound_id);
 		}
 
-		if engine.input.frame_state().active(self.actions.play_stereo_sound) {
-			engine.audio.play_one_shot(self.stereo_sound_id);
+		if input_state.active(self.actions.play_stereo_sound) {
+			bus.start_sound(self.stereo_sound_id);
 		}
 
-		if engine.input.frame_state().active(self.actions.play_static_stream_sound) {
-			engine.audio.play_one_shot(self.static_ogg_sound_id);
+		if input_state.active(self.actions.play_static_stream_sound) {
+			bus.start_sound(self.static_ogg_sound_id);
 		}
 
-		if engine.input.frame_state().active(self.actions.play_file_stream_sound) {
-			engine.audio.play_one_shot(self.file_ogg_sound_id);
+		if input_state.active(self.actions.play_file_stream_sound) {
+			bus.start_sound(self.file_ogg_sound_id);
 		}
-
 	}
 
 	pub fn should_quit(&self) -> bool {
