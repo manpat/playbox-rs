@@ -3,6 +3,7 @@ use toybox::input::InputSystem;
 use toybox::input::raw::Scancode;
 
 use crate::model::{self, Player, Camera};
+use model::camera::ControlMode;
 
 const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, -PI/16.0);
 
@@ -31,7 +32,19 @@ impl CameraController {
 		}
 	}
 
-	pub fn update(&mut self, input: &InputSystem, camera: &mut Camera, player: &Player) {
+	pub fn update(&mut self, input: &mut InputSystem, camera: &mut Camera, player: &Player) {
+		if camera.control_mode != ControlMode::OrbitPlayer {
+			if input.is_context_active(self.actions.context_id()) {
+				input.leave_context(self.actions.context_id());
+			}
+
+			return
+		}
+
+		if !input.is_context_active(self.actions.context_id()) {
+			input.enter_context(self.actions.context_id());
+		}
+
 		let frame_state = input.frame_state();
 
 		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {

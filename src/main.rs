@@ -37,6 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input, &mut engine.audio);
 	let mut camera_controller = controller::CameraController::new(&mut engine.input);
+	let mut debug_camera_controller = controller::DebugCameraController::new(&mut engine.input);
 	let mut gem_controller = controller::GemController::new(&mut engine.audio)?;
 	let debug_controller = controller::DebugController::new(&mut engine.input);
 
@@ -55,8 +56,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		blob_shadow_model.clear();
 
-		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene);
-		camera_controller.update(&engine.input, &mut camera, &player);
+		debug_controller.update(&mut engine.input, &mut debug_model, &mut scene, &mut camera);
+		camera_controller.update(&mut engine.input, &mut camera, &player);
+		debug_camera_controller.update(&mut engine.input, &mut camera);
 		player_controller.update(&engine.input, &mut engine.audio, &mut player, &mut blob_shadow_model, &camera, &scene);
 		gem_controller.update(&mut engine.audio, &mut scene, &player);
 
