@@ -88,7 +88,7 @@ impl MeshBuilderTestView {
 		}
 
 		{
-			let mut mb = ColorMeshBuilder2D::new(&mut self.mesh_data_2d);
+			let mut mb = ColorMeshBuilder::new(&mut self.mesh_data_2d);
 			mb.set_color(Color::rgb(0.6, 1.0, 0.3));
 			// mb.build(geom::Polygon::unit(7));
 			mb.build(geom::Quad::from_matrix(Mat2x3::scale_translate(Vec2::splat(0.2), Vec2::new(1.0, 0.2))));
