@@ -55,7 +55,7 @@ impl MeshBuilderTestView {
 			let mut mb = ColorMeshBuilder::new(&mut self.mesh_data_3d);
 			mb.set_color(Color::rgb(1.0, 0.5, 0.2));
 
-			mb.build(geom::Tetrahedron::unit());
+			mb.build(geom::Cuboid::from_matrix(Mat3x4::translate(Vec3::from_y(0.5))));
 			mb.build(geom::Tetrahedron::from_matrix(Mat3x4::rotate_y_translate(PI*self.time, Vec3::from_y(2.0))));
 
 			let plane = Mat3::from_columns([
@@ -64,7 +64,7 @@ impl MeshBuilderTestView {
 				Vec3::new(2.0, 0.05, 5.0),
 			]);
 
-			let mut pmb = mb.on_plane(plane);
+			let mut pmb = mb.on_plane_ref(plane);
 			pmb.set_color(Color::rgb(0.5, 0.5, 0.9));
 			pmb.build(geom::Polygon::unit(6));
 			pmb.build(geom::Quad::from_matrix(Mat2x3::rotate_translate(

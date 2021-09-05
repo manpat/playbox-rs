@@ -45,15 +45,15 @@ impl PlayerView {
 		let body_vertices = [
 			self.player_hat_pos,
 			body_transform * Vec3::new(-1.0, 0.0,-1.0),
-			body_transform * Vec3::new( 1.0, 0.0,-1.0),
-			body_transform * Vec3::new( 1.0, 0.0, 1.0),
 			body_transform * Vec3::new(-1.0, 0.0, 1.0),
+			body_transform * Vec3::new( 1.0, 0.0, 1.0),
+			body_transform * Vec3::new( 1.0, 0.0,-1.0),
 		];
 
 		let mut mb = ColorMeshBuilder::new(&mut self.mesh_data);
 		mb.set_color(body_color);
 		mb.extend_3d_fan_closed(5, body_vertices);
-		mb.extend_3d_fan(4, body_vertices[1..].iter().cloned());
+		mb.extend_3d_fan(4, body_vertices[1..].iter().rev().cloned());
 
 		for &foot_pos in player.feet_positions.iter() {
 			// TODO(pat.m): take orientation from scene intersection
@@ -63,7 +63,7 @@ impl PlayerView {
 				foot_pos + Vec3::from_y(0.1),
 			]);
 
-			let mut pmb = mb.on_plane(foot_plane);
+			let mut pmb = mb.on_plane_ref(foot_plane);
 			pmb.set_color(foot_color);
 			pmb.build(geom::Polygon::from_matrix(9, Mat2x3::uniform_scale(foot_size)));
 		}

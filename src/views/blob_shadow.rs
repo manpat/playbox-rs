@@ -1,5 +1,5 @@
 pub use toybox::prelude::*;
-use gfx::mesh::Mesh;
+use gfx::mesh::*;
 use crate::model;
 
 pub struct BlobShadowView {
@@ -15,18 +15,21 @@ impl BlobShadowView {
 			crate::shaders::FLAT_COLOR_FRAG,
 		)?;
 
-		let vertices: Vec<_> = (0..36)
-			.map(|idx| gfx::ColorVertex::new(Vec3::from_y_angle(idx as f32 / 36.0 * TAU) / 2.0, Vec3::zero()))
-			.collect();
-
-		let indices: Vec<u16> = (0..36)
-			.flat_map(|idx| [0, idx, (idx+1) % 36])
-			.collect();
-
 		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Stream);
 
-		let mut mesh = Mesh::new(gfx);
-		mesh.upload_separate(&vertices, &indices);
+		let plane = Mat3::from_columns([
+			Vec3::from_x(1.0),
+			Vec3::from_z(-1.0),
+			Vec3::zero(),
+		]);
+
+		let mut mesh_data = MeshData::new();
+		let mut mb = ColorMeshBuilder::new(&mut mesh_data).on_plane(plane);
+
+		mb.set_color(Vec3::zero());
+		mb.build(geom::Polygon::unit(36));
+
+		let mesh = Mesh::from_mesh_data(gfx, &mesh_data);
 
 		Ok(BlobShadowView {
 			shader,
