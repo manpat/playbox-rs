@@ -2,8 +2,6 @@ use toybox::prelude::*;
 use gfx::vertex::{ColorVertex, ColorVertex2D};
 use gfx::mesh::*;
 
-use crate::model;
-
 pub struct MeshBuilderTestView {
 	shader_3d: gfx::Shader,
 	shader_2d: gfx::Shader,

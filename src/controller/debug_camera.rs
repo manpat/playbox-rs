@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use toybox::input::InputSystem;
 use toybox::input::raw::Scancode;
 
-use crate::model::{self, Player, Camera};
+use crate::model::{self, Camera};
 use model::camera::ControlMode;
 
 const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, PI/2.0);

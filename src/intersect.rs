@@ -61,8 +61,8 @@ fn entity_raycast(entity: &toy::EntityRef<'_>, ray: &Ray) -> Option<Vec3> {
 
 struct IntersectResult {
 	t: f32,
-	u: f32,
-	v: f32,
+	// u: f32,
+	// v: f32,
 }
 
 fn ray_triangle_intersect(ray: &Ray, triangle: &[Vec3; 3], cull_backface: bool) -> Option<IntersectResult> {
@@ -100,5 +100,5 @@ fn ray_triangle_intersect(ray: &Ray, triangle: &[Vec3; 3], cull_backface: bool) 
  
 	let t = v0v2.dot(qvec) * inv_det;
  
-	Some(IntersectResult {t, u, v})
+	Some(IntersectResult {t, /*u, v*/})
 } 

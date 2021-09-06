@@ -1,4 +1,4 @@
-pub use toybox::prelude::*;
+use toybox::prelude::*;
 use gfx::mesh::*;
 use crate::model;
 

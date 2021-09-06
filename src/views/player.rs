@@ -95,8 +95,8 @@ impl PlayerView {
 
 		let mut pmb = mb.on_plane_ref(front_face_plane);
 		pmb.set_color(eye_color);
-		pmb.build(geom::Polygon::from_matrix(9, Mat2x3::scale_translate(eye_scale, Vec2::from_x(-0.4))));
-		pmb.build(geom::Polygon::from_matrix(9, Mat2x3::scale_translate(eye_scale, Vec2::from_x(0.4))));
+		pmb.build(geom::Polygon::from_pos_scale(9, Vec2::from_x(-0.4), eye_scale));
+		pmb.build(geom::Polygon::from_pos_scale(9, Vec2::from_x(0.4), eye_scale));
 
 		self.mesh.upload(&self.mesh_data);
 
