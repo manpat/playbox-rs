@@ -11,6 +11,8 @@ pub struct PlayerView {
 
 	player_hat_pos: Vec3,
 	player_vel: Vec3,
+
+	blink_timer: f32,
 }
 
 impl PlayerView {
@@ -29,6 +31,8 @@ impl PlayerView {
 
 			player_hat_pos: Vec3::new(0.0, 2.0, 0.0),
 			player_vel: Vec3::zero(),
+
+			blink_timer: 0.0,
 		})
 	}
 
@@ -39,6 +43,7 @@ impl PlayerView {
 		let foot_size = 0.7;
 		let body_color = Color::rgb(1.0, 0.8, 0.5);
 		let foot_color = Color::rgb(0.8, 0.7, 0.4);
+		let eye_color = Color::rgb(0.2, 0.2, 0.2);
 
 		self.mesh_data.clear();
 
@@ -67,6 +72,31 @@ impl PlayerView {
 			pmb.set_color(foot_color);
 			pmb.build(geom::Polygon::from_matrix(9, Mat2x3::uniform_scale(foot_size)));
 		}
+
+		let front_face_center = (body_vertices[1] + body_vertices[4]) / 2.0;
+		let front_face_up = self.player_hat_pos - front_face_center;
+		let front_face_right = body_vertices[1] - body_vertices[4];
+		let front_face_away = front_face_right.cross(front_face_up).normalize();
+
+		let front_face_plane = Mat3::from_columns([
+			front_face_right.normalize(),
+			front_face_up.normalize(),
+			front_face_center + front_face_up / 2.0 + front_face_away * 0.1,
+		]);
+
+		self.blink_timer += 1.0 / 60.0;
+		self.blink_timer %= 3.0;
+
+		let eye_scale = if self.blink_timer < 0.1 {
+			Vec2::new(0.5, 0.1)
+		} else {
+			Vec2::new(0.4, 0.4)
+		};
+
+		let mut pmb = mb.on_plane_ref(front_face_plane);
+		pmb.set_color(eye_color);
+		pmb.build(geom::Polygon::from_matrix(9, Mat2x3::scale_translate(eye_scale, Vec2::from_x(-0.4))));
+		pmb.build(geom::Polygon::from_matrix(9, Mat2x3::scale_translate(eye_scale, Vec2::from_x(0.4))));
 
 		self.mesh.upload(&self.mesh_data);
 
