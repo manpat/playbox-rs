@@ -9,29 +9,29 @@ pub struct GemController {
 
 
 impl GemController {
-	pub fn new(audio: &mut audio::AudioSystem) -> Result<GemController, Box<dyn Error>> {
+	pub fn new(engine: &mut toybox::Engine) -> Result<GemController, Box<dyn Error>> {
 		Ok(GemController {
 			chime_sound: {
 				let source = audio::FileStream::from_vorbis_file("assets/chime.ogg")?;
-				audio.register_file_stream(source)
+				engine.audio.register_file_stream(source)
 			},
 
 			gem_sound_bus: {
-				let bus = audio.new_bus("Gems");
-				audio.get_bus_mut(bus).unwrap().set_gain(0.5);
+				let bus = engine.audio.new_bus("Gems");
+				engine.audio.get_bus_mut(bus).unwrap().set_gain(0.5);
 				bus
 			},
 		})
 	}
 
-	pub fn update(&mut self, audio: &mut audio::AudioSystem, scene: &mut model::Scene, player: &model::Player) {
+	pub fn update(&mut self, engine: &mut toybox::Engine, scene: &mut model::Scene, player: &model::Player) {
 		for gem in scene.gems.iter_mut() {
 			match gem.state {
 				GemState::Idle => {
 					let dist = (gem.position - player.position).length();
 					if dist < 2.5 {
 						gem.state = GemState::Collecting(0.0);
-						audio.start_sound(self.gem_sound_bus, self.chime_sound);
+						engine.audio.start_sound(self.gem_sound_bus, self.chime_sound);
 					}
 				}
 

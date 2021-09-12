@@ -1,5 +1,4 @@
 use toybox::prelude::*;
-use toybox::input::InputSystem;
 use toybox::input::raw::Scancode;
 
 use crate::model::{self, Player, Camera};
@@ -22,9 +21,9 @@ pub struct CameraController {
 
 
 impl CameraController {
-	pub fn new(input: &mut InputSystem) -> Self {
-		let actions = CameraActions::new(input);
-		input.enter_context(actions.context_id());
+	pub fn new(engine: &mut toybox::Engine) -> Self {
+		let actions = CameraActions::new(&mut engine.input);
+		engine.input.enter_context(actions.context_id());
 
 		CameraController {
 			actions,
@@ -32,20 +31,20 @@ impl CameraController {
 		}
 	}
 
-	pub fn update(&mut self, input: &mut InputSystem, camera: &mut Camera, player: &Player) {
+	pub fn update(&mut self, engine: &mut toybox::Engine, camera: &mut Camera, player: &Player) {
 		if camera.control_mode != ControlMode::OrbitPlayer {
-			if input.is_context_active(self.actions.context_id()) {
-				input.leave_context(self.actions.context_id());
+			if engine.input.is_context_active(self.actions.context_id()) {
+				engine.input.leave_context(self.actions.context_id());
 			}
 
 			return
 		}
 
-		if !input.is_context_active(self.actions.context_id()) {
-			input.enter_context(self.actions.context_id());
+		if !engine.input.is_context_active(self.actions.context_id()) {
+			engine.input.enter_context(self.actions.context_id());
 		}
 
-		let frame_state = input.frame_state();
+		let frame_state = engine.input.frame_state();
 
 		if let Some(mouse) = frame_state.mouse(self.actions.mouse) {
 			let (pitch_min, pitch_max) = CAMERA_PITCH_LIMIT;

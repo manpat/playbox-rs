@@ -1,7 +1,6 @@
 use toybox::prelude::*;
-use toybox::input::InputSystem;
 use toybox::input::raw::Scancode;
-use toybox::audio::{self, AudioSystem, SoundAssetID};
+use toybox::audio::{self, SoundAssetID};
 
 use crate::model::{self, Player, Camera, BlobShadowModel};
 use crate::intersect::{Ray, scene_raycast};
@@ -29,9 +28,9 @@ pub struct PlayerController {
 }
 
 impl PlayerController {
-	pub fn new(input: &mut InputSystem, audio: &mut AudioSystem) -> PlayerController {
-		let actions = PlayerActions::new(input);
-		input.enter_context(actions.context_id());
+	pub fn new(engine: &mut toybox::Engine) -> PlayerController {
+		let actions = PlayerActions::new(&mut engine.input);
+		engine.input.enter_context(actions.context_id());
 
 		let footstep_sound_id = {
 			let framerate = 44100;
@@ -55,11 +54,11 @@ impl PlayerController {
 				});
 
 			let buffer = audio::Buffer::from_mono_samples(samples);
-			audio.register_buffer(buffer)
+			engine.audio.register_buffer(buffer)
 		};
 
-		let soundbus = audio.new_bus("Player");
-		audio.get_bus_mut(soundbus).unwrap().set_gain(0.5);
+		let soundbus = engine.audio.new_bus("Player");
+		engine.audio.get_bus_mut(soundbus).unwrap().set_gain(0.5);
 
 		PlayerController {
 			actions,
@@ -71,10 +70,10 @@ impl PlayerController {
 		}
 	}
 
-	pub fn update(&mut self, input: &InputSystem, audio: &mut AudioSystem,
+	pub fn update(&mut self, engine: &mut toybox::Engine,
 		player: &mut Player, blob_shadows: &mut BlobShadowModel, camera: &Camera, scene: &model::Scene)
 	{
-		let frame_state = input.frame_state();
+		let frame_state = engine.input.frame_state();
 
 		let camera_orientation = Quat::from_yaw(camera.yaw);
 		let mut move_direction = Vec3::zero();
@@ -124,7 +123,7 @@ impl PlayerController {
 			player.position.y += (hit_pos.y - player.position.y) / 4.0;
 		}
 
-		self.update_feet(audio, player, scene);
+		self.update_feet(engine, player, scene);
 
 		let feet_center = player.feet_positions.iter().sum::<Vec3>() / player.feet_positions.len() as f32;
 		let body_height = 1.5;
@@ -138,7 +137,7 @@ impl PlayerController {
 		// }
 	}
 
-	fn update_feet(&mut self, audio: &mut AudioSystem, player: &mut Player, scene: &model::Scene) {
+	fn update_feet(&mut self, engine: &mut toybox::Engine, player: &mut Player, scene: &model::Scene) {
 		let player_ori = Quat::from_yaw(player.yaw);
 
 		let player_fwd = player_ori.forward();
@@ -173,7 +172,7 @@ impl PlayerController {
 				*foot_pos = hit_pos;
 
 				let gain = rand::random::<f32>() * 0.3 + 0.5;
-				let bus = audio.get_bus_mut(self.soundbus).unwrap();
+				let bus = engine.audio.get_bus_mut(self.soundbus).unwrap();
 				bus.start_sound(self.footstep_sound_id);
 				bus.set_gain(gain*gain);
 			}
