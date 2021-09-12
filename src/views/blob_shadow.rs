@@ -9,7 +9,7 @@ pub struct BlobShadowView {
 }
 
 impl BlobShadowView {
-	pub fn new(gfx: &gfx::Context) -> Result<BlobShadowView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::Context) -> Result<BlobShadowView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_INSTANCED_TRANFORM_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -66,6 +66,6 @@ impl BlobShadowView {
 
 		ctx.gfx.bind_shader(self.shader);
 		ctx.gfx.bind_shader_storage_buffer(0, self.instance_buffer);
-		self.mesh.draw_instanced(&ctx.gfx, gfx::DrawMode::Triangles, self.instance_buffer.len());
+		self.mesh.draw_instanced(ctx.gfx, gfx::DrawMode::Triangles, self.instance_buffer.len());
 	}
 }

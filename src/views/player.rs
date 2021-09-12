@@ -16,7 +16,7 @@ pub struct PlayerView {
 }
 
 impl PlayerView {
-	pub fn new(gfx: &gfx::Context) -> Result<PlayerView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::Context) -> Result<PlayerView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -112,6 +112,6 @@ impl PlayerView {
 		let _section = ctx.perf.scoped_section("player");
 
 		ctx.gfx.bind_shader(self.shader);
-		self.mesh.draw(&ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh.draw(ctx.gfx, gfx::DrawMode::Triangles);
 	}
 }

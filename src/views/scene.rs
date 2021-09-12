@@ -14,7 +14,7 @@ pub struct SceneView {
 }
 
 impl SceneView {
-	pub fn new(gfx: &gfx::Context, scene: &model::Scene) -> Result<SceneView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::Context, scene: &model::Scene) -> Result<SceneView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -46,9 +46,9 @@ impl SceneView {
 		let _section = ctx.perf.scoped_section("scene");
 
 		ctx.gfx.bind_shader(self.shader);
-		self.mesh.draw(&ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh.draw(ctx.gfx, gfx::DrawMode::Triangles);
 
-		self.gem_view.draw(&ctx.gfx);
+		self.gem_view.draw(ctx.gfx);
 	}
 }
 

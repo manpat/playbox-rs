@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	engine.gfx.add_shader_import("global", shaders::GLOBAL_COMMON);
 
 	let mut uniform_buffer = engine.gfx.new_buffer(gfx::BufferUsage::Stream);
-	engine.gfx.bind_uniform_buffer(0, uniform_buffer);
+	engine.gfx.render_state().bind_uniform_buffer(0, uniform_buffer);
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
@@ -27,12 +27,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut blob_shadow_model = model::BlobShadowModel::new();
 
-	let mut perf_view = views::PerfView::new(&engine.gfx)?;
-	let mut player_view = views::PlayerView::new(&engine.gfx)?;
-	let mut debug_view = views::DebugView::new(&engine.gfx)?;
-	let mut scene_view = views::SceneView::new(&engine.gfx, &scene)?;
-	let mut blob_shadow_view = views::BlobShadowView::new(&engine.gfx)?;
-	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&engine.gfx)?;
+	let mut perf_view = views::PerfView::new(&mut engine.gfx)?;
+	let mut player_view = views::PlayerView::new(&mut engine.gfx)?;
+	let mut debug_view = views::DebugView::new(&mut engine.gfx)?;
+	let mut scene_view = views::SceneView::new(&mut engine.gfx, &scene)?;
+	let mut blob_shadow_view = views::BlobShadowView::new(&mut engine.gfx)?;
+	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut engine.gfx)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine.input, &mut engine.audio);
@@ -40,6 +40,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut debug_camera_controller = controller::DebugCameraController::new(&mut engine.input);
 	let mut gem_controller = controller::GemController::new(&mut engine.audio)?;
 	let debug_controller = controller::DebugController::new(&mut engine.input);
+
+	let mut _test_fbo = engine.gfx.new_framebuffer(gfx::FramebufferSize::Backbuffer);
 
 	'main: loop {
 		engine.process_events();
@@ -69,13 +71,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 		blob_shadow_view.update(&blob_shadow_model, &scene);
 		mesh_builder_test_view.update();
 
-		engine.gfx.set_clear_color(Color::grey(0.1));
-		engine.gfx.clear(gfx::ClearMode::ALL);
+		engine.gfx.render_state().set_clear_color(Color::grey(0.1));
+		engine.gfx.render_state().clear(gfx::ClearMode::ALL);
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload(&[uniforms]);
 
-		let mut view_ctx = views::ViewContext::new(&engine.gfx, &mut engine.instrumenter);
+		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter);
 
 		scene_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);

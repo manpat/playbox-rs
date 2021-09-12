@@ -10,13 +10,13 @@ pub struct PerfView {
 }
 
 impl PerfView {
-	pub fn new(gfx: &gfx::Context) -> Result<PerfView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::Context) -> Result<PerfView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_2D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
 		)?;
 
-		let vao = gfx.new_vao();
+		let mut vao = gfx.new_vao();
 
 		let vertex_buffer = gfx.new_buffer(gfx::BufferUsage::Stream);
 		let index_buffer = gfx.new_buffer(gfx::BufferUsage::Stream);

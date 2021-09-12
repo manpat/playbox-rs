@@ -16,7 +16,7 @@ pub struct MeshBuilderTestView {
 }
 
 impl MeshBuilderTestView {
-	pub fn new(gfx: &gfx::Context) -> Result<Self, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::Context) -> Result<Self, Box<dyn Error>> {
 		let shader_3d = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -100,11 +100,11 @@ impl MeshBuilderTestView {
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		ctx.gfx.bind_shader(self.shader_3d);
-		self.mesh_3d.draw(&ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh_3d.draw(ctx.gfx, gfx::DrawMode::Triangles);
 	}
 
 	pub fn draw_2d(&self, ctx: &mut super::ViewContext) {
 		ctx.gfx.bind_shader(self.shader_2d);
-		self.mesh_2d.draw(&ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh_2d.draw(ctx.gfx, gfx::DrawMode::Triangles);
 	}
 }
