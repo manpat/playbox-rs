@@ -41,7 +41,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut gem_controller = controller::GemController::new(&mut engine)?;
 	let debug_controller = controller::DebugController::new(&mut engine);
 
-	let mut _test_fbo = engine.gfx.new_framebuffer(gfx::FramebufferSize::Backbuffer);
+	let test_fbo = engine.gfx.new_framebuffer(
+		gfx::FramebufferSettings::new(gfx::FramebufferSize::Backbuffer)
+			.add_depth()
+			.add_color(0, gfx::raw::R11F_G11F_B10F)
+			.add_color(3, gfx::raw::RGBA8)
+	);
 
 	'main: loop {
 		engine.process_events();
@@ -79,10 +84,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter);
 
+		view_ctx.gfx.bind_framebuffer(&test_fbo);
+		view_ctx.gfx.clear(gfx::ClearMode::ALL);
+
 		scene_view.draw(&mut view_ctx);
 		player_view.draw(&mut view_ctx);
 		blob_shadow_view.draw(&mut view_ctx);
+		view_ctx.gfx.bind_framebuffer(None);
+
 		mesh_builder_test_view.draw(&mut view_ctx);
+
 
 		if debug_model.active {
 			perf_view.draw(&mut view_ctx);
