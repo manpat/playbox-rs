@@ -42,10 +42,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let debug_controller = controller::DebugController::new(&mut engine);
 
 	let test_fbo = engine.gfx.new_framebuffer(
-		gfx::FramebufferSettings::new(gfx::FramebufferSize::Backbuffer)
+		gfx::FramebufferSettings::new(gfx::TextureSize::Backbuffer)
 			.add_depth()
 			.add_color(0, gfx::raw::R11F_G11F_B10F)
 			.add_color(3, gfx::raw::RGBA8)
+	);
+
+	let test_fbo2 = engine.gfx.new_framebuffer(
+		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(4))
+			.add_depth()
+			.add_color(0, gfx::raw::RGBA8)
 	);
 
 	'main: loop {
@@ -84,15 +90,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter);
 
-		view_ctx.gfx.bind_framebuffer(&test_fbo);
+		view_ctx.gfx.bind_framebuffer(test_fbo);
 		view_ctx.gfx.clear(gfx::ClearMode::ALL);
 
 		scene_view.draw(&mut view_ctx);
+
+		view_ctx.gfx.bind_framebuffer(test_fbo2);
+		view_ctx.gfx.clear(gfx::ClearMode::ALL);
+
 		player_view.draw(&mut view_ctx);
 		blob_shadow_view.draw(&mut view_ctx);
-		view_ctx.gfx.bind_framebuffer(None);
-
 		mesh_builder_test_view.draw(&mut view_ctx);
+
+		view_ctx.gfx.bind_framebuffer(None);
 
 
 		if debug_model.active {

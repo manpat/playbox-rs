@@ -100,11 +100,11 @@ impl MeshBuilderTestView {
 
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		ctx.gfx.bind_shader(self.shader_3d);
-		self.mesh_3d.draw(ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh_3d.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);
 	}
 
 	pub fn draw_2d(&self, ctx: &mut super::ViewContext) {
 		ctx.gfx.bind_shader(self.shader_2d);
-		self.mesh_2d.draw(ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh_2d.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);
 	}
 }

@@ -66,6 +66,6 @@ impl BlobShadowView {
 
 		ctx.gfx.bind_shader(self.shader);
 		ctx.gfx.bind_shader_storage_buffer(0, self.instance_buffer);
-		self.mesh.draw_instanced(ctx.gfx, gfx::DrawMode::Triangles, self.instance_buffer.len());
+		self.mesh.draw_instanced(&mut ctx.gfx, gfx::DrawMode::Triangles, self.instance_buffer.len());
 	}
 }

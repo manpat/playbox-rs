@@ -90,7 +90,7 @@ impl GemView {
 		}
 	}
 
-	pub fn draw(&self, gfx: &mut gfx::RenderState) {
+	pub fn draw(&self, gfx: &mut gfx::RenderState<'_>) {
 		if self.instance_buffer.is_empty() {
 			return
 		}

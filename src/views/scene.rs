@@ -46,9 +46,9 @@ impl SceneView {
 		let _section = ctx.perf.scoped_section("scene");
 
 		ctx.gfx.bind_shader(self.shader);
-		self.mesh.draw(ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);
 
-		self.gem_view.draw(ctx.gfx);
+		self.gem_view.draw(&mut ctx.gfx);
 	}
 }
 

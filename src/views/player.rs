@@ -112,6 +112,6 @@ impl PlayerView {
 		let _section = ctx.perf.scoped_section("player");
 
 		ctx.gfx.bind_shader(self.shader);
-		self.mesh.draw(ctx.gfx, gfx::DrawMode::Triangles);
+		self.mesh.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);
 	}
 }
