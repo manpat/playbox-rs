@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		view_ctx.gfx.bind_framebuffer(None);
 
 		{
-			let resources = view_ctx.gfx.resources();
+			let resources = view_ctx.resources;
 			let fbo_0 = resources.get(test_fbo);
 			let color_0 = fbo_0.color_attachment(0).unwrap();
 			let color_0_size = resources.get(color_0).size() + Vec2i::splat(7);
@@ -126,7 +126,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 				gfx::raw::MemoryBarrier(gfx::raw::TEXTURE_FETCH_BARRIER_BIT);
 			}
 
-			let resources = view_ctx.gfx.resources();
 			let color_1 = resources.get(test_fbo2).color_attachment(0).unwrap();
 
 			view_ctx.gfx.bind_texture(0, color_0);
