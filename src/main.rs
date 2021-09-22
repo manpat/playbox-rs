@@ -44,15 +44,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let test_fbo = engine.gfx.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::Backbuffer)
 			.add_depth()
-			.add_color(0, gfx::raw::R11F_G11F_B10F)
-			.add_color(3, gfx::raw::RGBA8)
+			.add_color(0, gfx::TextureFormat::R11G11B10F)
+			.add_color(3, gfx::TextureFormat::color())
 	);
 
 	let test_fbo2 = engine.gfx.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(4))
 			.add_depth()
-			.add_color(0, gfx::raw::RGBA8)
+			.add_color(0, gfx::TextureFormat::color())
 	);
+
+	let post_effect_compute_shader = engine.gfx.new_compute_shader(shaders::TEST_POST_EFFECT_COMPUTE)?;
+
+	let composite_shader = engine.gfx.new_simple_shader(shaders::FULLSCREEN_QUAD_VERT,
+		include_str!("shaders/final_composite.frag.glsl"))?;
 
 	'main: loop {
 		engine.process_events();
@@ -103,6 +108,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 		mesh_builder_test_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.bind_framebuffer(None);
+
+		{
+			let resources = view_ctx.gfx.resources();
+			let fbo_0 = resources.get(test_fbo);
+			let color_0 = fbo_0.color_attachment(0).unwrap();
+			let color_0_size = resources.get(color_0).size() + Vec2i::splat(7);
+
+			let compute_w = (color_0_size.x/8) as u32;
+			let compute_h = (color_0_size.y/8) as u32;
+
+			view_ctx.gfx.bind_image_for_rw(0, color_0);
+			view_ctx.gfx.bind_shader(post_effect_compute_shader);
+			view_ctx.gfx.dispatch_compute(compute_w, compute_h, 1);
+
+			unsafe {
+				gfx::raw::MemoryBarrier(gfx::raw::TEXTURE_FETCH_BARRIER_BIT);
+			}
+
+			let resources = view_ctx.gfx.resources();
+			let color_1 = resources.get(test_fbo2).color_attachment(0).unwrap();
+
+			view_ctx.gfx.bind_texture(0, color_0);
+			view_ctx.gfx.bind_texture(1, color_1);
+			view_ctx.gfx.bind_shader(composite_shader);
+			view_ctx.gfx.draw_arrays(gfx::DrawMode::Triangles, 6);
+		}
 
 
 		if debug_model.active {
