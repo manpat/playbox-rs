@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		blob_shadow_view.update(&blob_shadow_model, &scene);
 		mesh_builder_test_view.update();
 
-		engine.gfx.render_state().set_clear_color(Color::grey(0.1));
+		engine.gfx.render_state().set_clear_color(Color::grey_a(0.1, 0.0));
 		engine.gfx.render_state().clear(gfx::ClearMode::ALL);
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
@@ -127,16 +127,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 			}
 
 			let color_1 = resources.get(test_fbo2).color_attachment(0).unwrap();
+			let depth_0 = resources.get(test_fbo).depth_stencil_attachment().unwrap();
+			let depth_1 = resources.get(test_fbo2).depth_stencil_attachment().unwrap();
 
 			view_ctx.gfx.bind_texture(0, color_0);
 			view_ctx.gfx.bind_texture(1, color_1);
+			view_ctx.gfx.bind_texture(2, depth_0);
+			view_ctx.gfx.bind_texture(3, depth_1);
 			view_ctx.gfx.bind_shader(composite_shader);
 			view_ctx.gfx.draw_arrays(gfx::DrawMode::Triangles, 6);
 		}
 
 
+		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
+
 		if debug_model.active {
-			view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 			perf_view.draw(&mut view_ctx);
 			debug_view.draw(&mut view_ctx);
 		}

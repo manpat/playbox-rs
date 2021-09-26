@@ -2,13 +2,23 @@
 
 in vec2 v_uv;
 
-layout(binding=0) uniform sampler2D u_texture0;
-layout(binding=1) uniform sampler2D u_texture1;
+layout(binding=0) uniform sampler2D u_scene;
+layout(binding=1) uniform sampler2D u_foreground;
+
+layout(binding=2) uniform sampler2D u_scene_depth;
+layout(binding=3) uniform sampler2D u_foreground_depth;
 
 layout(location=0) out vec4 out_color;
 
 void main() {
-	vec4 color_0 = texture(u_texture0, v_uv);
-	vec4 color_1 = texture(u_texture1, v_uv);
-	out_color = vec4(max(color_0.rgb, color_1.rgb), 1.0);
+	vec4 scene_color = texture(u_scene, v_uv);
+	vec4 foreground_color = texture(u_foreground, v_uv);
+
+	float scene_depth = texture(u_scene_depth, v_uv).r;
+	float foreground_depth = texture(u_foreground_depth, v_uv).r;
+
+	const float depth_pass = float(scene_depth > foreground_depth);
+	const float alpha = foreground_color.a;
+
+	out_color = mix(scene_color, foreground_color, depth_pass * alpha);
 }
