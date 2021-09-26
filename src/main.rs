@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut perf_view = views::PerfView::new(&mut engine.gfx)?;
 	let mut player_view = views::PlayerView::new(&mut engine.gfx)?;
-	let mut debug_view = views::DebugView::new(&mut engine.gfx)?;
+	let mut debug_view = views::DebugView::new(&mut engine.gfx, &scene)?;
 	let mut scene_view = views::SceneView::new(&mut engine.gfx, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&mut engine.gfx)?;
 	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut engine.gfx)?;
@@ -113,14 +113,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 			let resources = view_ctx.resources;
 			let fbo_0 = resources.get(test_fbo);
 			let color_0 = fbo_0.color_attachment(0).unwrap();
-			let color_0_size = resources.get(color_0).size() + Vec2i::splat(7);
+			let color_0_size = resources.get(color_0).size();
 
-			let compute_w = (color_0_size.x/8) as u32;
-			let compute_h = (color_0_size.y/8) as u32;
+			let compute_workgroups = (color_0_size + Vec2i::splat(15)) / 16;
+			let Vec2i{x: compute_w, y: compute_h} = compute_workgroups;
 
 			view_ctx.gfx.bind_image_for_rw(0, color_0);
 			view_ctx.gfx.bind_shader(post_effect_compute_shader);
-			view_ctx.gfx.dispatch_compute(compute_w, compute_h, 1);
+			view_ctx.gfx.dispatch_compute(compute_w as u32, compute_h as u32, 1);
 
 			unsafe {
 				gfx::raw::MemoryBarrier(gfx::raw::TEXTURE_FETCH_BARRIER_BIT);
@@ -136,6 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
 		if debug_model.active {
+			view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 			perf_view.draw(&mut view_ctx);
 			debug_view.draw(&mut view_ctx);
 		}

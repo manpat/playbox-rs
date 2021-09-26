@@ -55,7 +55,7 @@ impl PerfView {
 		for (idx, section) in summary.sections.iter().enumerate() {
 			let section_angle = section.cpu_time_ms as f32 * total_angle;
 
-			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.7, 0.7);
+			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.8, 0.6);
 
 			builder.build_wedge(current_angle, current_angle + section_angle, color);
 
@@ -71,7 +71,7 @@ impl PerfView {
 		for (idx, section) in summary.sections.iter().enumerate() {
 			let section_angle = section.gpu_time_ms as f32 * total_angle;
 
-			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.7, 0.7);
+			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.8, 0.6);
 
 			builder.build_wedge(current_angle, current_angle + section_angle, color);
 
@@ -87,7 +87,7 @@ impl PerfView {
 		for (idx, section) in summary.sections.iter().enumerate() {
 			let section_angle = section.triangles as f32 * total_angle;
 
-			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.7, 0.7);
+			let color = Color::hsv((idx as f32 * 40.0) % 360.0, 0.8, 0.6);
 
 			builder.build_wedge(current_angle, current_angle + section_angle, color);
 

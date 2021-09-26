@@ -41,7 +41,7 @@ impl PlayerView {
 		let body_transform = Mat3x4::rotate_y_translate(player.yaw, player.body_position);
 
 		let foot_size = 0.7;
-		let body_color = Color::rgb(1.0, 0.8, 0.5);
+		let body_color = Color::rgb(1.0, 0.5, 0.2);
 		let foot_color = Color::rgb(0.8, 0.7, 0.4);
 		let eye_color = Color::rgb(0.2, 0.2, 0.2);
 

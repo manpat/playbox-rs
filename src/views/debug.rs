@@ -1,5 +1,8 @@
 use toybox::prelude::*;
 use gfx::vertex::ColorVertex2D;
+use crate::model;
+
+mod srgb;
 
 pub struct DebugView {
 	shader: gfx::Shader,
@@ -7,11 +10,13 @@ pub struct DebugView {
 	vertex_buffer: gfx::Buffer<ColorVertex2D>,
 	index_buffer: gfx::Buffer<u16>,
 
+	srgb_view: srgb::SrgbView,
+
 	active: bool,
 }
 
 impl DebugView {
-	pub fn new(gfx: &mut gfx::Context) -> Result<DebugView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::Context, scene: &model::Scene) -> Result<DebugView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_2D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -38,12 +43,14 @@ impl DebugView {
 			vertex_buffer,
 			index_buffer,
 
+			srgb_view: srgb::SrgbView::new(gfx, scene)?,
+
 			active: false,
 		})
 	}
 
 
-	pub fn update(&mut self, debug_model: &crate::model::Debug) {
+	pub fn update(&mut self, debug_model: &model::Debug) {
 		self.active = debug_model.active;
 		if !self.active {
 			return
@@ -57,6 +64,8 @@ impl DebugView {
 		];
 
 		self.vertex_buffer.upload(&vertices);
+
+		self.srgb_view.update();
 	}
 
 
@@ -65,10 +74,14 @@ impl DebugView {
 			return
 		}
 
-		let _section = ctx.perf.scoped_section("debug");
+		{
+			let _section = ctx.perf.scoped_section("debug");
 
-		ctx.gfx.bind_vao(self.vao);
-		ctx.gfx.bind_shader(self.shader);
-		ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
+			ctx.gfx.bind_vao(self.vao);
+			ctx.gfx.bind_shader(self.shader);
+			ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
+		}
+
+		self.srgb_view.draw(ctx);
 	}
 }

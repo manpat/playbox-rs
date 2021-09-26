@@ -64,10 +64,8 @@ fn build_entity_transformed(mesh_data: &mut MeshData<ColorVertex>,
 		.zip(&color_data.data)
 		.map(move |(&p, &col)| {
 			let p = transform * p;
-			ColorVertex::new(p, col.to_vec3())
+			ColorVertex::new(p, col)
 		});
 
 	mesh_data.extend(ent_vertices, ent_mesh_data.indices.iter().cloned());
 }
-
-
