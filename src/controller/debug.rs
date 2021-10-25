@@ -13,6 +13,7 @@ toybox::declare_input_context! {
 toybox::declare_input_context! {
 	struct ActiveActions "Active Debug" {
 		trigger reset_gems { "Reset Gems" [Scancode::F1] }
+		trigger dump_stats { "Dump Perf Stats" [Scancode::F12] }
 
 		state left_mouse { "Interact" [MouseButton::Left] }
 		pointer mouse { "Mouse" }
@@ -71,6 +72,12 @@ impl DebugController {
 				ControlMode::OrbitPlayer => ControlMode::FreeFly,
 				ControlMode::FreeFly => ControlMode::OrbitPlayer,
 			};
+		}
+
+		if input_state.active(self.active_actions.dump_stats) {
+			if let Some(summary) = engine.instrumenter.summary() {
+				println!("{:#?}", summary);
+			}
 		}
 	}
 }

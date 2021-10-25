@@ -29,7 +29,7 @@ impl SrgbView {
 			.expect("Missing color data");
 
 		let gradient_positions = gradient_mesh_src.positions.iter().map(Vec3::to_xy).collect();
-		let gradient_colors = color_data.data.iter().map(Color::from).collect();
+		let gradient_colors = color_data.data.iter().copied().map(Color::from).collect();
 		let gradient_indices = gradient_mesh_src.indices.clone();
 
 		let gradient_mesh = gfx::Mesh::new(gfx);

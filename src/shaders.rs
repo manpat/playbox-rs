@@ -7,7 +7,7 @@ pub const COLOR_3D_INSTANCED_TRANFORM_VERT: &'static str = include_str!("shaders
 pub const FULLSCREEN_QUAD_VERT: &'static str = include_str!("shaders/fullscreen_quad.vert.glsl");
 
 pub const FLAT_COLOR_FRAG: &'static str = include_str!("shaders/flat_color.frag.glsl");
+pub const FLAT_COLOR_PATTERN_ALPHA_FRAG: &'static str = include_str!("shaders/flat_color_pattern_alpha.frag.glsl");
 pub const BASIC_TEXTURED_FRAG: &'static str = include_str!("shaders/basic_textured.frag.glsl");
-
 
 pub const TEST_POST_EFFECT_COMPUTE: &'static str = include_str!("shaders/test_post_effect.compute.glsl");

@@ -12,7 +12,7 @@ impl BlobShadowView {
 	pub fn new(gfx: &mut gfx::Context) -> Result<BlobShadowView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_INSTANCED_TRANFORM_VERT,
-			crate::shaders::FLAT_COLOR_FRAG,
+			crate::shaders::FLAT_COLOR_PATTERN_ALPHA_FRAG,
 		)?;
 
 		let instance_buffer = gfx.new_buffer::<Mat3x4>(gfx::BufferUsage::Stream);
@@ -26,7 +26,7 @@ impl BlobShadowView {
 		let mut mesh_data = MeshData::new();
 		let mut mb = ColorMeshBuilder::new(&mut mesh_data).on_plane(plane);
 
-		mb.set_color(Vec3::zero());
+		mb.set_color(Color::grey_a(0.0, 0.8));
 		mb.build(geom::Polygon::unit(36));
 
 		let mesh = Mesh::from_mesh_data(gfx, &mesh_data);

@@ -11,7 +11,7 @@ impl Scene {
 		let scene_data = std::fs::read("assets/scene.toy")?;
 		let source_data = toy::load(&scene_data)?;
 
-		let scene = source_data.find_scene("main").unwrap();
+		let scene = source_data.find_scene("main").expect("Failed to find main scene");
 		let gems = scene.entities()
 			.filter(|e| e.name.starts_with("GEM_"))
 			.map(|e| Gem {

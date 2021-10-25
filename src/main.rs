@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	);
 
 	let test_fbo2 = engine.gfx.new_framebuffer(
-		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(4))
+		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(2))
 			.add_depth()
 			.add_color(0, gfx::TextureFormat::color())
 	);
