@@ -9,8 +9,6 @@ pub struct SrgbView {
 	gradient_positions: Vec<Vec2>,
 	gradient_colors: Vec<Color>,
 	gradient_indices: Vec<u16>,
-
-	time: f32,
 }
 
 impl SrgbView {
@@ -41,8 +39,6 @@ impl SrgbView {
 			gradient_positions,
 			gradient_colors,
 			gradient_indices,
-
-			time: 0.0,
 		})
 	}
 

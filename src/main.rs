@@ -18,7 +18,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 	engine.gfx.add_shader_import("global", shaders::GLOBAL_COMMON);
 
 	let mut uniform_buffer = engine.gfx.new_buffer(gfx::BufferUsage::Stream);
-	engine.gfx.render_state().bind_uniform_buffer(0, uniform_buffer);
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
@@ -27,7 +26,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut blob_shadow_model = model::BlobShadowModel::new();
 
-	let mut perf_view = views::PerfView::new(&mut engine.gfx)?;
 	let mut player_view = views::PlayerView::new(&mut engine.gfx)?;
 	let mut debug_view = views::DebugView::new(&mut engine.gfx, &scene)?;
 	let mut scene_view = views::SceneView::new(&mut engine.gfx, &scene)?;
@@ -80,12 +78,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 		player_controller.update(&mut engine, &mut player, &mut blob_shadow_model, &camera, &scene);
 		gem_controller.update(&mut engine, &mut scene, &player);
 
-		perf_view.update(&engine.instrumenter, engine.gfx.aspect());
-		debug_view.update(&debug_model);
+		debug_view.update(&engine, &debug_model);
 		player_view.update(&player);
 		scene_view.update(&scene, &mut blob_shadow_model);
 		blob_shadow_view.update(&blob_shadow_model, &scene);
 		mesh_builder_test_view.update();
+
+		engine.imgui.set_enabled(debug_model.active);
 
 		engine.gfx.render_state().set_clear_color(Color::grey_a(0.1, 0.0));
 		engine.gfx.render_state().clear(gfx::ClearMode::ALL);
@@ -93,7 +92,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload(&[uniforms]);
 
-		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter);
+		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter, engine.imgui.frame());
+
+		view_ctx.gfx.bind_uniform_buffer(0, uniform_buffer);
 
 		view_ctx.gfx.bind_framebuffer(test_fbo);
 		view_ctx.gfx.clear(gfx::ClearMode::ALL);
@@ -142,7 +143,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 
 		if debug_model.active {
-			perf_view.draw(&mut view_ctx);
 			debug_view.draw(&mut view_ctx);
 		}
 			

@@ -100,7 +100,7 @@ impl PerfView {
 	}
 
 
-	pub fn draw(&self, ctx: &mut super::ViewContext) {
+	pub fn draw(&self, ctx: &mut crate::views::ViewContext) {
 		let _section = ctx.perf.scoped_section("perf");
 
 		if self.index_buffer.is_empty() {

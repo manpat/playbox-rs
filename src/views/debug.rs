@@ -3,6 +3,7 @@ use gfx::vertex::ColorVertex2D;
 use crate::model;
 
 mod srgb;
+mod perf;
 
 pub struct DebugView {
 	shader: gfx::Shader,
@@ -11,8 +12,11 @@ pub struct DebugView {
 	index_buffer: gfx::Buffer<u16>,
 
 	srgb_view: srgb::SrgbView,
+	perf_view: perf::PerfView,
 
 	active: bool,
+	srgb_active: bool,
+	perf_active: bool,
 }
 
 impl DebugView {
@@ -44,13 +48,23 @@ impl DebugView {
 			index_buffer,
 
 			srgb_view: srgb::SrgbView::new(gfx, scene)?,
+			perf_view: perf::PerfView::new(gfx)?,
 
 			active: false,
+			srgb_active: false,
+			perf_active: false,
 		})
 	}
 
 
-	pub fn update(&mut self, debug_model: &model::Debug) {
+	pub fn update(&mut self, engine: &toybox::Engine, debug_model: &model::Debug) {
+		let ui = engine.imgui.frame();
+
+		imgui::Window::new("Debug").build(ui, || {
+			ui.checkbox("Srgb Test", &mut self.srgb_active);
+			ui.checkbox("Perf View", &mut self.perf_active);
+		});
+
 		self.active = debug_model.active;
 		if !self.active {
 			return
@@ -66,6 +80,7 @@ impl DebugView {
 		self.vertex_buffer.upload(&vertices);
 
 		self.srgb_view.update();
+		self.perf_view.update(&engine.instrumenter, engine.gfx.aspect());
 	}
 
 
@@ -82,6 +97,12 @@ impl DebugView {
 			ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
 		}
 
-		self.srgb_view.draw(ctx);
+		if self.srgb_active {
+			self.srgb_view.draw(ctx);
+		}
+
+		if self.perf_active {
+			self.perf_view.draw(ctx);
+		}
 	}
 }
