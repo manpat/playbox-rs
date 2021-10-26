@@ -24,10 +24,8 @@ pub struct DebugCameraController {
 
 impl DebugCameraController {
 	pub fn new(engine: &mut toybox::Engine) -> Self {
-		let actions = DebugCameraActions::new(&mut engine.input);
-
 		DebugCameraController {
-			actions,
+			actions: DebugCameraActions::new_active(&mut engine.input),
 		}
 	}
 

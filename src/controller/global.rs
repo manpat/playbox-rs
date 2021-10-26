@@ -31,9 +31,6 @@ pub struct GlobalController {
 
 impl GlobalController {
 	pub fn new(engine: &mut toybox::Engine) -> Result<GlobalController, Box<dyn Error>> {
-		let actions = GlobalActions::new(&mut engine.input);
-		engine.input.enter_context(actions.context_id());
-
 		let pluck_sound_id = {
 			let framerate = 44100;
 			let freq = 440.0;
@@ -107,7 +104,7 @@ impl GlobalController {
 			.set_send_bus(soundbus_top);
 
 		Ok(GlobalController {
-			actions,
+			actions: GlobalActions::new_active(&mut engine.input),
 
 			pluck_sound_id,
 			stereo_sound_id,

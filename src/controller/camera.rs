@@ -22,11 +22,8 @@ pub struct CameraController {
 
 impl CameraController {
 	pub fn new(engine: &mut toybox::Engine) -> Self {
-		let actions = CameraActions::new(&mut engine.input);
-		engine.input.enter_context(actions.context_id());
-
 		CameraController {
-			actions,
+			actions: CameraActions::new_active(&mut engine.input),
 			zoom: 12.0,
 		}
 	}

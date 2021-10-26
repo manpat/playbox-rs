@@ -32,13 +32,9 @@ pub struct DebugController {
 
 impl DebugController {
 	pub fn new(engine: &mut toybox::Engine) -> DebugController {
-		let actions = Actions::new(&mut engine.input);
-		let active_actions = ActiveActions::new(&mut engine.input);
-
-		engine.input.enter_context(actions.context_id());
-
 		DebugController {
-			actions, active_actions
+			actions: Actions::new_active(&mut engine.input),
+			active_actions: ActiveActions::new(&mut engine.input),
 		}
 	}
 

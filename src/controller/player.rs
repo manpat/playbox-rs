@@ -29,9 +29,6 @@ pub struct PlayerController {
 
 impl PlayerController {
 	pub fn new(engine: &mut toybox::Engine) -> PlayerController {
-		let actions = PlayerActions::new(&mut engine.input);
-		engine.input.enter_context(actions.context_id());
-
 		let footstep_sound_id = {
 			let framerate = 44100;
 			let freq = 20.0;
@@ -61,7 +58,7 @@ impl PlayerController {
 		engine.audio.get_bus_mut(soundbus).unwrap().set_gain(0.5);
 
 		PlayerController {
-			actions,
+			actions: PlayerActions::new_active(&mut engine.input),
 			move_speed: 0.0,
 			prev_angle_diff: 0.0,
 			next_foot_update: 0,
