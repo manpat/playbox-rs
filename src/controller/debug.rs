@@ -5,6 +5,8 @@ use crate::model;
 
 toybox::declare_input_context! {
 	struct Actions "Debug" {
+		priority [10]
+
 		trigger toggle_active { "Toggle" [Scancode::Grave] }
 		trigger toggle_flycam { "Toggle Fly Cam" [Scancode::V] }
 	}
@@ -12,6 +14,8 @@ toybox::declare_input_context! {
 
 toybox::declare_input_context! {
 	struct ActiveActions "Active Debug" {
+		priority [10]
+
 		trigger reset_gems { "Reset Gems" [Scancode::F1] }
 		trigger dump_stats { "Dump Perf Stats" [Scancode::F12] }
 
