@@ -13,10 +13,6 @@ pub struct DebugView {
 
 	srgb_view: srgb::SrgbView,
 	perf_view: perf::PerfView,
-
-	active: bool,
-	srgb_active: bool,
-	perf_active: bool,
 }
 
 impl DebugView {
@@ -49,27 +45,11 @@ impl DebugView {
 
 			srgb_view: srgb::SrgbView::new(gfx, scene)?,
 			perf_view: perf::PerfView::new(gfx)?,
-
-			active: false,
-			srgb_active: false,
-			perf_active: false,
 		})
 	}
 
 
 	pub fn update(&mut self, engine: &toybox::Engine, debug_model: &model::Debug) {
-		let ui = engine.imgui.frame();
-
-		imgui::Window::new("Debug").build(ui, || {
-			ui.checkbox("Srgb Test", &mut self.srgb_active);
-			ui.checkbox("Perf View", &mut self.perf_active);
-		});
-
-		self.active = debug_model.active;
-		if !self.active {
-			return
-		}
-
 		let vertices = [
 			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.02,-0.02), Vec3::new(1.0, 1.0, 1.0)),
 			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new( 0.02,-0.02), Vec3::new(1.0, 1.0, 1.0)),
@@ -84,11 +64,7 @@ impl DebugView {
 	}
 
 
-	pub fn draw(&self, ctx: &mut super::ViewContext) {
-		if !self.active {
-			return
-		}
-
+	pub fn draw(&self, ctx: &mut super::ViewContext, debug_model: &model::Debug) {
 		{
 			let _section = ctx.perf.scoped_section("debug");
 
@@ -97,11 +73,11 @@ impl DebugView {
 			ctx.gfx.draw_indexed(gfx::DrawMode::Triangles, self.index_buffer.len());
 		}
 
-		if self.srgb_active {
+		if debug_model.srgb_active {
 			self.srgb_view.draw(ctx);
 		}
 
-		if self.perf_active {
+		if debug_model.perf_active {
 			self.perf_view.draw(ctx);
 		}
 	}

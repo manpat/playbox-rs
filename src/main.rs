@@ -111,6 +111,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		view_ctx.gfx.bind_framebuffer(None);
 
 		{
+			let _scope = view_ctx.perf.scoped_section("post process");
+
 			let resources = view_ctx.resources;
 			let fbo_0 = resources.get(test_fbo);
 			let color_0 = fbo_0.color_attachment(0).unwrap();
@@ -143,7 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 
 		if debug_model.active {
-			debug_view.draw(&mut view_ctx);
+			debug_view.draw(&mut view_ctx, &debug_model);
 		}
 			
 		mesh_builder_test_view.draw_2d(&mut view_ctx);

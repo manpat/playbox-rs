@@ -60,9 +60,7 @@ impl DebugController {
 		}
 
 		if input_state.active(self.active_actions.reset_gems) {
-			for gem in scene.gems.iter_mut() {
-				gem.state = model::scene::GemState::Idle;
-			}
+			reset_gems(scene);
 		}
 
 		if input_state.active(self.actions.toggle_flycam) {
@@ -79,5 +77,61 @@ impl DebugController {
 				println!("{:#?}", summary);
 			}
 		}
+
+		let ui = engine.imgui.frame();
+
+		if let Some(_) = imgui::Window::new("Debug").begin(ui)
+		{
+			ui.checkbox("Srgb Test", &mut debug_model.srgb_active);
+			ui.checkbox("Perf View", &mut debug_model.perf_active);
+
+			if ui.button("Reset Gems") {
+				reset_gems(scene);
+			}
+
+			let camera_mode = &mut camera.control_mode;
+			if let Some(_) = ui.begin_combo("Camera Mode", format!("{:?}", camera_mode)) {
+				use model::camera::ControlMode;
+
+				if imgui::Selectable::new("OrbitPlayer").build(ui) {
+					*camera_mode = ControlMode::OrbitPlayer;
+				}
+
+				if imgui::Selectable::new("FreeFly").build(ui) {
+					*camera_mode = ControlMode::FreeFly;
+				}
+			}
+		}
+
+		if debug_model.perf_active {
+			if let Some(_window) = imgui::Window::new("Perf")
+				.opened(&mut debug_model.perf_active)
+				.begin(ui)
+			{
+				if let Some(summary) = engine.instrumenter.summary() {
+					ui.label_text("Total Triangles", summary.total_triangles.to_string());
+					ui.label_text("Total GPU ms", format!("{:.2}ms", summary.total_gpu_time_ms));
+					ui.label_text("Total CPU ms", format!("{:.2}ms", summary.total_cpu_time_ms));
+
+					for section in summary.sections.iter() {
+						if let Some(_node) = imgui::TreeNode::new(&section.name)
+							.default_open(true)
+							.push(ui)
+						{
+							ui.label_text("Triangles", section.triangles.to_string());
+							ui.label_text("GPU time", format!("{:.2}ms", section.gpu_time_ms));
+							ui.label_text("CPU time", format!("{:.2}ms", section.cpu_time_ms));
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+fn reset_gems(scene: &mut model::Scene) {
+	for gem in scene.gems.iter_mut() {
+		gem.state = model::scene::GemState::Idle;
 	}
 }
