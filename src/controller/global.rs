@@ -18,12 +18,12 @@ toybox::declare_input_context! {
 pub struct GlobalController {
 	actions: GlobalActions,
 
-	pluck_sound_id: SoundAssetID,
-	stereo_sound_id: SoundAssetID,
-	static_ogg_sound_id: SoundAssetID,
-	file_ogg_sound_id: SoundAssetID,
+	// pluck_sound_id: SoundAssetID,
+	// stereo_sound_id: SoundAssetID,
+	// static_ogg_sound_id: SoundAssetID,
+	// file_ogg_sound_id: SoundAssetID,
 
-	soundbus: audio::BusID,
+	// soundbus: audio::BusID,
 
 	should_quit: bool,
 	wireframe_enabled: bool,
@@ -31,87 +31,87 @@ pub struct GlobalController {
 
 impl GlobalController {
 	pub fn new(engine: &mut toybox::Engine) -> Result<GlobalController, Box<dyn Error>> {
-		let pluck_sound_id = {
-			let framerate = 44100;
-			let freq = 440.0;
+		// let pluck_sound_id = {
+		// 	let framerate = 44100;
+		// 	let freq = 440.0;
 
-			let attack_t = framerate as f32 * 0.01;
-			let release_t = framerate as f32 * 0.2;
+		// 	let attack_t = framerate as f32 * 0.01;
+		// 	let release_t = framerate as f32 * 0.2;
 
-			let sound_t = attack_t + release_t;
-			let buffer_size = sound_t as usize;
+		// 	let sound_t = attack_t + release_t;
+		// 	let buffer_size = sound_t as usize;
 
-			let samples = (0..buffer_size)
-				.map(move |x| {
-					let x = x as f32;
-					let attack = (x / attack_t).min(1.0);
-					let release = (1.0 - (x - attack_t) / (sound_t - attack_t)).powf(10.0);
+		// 	let samples = (0..buffer_size)
+		// 		.map(move |x| {
+		// 			let x = x as f32;
+		// 			let attack = (x / attack_t).min(1.0);
+		// 			let release = (1.0 - (x - attack_t) / (sound_t - attack_t)).powf(10.0);
 
-					let envelope = attack*release;
+		// 			let envelope = attack*release;
 
-					(x * freq / framerate as f32 * PI).sin() * envelope
-				});
+		// 			(x * freq / framerate as f32 * PI).sin() * envelope
+		// 		});
 
-			let buffer = audio::Buffer::from_mono_samples(samples);
-			engine.audio.register_buffer(buffer)
-		};
+		// 	let buffer = audio::Buffer::from_mono_samples(samples);
+		// 	engine.audio.register_buffer(buffer)
+		// };
 
-		let stereo_sound_id = {
-			let framerate = 44100;
-			let freq = 660.0;
+		// let stereo_sound_id = {
+		// 	let framerate = 44100;
+		// 	let freq = 660.0;
 
-			let attack_t = framerate as f32 * 0.01;
-			let release_t = framerate as f32 * 4.0;
+		// 	let attack_t = framerate as f32 * 0.01;
+		// 	let release_t = framerate as f32 * 4.0;
 
-			let sound_t = attack_t + release_t;
-			let buffer_size = sound_t as usize;
+		// 	let sound_t = attack_t + release_t;
+		// 	let buffer_size = sound_t as usize;
 
-			let samples = (0..buffer_size)
-				.map(move |x| {
-					let x = x as f32;
-					let attack = (x / attack_t).min(1.0);
-					let release = (1.0 - (x - attack_t) / (sound_t - attack_t)).powf(10.0);
+		// 	let samples = (0..buffer_size)
+		// 		.map(move |x| {
+		// 			let x = x as f32;
+		// 			let attack = (x / attack_t).min(1.0);
+		// 			let release = (1.0 - (x - attack_t) / (sound_t - attack_t)).powf(10.0);
 
-					let envelope = attack*release;
+		// 			let envelope = attack*release;
 
-					(x * freq / framerate as f32 * PI).sin() * envelope
-				})
-				.flat_map(|sample| [sample, -sample]);
+		// 			(x * freq / framerate as f32 * PI).sin() * envelope
+		// 		})
+		// 		.flat_map(|sample| [sample, -sample]);
 
-			let buffer = audio::Buffer::from_stereo_samples(samples);
-			engine.audio.register_buffer(buffer)
-		};
+		// 	let buffer = audio::Buffer::from_stereo_samples(samples);
+		// 	engine.audio.register_buffer(buffer)
+		// };
 
-		let static_ogg_sound_id = {
-			let raw_data = include_bytes!("../../assets/forest.ogg");
-			let stream = audio::FileStream::from_vorbis_static(raw_data)?;
-			engine.audio.register_file_stream(stream)
-		};
+		// let static_ogg_sound_id = {
+		// 	let raw_data = include_bytes!("../../assets/forest.ogg");
+		// 	let stream = audio::FileStream::from_vorbis_static(raw_data)?;
+		// 	engine.audio.register_file_stream(stream)
+		// };
 
-		let file_ogg_sound_id = {
-			let stream = audio::FileStream::from_vorbis_file("assets/forest.ogg")?;
-			engine.audio.register_file_stream(stream)
-		};
+		// let file_ogg_sound_id = {
+		// 	let stream = audio::FileStream::from_vorbis_file("assets/forest.ogg")?;
+		// 	engine.audio.register_file_stream(stream)
+		// };
 
 
-		let soundbus_bottom = engine.audio.new_bus("Global Bottom");
-		let soundbus_top = engine.audio.new_bus("Global Top");
+		// let soundbus_bottom = engine.audio.new_bus("Global Bottom");
+		// let soundbus_top = engine.audio.new_bus("Global Top");
 
-		engine.audio.get_bus_mut(soundbus_top).unwrap()
-			.set_gain(0.1);
+		// engine.audio.get_bus_mut(soundbus_top).unwrap()
+		// 	.set_gain(0.1);
 
-		engine.audio.get_bus_mut(soundbus_bottom).unwrap()
-			.set_send_bus(soundbus_top);
+		// engine.audio.get_bus_mut(soundbus_bottom).unwrap()
+		// 	.set_send_bus(soundbus_top);
 
 		Ok(GlobalController {
 			actions: GlobalActions::new_active(&mut engine.input),
 
-			pluck_sound_id,
-			stereo_sound_id,
-			static_ogg_sound_id,
-			file_ogg_sound_id,
+			// pluck_sound_id,
+			// stereo_sound_id,
+			// static_ogg_sound_id,
+			// file_ogg_sound_id,
 
-			soundbus: soundbus_bottom,
+			// soundbus: soundbus_bottom,
 
 			should_quit: false,
 			wireframe_enabled: false,
@@ -120,7 +120,7 @@ impl GlobalController {
 
 	pub fn update(&mut self, engine: &mut toybox::Engine) {
 		let input_state = engine.input.frame_state();
-		let bus = engine.audio.get_bus_mut(self.soundbus).unwrap();
+		// let bus = engine.audio.get_bus_mut(self.soundbus).unwrap();
 
 		if input_state.active(self.actions.quit) {
 			self.should_quit = true
@@ -131,21 +131,21 @@ impl GlobalController {
 			engine.gfx.render_state().set_wireframe(self.wireframe_enabled);
 		}
 
-		if input_state.active(self.actions.play_sound) {
-			bus.start_sound(self.pluck_sound_id);
-		}
+		// if input_state.active(self.actions.play_sound) {
+		// 	bus.start_sound(self.pluck_sound_id);
+		// }
 
-		if input_state.active(self.actions.play_stereo_sound) {
-			bus.start_sound(self.stereo_sound_id);
-		}
+		// if input_state.active(self.actions.play_stereo_sound) {
+		// 	bus.start_sound(self.stereo_sound_id);
+		// }
 
-		if input_state.active(self.actions.play_static_stream_sound) {
-			bus.start_sound(self.static_ogg_sound_id);
-		}
+		// if input_state.active(self.actions.play_static_stream_sound) {
+		// 	bus.start_sound(self.static_ogg_sound_id);
+		// }
 
-		if input_state.active(self.actions.play_file_stream_sound) {
-			bus.start_sound(self.file_ogg_sound_id);
-		}
+		// if input_state.active(self.actions.play_file_stream_sound) {
+		// 	bus.start_sound(self.file_ogg_sound_id);
+		// }
 	}
 
 	pub fn should_quit(&self) -> bool {

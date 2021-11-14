@@ -37,6 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut camera_controller = controller::CameraController::new(&mut engine);
 	let mut debug_camera_controller = controller::DebugCameraController::new(&mut engine);
 	let mut gem_controller = controller::GemController::new(&mut engine)?;
+	let mut audio_test_controller = controller::AudioTestController::new(&mut engine);
 	let debug_controller = controller::DebugController::new(&mut engine);
 
 	let test_fbo = engine.gfx.new_framebuffer(
@@ -77,6 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		debug_camera_controller.update(&mut engine, &mut camera);
 		player_controller.update(&mut engine, &mut player, &mut blob_shadow_model, &camera, &scene);
 		gem_controller.update(&mut engine, &mut scene, &player);
+		audio_test_controller.update(&mut engine);
 
 		debug_view.update(&engine, &debug_model);
 		player_view.update(&player);
@@ -86,13 +88,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		engine.imgui.set_enabled(debug_model.active);
 
-		engine.gfx.render_state().set_clear_color(Color::grey_a(0.1, 0.0));
-		engine.gfx.render_state().clear(gfx::ClearMode::ALL);
-
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload(&[uniforms]);
 
 		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter, engine.imgui.frame());
+
+		view_ctx.gfx.set_clear_color(Color::grey_a(0.1, 0.0));
+		view_ctx.gfx.clear(gfx::ClearMode::ALL);
 
 		view_ctx.gfx.bind_uniform_buffer(0, uniform_buffer);
 
