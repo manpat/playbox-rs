@@ -18,7 +18,8 @@ void main() {
 	float foreground_depth = texture(u_foreground_depth, v_uv).r;
 
 	const float depth_pass = float(scene_depth > foreground_depth);
-	const float alpha = foreground_color.a;
+	const float alpha = depth_pass * foreground_color.a;
 
-	out_color = mix(scene_color, foreground_color, depth_pass * alpha);
+	out_color = mix(scene_color, foreground_color, alpha);
+	gl_FragDepth = mix(scene_depth, foreground_depth, alpha);
 }
