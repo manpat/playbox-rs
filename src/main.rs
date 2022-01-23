@@ -31,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut scene_view = views::SceneView::new(&mut engine.gfx, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&mut engine.gfx)?;
 	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut engine.gfx)?;
+	let mut gbuffer_particles_view = views::GBufferParticlesView::new(&mut engine.gfx)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine);
@@ -48,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	);
 
 	let test_fbo2 = engine.gfx.new_framebuffer(
-		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(2))
+		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(3))
 			.add_depth()
 			.add_color(0, gfx::TextureFormat::color())
 	);
@@ -89,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		engine.imgui.set_enabled(debug_model.active);
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
-		uniform_buffer.upload(&[uniforms]);
+		uniform_buffer.upload_single(&uniforms);
 
 		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter, engine.imgui.frame());
 
@@ -111,6 +112,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		mesh_builder_test_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.bind_framebuffer(None);
+
+		
 
 		{
 			let _scope = view_ctx.perf.scoped_section("post process");
@@ -143,15 +146,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 			view_ctx.gfx.draw_arrays(gfx::DrawMode::Triangles, 6);
 		}
 
+		gbuffer_particles_view.update(&mut view_ctx, test_fbo);
+		gbuffer_particles_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 
 		if debug_model.active {
 			debug_view.draw(&mut view_ctx, &debug_model);
+			mesh_builder_test_view.draw_2d(&mut view_ctx);
 		}
 			
-		mesh_builder_test_view.draw_2d(&mut view_ctx);
-
 		engine.end_frame();
 	}
 
@@ -165,21 +169,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[derive(Copy, Clone, Debug)]
 struct Uniforms {
 	projection_view: Mat4,
+	projection_view_inverse: Mat4,
 	ui_projection_view: Mat4,
 	// NOTE: align to Vec4s
 }
 
 
 fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
-	Uniforms {
-		projection_view: {
-			let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
-			let camera_orientation = camera_orientation.to_mat4();
+	let projection_view = {
+		let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
+		let camera_orientation = camera_orientation.to_mat4();
 
-			Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
-				* camera_orientation
-				* Mat4::translate(-camera.position)
-		},
+		Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
+			* camera_orientation
+			* Mat4::translate(-camera.position)
+	};
+
+	Uniforms {
+		projection_view,
+		projection_view_inverse: projection_view.inverse(),
 
 		ui_projection_view: {
 			Mat4::scale(Vec3::new(1.0 / aspect, 1.0, 1.0))
