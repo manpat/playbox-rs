@@ -146,8 +146,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 			view_ctx.gfx.draw_arrays(gfx::DrawMode::Triangles, 6);
 		}
 
-		gbuffer_particles_view.update(&mut view_ctx, test_fbo);
-		gbuffer_particles_view.draw(&mut view_ctx);
+		// gbuffer_particles_view.update(&mut view_ctx, test_fbo);
+		// gbuffer_particles_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 

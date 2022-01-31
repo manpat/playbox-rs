@@ -23,47 +23,47 @@ pub struct PlayerController {
 	prev_angle_diff: f32,
 	next_foot_update: usize,
 
-	// footstep_sound_id: SoundAssetID,
-	// soundbus: audio::BusID,
+	footstep_sound_id: audio::SoundId,
+	footstep_mixer: audio::NodeId,
 }
 
 impl PlayerController {
 	pub fn new(engine: &mut toybox::Engine) -> PlayerController {
-		// let footstep_sound_id = {
-		// 	let framerate = 44100;
-		// 	let freq = 20.0;
+		let footstep_sound_id = {
+			let framerate = 44100;
+			let freq = 20.0;
 
-		// 	let attack_t = framerate as f32 * 0.001;
-		// 	let release_t = framerate as f32 * 0.1;
+			let attack_t = framerate as f32 * 0.001;
+			let release_t = framerate as f32 * 0.1;
 
-		// 	let sound_t = attack_t + release_t;
-		// 	let buffer_size = sound_t as usize;
+			let sound_t = attack_t + release_t;
+			let buffer_size = sound_t as usize;
 
-		// 	let samples = (0..buffer_size)
-		// 		.map(move |x| {
-		// 			let x = x as f32;
-		// 			let attack = (x / attack_t).min(1.0);
-		// 			let release = (1.0 - (x - attack_t) / (sound_t - attack_t)).powf(10.0);
+			let buffer = (0..buffer_size)
+				.map(move |x| {
+					let x = x as f32;
+					let attack = (x / attack_t).min(1.0);
+					let release = (1.0 - (x - attack_t) / (sound_t - attack_t)).powf(10.0);
 
-		// 			let envelope = attack*release;
+					let envelope = attack*release;
 
-		// 			(x * freq / framerate as f32 * PI).sin() * envelope
-		// 		});
+					(x * freq / framerate as f32 * PI).sin() * envelope
+				})
+				.collect();
 
-		// 	let buffer = audio::Buffer::from_mono_samples(samples);
-		// 	engine.audio.register_buffer(buffer)
-		// };
+			engine.audio.add_sound(buffer)
+		};
 
-		// let soundbus = engine.audio.new_bus("Player");
-		// engine.audio.get_bus_mut(soundbus).unwrap().set_gain(0.5);
+		let mixer_node = audio::nodes::MixerNode::new(1.0);
+		let footstep_mixer = engine.audio.add_node_with_send(mixer_node, engine.audio.output_node());
 
 		PlayerController {
 			actions: PlayerActions::new_active(&mut engine.input),
 			move_speed: 0.0,
 			prev_angle_diff: 0.0,
 			next_foot_update: 0,
-			// footstep_sound_id,
-			// soundbus,
+			footstep_sound_id,
+			footstep_mixer,
 		}
 	}
 
@@ -168,10 +168,18 @@ impl PlayerController {
 			if (hit_pos-feet_center).length() < 6.0 {
 				*foot_pos = hit_pos;
 
-				// let gain = rand::random::<f32>() * 0.3 + 0.5;
-				// let bus = engine.audio.get_bus_mut(self.soundbus).unwrap();
-				// bus.start_sound(self.footstep_sound_id);
-				// bus.set_gain(gain*gain);
+				let gain = rand::random::<f32>() * 0.3 + 0.5;
+				let gain = gain*gain;
+
+				let sampler_node = audio::nodes::SamplerNode::new(self.footstep_sound_id);
+				let mixer_node = audio::nodes::MixerNode::new(gain);
+
+				engine.audio.update_graph(|graph| {
+					let mixer_id = graph.add_node(mixer_node, true);
+					let sampler_id = graph.add_node(sampler_node, false);
+
+					graph.add_send_chain(&[sampler_id, mixer_id, self.footstep_mixer]);
+				});
 			}
 		}
 

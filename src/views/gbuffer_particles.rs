@@ -41,7 +41,7 @@ impl GBufferParticlesView {
 			particle_buffer,
 			control_buffer,
 
-			debug_spawn_rate: 128,
+			debug_spawn_rate: 512,
 		})
 	}
 
