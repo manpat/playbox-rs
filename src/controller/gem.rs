@@ -3,24 +3,22 @@ use toybox::prelude::*;
 use crate::model::{self, scene::GemState};
 
 pub struct GemController {
-	// chime_sound: audio::SoundAssetID,
-	// gem_sound_bus: audio::BusID,
+	chime_sound_id: audio::SoundId,
+	gem_sound_mixer: audio::NodeId,
 }
 
 
 impl GemController {
 	pub fn new(engine: &mut toybox::Engine) -> Result<GemController, Box<dyn Error>> {
 		Ok(GemController {
-			// chime_sound: {
-			// 	let source = audio::FileStream::from_vorbis_file("assets/chime.ogg")?;
-			// 	engine.audio.register_file_stream(source)
-			// },
+			chime_sound_id: {
+				let source = super::load_audio_buffer("assets/chime.ogg")?;
+				engine.audio.add_sound(source)
+			},
 
-			// gem_sound_bus: {
-			// 	let bus = engine.audio.new_bus("Gems");
-			// 	engine.audio.get_bus_mut(bus).unwrap().set_gain(0.5);
-			// 	bus
-			// },
+			gem_sound_mixer: {
+				engine.audio.add_node_with_send(audio::nodes::MixerNode::new(0.5), engine.audio.output_node())
+			},
 		})
 	}
 
@@ -31,7 +29,11 @@ impl GemController {
 					let dist = (gem.position - player.position).length();
 					if dist < 2.5 {
 						gem.state = GemState::Collecting(0.0);
-						// engine.audio.start_sound(self.gem_sound_bus, self.chime_sound);
+						engine.audio.update_graph(|graph| {
+							let sampler_node = audio::nodes::SamplerNode::new(self.chime_sound_id);
+							let sampler_id = graph.add_node(sampler_node, false);
+							graph.add_send(sampler_id, self.gem_sound_mixer);
+						});
 					}
 				}
 

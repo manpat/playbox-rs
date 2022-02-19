@@ -1,6 +1,5 @@
 use toybox::prelude::*;
 use toybox::input::raw::Scancode;
-use toybox::audio::{self, SoundAssetID};
 
 use crate::model::{self, Player, Camera, BlobShadowModel};
 use crate::intersect::{Ray, scene_raycast};
