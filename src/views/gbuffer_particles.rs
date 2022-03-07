@@ -45,6 +45,7 @@ impl GBufferParticlesView {
 		})
 	}
 
+	#[instrument(skip_all)]
 	pub fn update(&mut self, ctx: &mut super::ViewContext, fbo: gfx::FramebufferKey) {
 		{
 			let _section = ctx.perf.scoped_section("particle spawn");
@@ -86,6 +87,7 @@ impl GBufferParticlesView {
 
 	}
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("particles");
 

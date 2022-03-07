@@ -52,6 +52,7 @@ impl GemView {
 		})
 	}
 
+	#[instrument(skip_all)]
 	pub fn update(&mut self, scene: &model::Scene, blob_shadows: &mut model::BlobShadowModel) {
 		use model::scene::GemState;
 
@@ -69,8 +70,8 @@ impl GemView {
 					}
 
 					GemState::Collecting(t) => {
-						let float_away = t.ease_back_in(0.0, 6.0);
-						let scale = t.ease_back_in(1.0, 0.0);
+						let float_away = t.ease_back_in().lerp(0.0, 6.0);
+						let scale = t.ease_back_in().lerp(1.0, 0.0);
 						let pos = gem.position + Vec3::from_y((anim_phase*2.0).sin() * 0.4 + float_away);
 						let rot = *anim_phase;
 						Some(Mat3x4::rotate_y_translate(rot, pos) * Mat3x4::uniform_scale(scale))
@@ -90,6 +91,7 @@ impl GemView {
 		}
 	}
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, gfx: &mut gfx::RenderState<'_>) {
 		if self.instance_buffer.is_empty() {
 			return

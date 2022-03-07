@@ -38,6 +38,7 @@ impl BlobShadowView {
 		})
 	}
 
+	#[instrument(skip_all)]
 	pub fn update(&mut self, blob_shadow_model: &model::BlobShadowModel, scene: &model::Scene) {
 		use crate::intersect::{Ray, scene_raycast};
 
@@ -59,6 +60,7 @@ impl BlobShadowView {
 		self.instance_buffer.upload(&instances);
 	}
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		if self.instance_buffer.is_empty() {
 			return

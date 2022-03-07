@@ -36,7 +36,7 @@ impl PlayerView {
 		})
 	}
 
-
+	#[instrument(skip_all)]
 	pub fn update(&mut self, player: &Player) {
 		let body_transform = Mat3x4::rotate_y_translate(player.yaw, player.body_position);
 
@@ -108,6 +108,7 @@ impl PlayerView {
 	}
 
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("player");
 

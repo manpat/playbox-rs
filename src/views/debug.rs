@@ -49,6 +49,7 @@ impl DebugView {
 	}
 
 
+	#[instrument(skip_all)]
 	pub fn update(&mut self, engine: &toybox::Engine, debug_model: &model::Debug) {
 		let vertices = [
 			ColorVertex2D::new(debug_model.mouse_pos + Vec2::new(-0.02,-0.02), Vec3::new(1.0, 1.0, 1.0)),
@@ -64,6 +65,7 @@ impl DebugView {
 	}
 
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext, debug_model: &model::Debug) {
 		{
 			let _section = ctx.perf.scoped_section("debug");

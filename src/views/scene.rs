@@ -23,7 +23,7 @@ impl SceneView {
 		let mut mesh_data = MeshData::new();
 		let main_scene = scene.main_scene();
 
-		for entity in main_scene.entities().filter(|e| !e.name.contains('_')) {
+		for entity in main_scene.entities().filter(|e| !e.name.contains('_') || e.name.starts_with("SOUND_")) {
 			build_entity_transformed(&mut mesh_data, entity, entity.transform());
 		}
 
@@ -38,10 +38,12 @@ impl SceneView {
 		})
 	}
 
+	#[instrument(skip_all)]
 	pub fn update(&mut self, scene: &model::Scene, blob_shadows: &mut model::BlobShadowModel) {
 		self.gem_view.update(scene, blob_shadows);
 	}
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		let _section = ctx.perf.scoped_section("scene");
 

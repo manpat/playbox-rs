@@ -45,6 +45,7 @@ impl MeshBuilderTestView {
 		})
 	}
 
+	#[instrument(skip_all)]
 	pub fn update(&mut self) {
 		self.mesh_data_2d.clear();
 		self.mesh_data_3d.clear();
@@ -98,11 +99,13 @@ impl MeshBuilderTestView {
 		self.time += 1.0 / 60.0;
 	}
 
+	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
 		ctx.gfx.bind_shader(self.shader_3d);
 		self.mesh_3d.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);
 	}
 
+	#[instrument(skip_all)]
 	pub fn draw_2d(&self, ctx: &mut super::ViewContext) {
 		ctx.gfx.bind_shader(self.shader_2d);
 		self.mesh_2d.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);

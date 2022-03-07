@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut camera_controller = controller::CameraController::new(&mut engine);
 	let mut debug_camera_controller = controller::DebugCameraController::new(&mut engine);
 	let mut gem_controller = controller::GemController::new(&mut engine)?;
-	let mut audio_test_controller = controller::AudioTestController::new(&mut engine);
+	let mut audio_test_controller = controller::AudioTestController::new(&mut engine, &scene);
 	let debug_controller = controller::DebugController::new(&mut engine);
 
 	let test_fbo = engine.gfx.new_framebuffer(
@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		debug_camera_controller.update(&mut engine, &mut camera);
 		player_controller.update(&mut engine, &mut player, &mut blob_shadow_model, &camera, &scene);
 		gem_controller.update(&mut engine, &mut scene, &player);
-		audio_test_controller.update(&mut engine);
+		audio_test_controller.update(&mut engine, &camera);
 
 		debug_view.update(&engine, &debug_model);
 		player_view.update(&player);
@@ -87,7 +87,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		blob_shadow_view.update(&blob_shadow_model, &scene);
 		mesh_builder_test_view.update();
 
-		engine.imgui.set_enabled(debug_model.active);
+		engine.imgui.set_input_enabled(debug_model.active);
+		engine.imgui.set_visible(true);
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload_single(&uniforms);

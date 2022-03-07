@@ -18,7 +18,7 @@ fn transform_ray(ray: &Ray, transform: &Mat3x4) -> Ray {
 }
 
 
-
+#[instrument(skip_all)]
 pub fn scene_raycast(scene: &toy::SceneRef<'_>, ray: &Ray) -> Option<Vec3> {
 	use common::ordified::*;
 

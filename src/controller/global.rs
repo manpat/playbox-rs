@@ -22,7 +22,7 @@ pub struct GlobalController {
 	pluck_sound_id: audio::SoundId,
 	// stereo_sound_id: audio::SoundId,
 	// static_ogg_sound_id: audio::SoundId,
-	file_ogg_sound_id: audio::SoundId,
+	// file_ogg_sound_id: audio::SoundId,
 
 	soundbus: audio::NodeId,
 
@@ -90,10 +90,10 @@ impl GlobalController {
 		// 	engine.audio.register_file_stream(stream)
 		// };
 
-		let file_ogg_sound_id = {
-			let sound = super::load_audio_buffer("assets/forest.ogg")?;
-			engine.audio.add_sound(sound)
-		};
+		// let file_ogg_sound_id = {
+		// 	let sound = super::load_audio_buffer("assets/forest.ogg")?;
+		// 	engine.audio.add_sound(sound)
+		// };
 
 
 		// let soundbus_bottom = engine.audio.new_bus("Global Bottom");
@@ -113,7 +113,7 @@ impl GlobalController {
 			pluck_sound_id,
 			// stereo_sound_id,
 			// static_ogg_sound_id,
-			file_ogg_sound_id,
+			// file_ogg_sound_id,
 
 			soundbus,
 
@@ -150,12 +150,12 @@ impl GlobalController {
 		// 	bus.start_sound(self.static_ogg_sound_id);
 		// }
 
-		if input_state.active(self.actions.play_file_stream_sound) {
-			engine.audio.update_graph(|graph| {
-				let node_id = graph.add_node(SamplerNode::new(self.file_ogg_sound_id), false);
-				graph.add_send(node_id, self.soundbus);
-			});
-		}
+		// if input_state.active(self.actions.play_file_stream_sound) {
+		// 	engine.audio.update_graph(|graph| {
+		// 		let node_id = graph.add_node(SamplerNode::new(self.file_ogg_sound_id), false);
+		// 		graph.add_send(node_id, self.soundbus);
+		// 	});
+		// }
 	}
 
 	pub fn should_quit(&self) -> bool {
