@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 
-[dependencies]
-toybox = { git = "https://github.com/manpat/toybox-rs.git" }
-
+[dependencies.toybox]
+git = "https://github.com/manpat/toybox-rs.git"
+features = ["tracy"]
