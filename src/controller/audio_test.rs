@@ -5,8 +5,14 @@ use crate::model;
 
 use std::iter;
 
+toybox::declare_input_context! {
+	struct Actions "Audio Test" {
+		trigger plink { "Plink" [input::raw::Scancode::Space] }
+	}
+}
 
 pub struct AudioTestController {
+	actions: Actions,
 	plink_sound_key: audio::SoundId,
 	plink_mixer_node: audio::NodeId,
 
@@ -15,22 +21,22 @@ pub struct AudioTestController {
 
 impl AudioTestController {
 	pub fn new(engine: &mut toybox::Engine, scene: &model::Scene) -> AudioTestController {
-		// let buffer = (0..44100/4)
-		// 	.map(|index| {
-		// 		let t = index as f32 / 44100.0;
-		// 		(880.0 * TAU * t).sin() * (1.0 - t*8.0).max(0.0).powi(4)
-		// 	})
-		// 	.collect();
+		let buffer = (0..44100/4)
+			.map(|index| {
+				let t = index as f32 / 44100.0;
+				(880.0 * TAU * t).sin() * (1.0 - t*8.0).max(0.0).powi(4)
+			})
+			.collect();
 
-		let buffer = super::load_audio_buffer("assets/chime.ogg").unwrap();
+		// let buffer = super::load_audio_buffer("assets/chime.ogg").unwrap();
 
 		let plink_sound_key = engine.audio.add_sound(buffer);
-		let plink_mixer_node = engine.audio.add_node_with_send(MixerNode::new(0.1), engine.audio.output_node());
+		let plink_mixer_node = engine.audio.add_node_with_send(MixerNode::new(1.0), engine.audio.output_node());
 
 
 		// let drone_mixer_node = engine.audio.add_node_with_send(MixerNode::new_stereo(0.001), engine.audio.output_node());
 
-		// engine.audio.update_graph(move |graph| {
+		// engine.audio.update_graph_immediate(move |graph| {
 		// 	let panner_node = graph.add_node(PannerNode::new(1.0), true);
 		// 	let mixer_node = graph.add_node(MixerNode::new(2.0), true);
 
@@ -42,7 +48,7 @@ impl AudioTestController {
 		// 	graph.add_send_chain(&[mixer_node, panner_node, drone_mixer_node]);
 		// });
 
-		// engine.audio.update_graph(move |graph| {
+		// engine.audio.update_graph_immediate(move |graph| {
 		// 	let panner_node = graph.add_node(PannerNode::new(-1.0), true);
 		// 	let mixer_node = graph.add_node(MixerNode::new(1.0), true);
 
@@ -77,7 +83,7 @@ impl AudioTestController {
 			})
 			.collect();
 
-		engine.audio.update_graph(|graph| {
+		engine.audio.update_graph_immediate(|graph| {
 			let mixer_node = graph.add_node(MixerNode::new_stereo(0.3), false);
 
 			graph.add_send_chain(&[mixer_node, graph.output_node()]);
@@ -108,6 +114,8 @@ impl AudioTestController {
 		});
 
 		AudioTestController {
+			actions: Actions::new_active(&mut engine.input),
+
 			plink_sound_key,
 			plink_mixer_node,
 
@@ -145,6 +153,11 @@ impl AudioTestController {
 			pan_parameter.write(pan);
 			attenuation_parameter.write(attenuation);
 			cutoff_parameter.write(cutoff);
+		}
+
+		if engine.input.frame_state().active(self.actions.plink) {
+			let node = SamplerNode::new(self.plink_sound_key);
+			engine.audio.add_node_with_send(node, self.plink_mixer_node);
 		}
 
 		let ui = engine.imgui.frame();
@@ -284,7 +297,7 @@ impl Node for SpatialiseNode {
 		let input = &inputs[0];
 		assert!(!input.stereo());
 
-		let smoothing = input.len();
+		let smoothing = input.len().min(100);
 		let mut pan_curve = self.pan_parameter.read(smoothing);
 		let mut attenuation_curve = self.attenuation_parameter.read(smoothing);
 		let mut cutoff_curve = self.cutoff_parameter.read(smoothing);

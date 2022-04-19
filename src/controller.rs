@@ -115,7 +115,7 @@ pub fn load_audio_buffer(asset_path: impl AsRef<std::path::Path>) -> Result<Vec<
 
                     // The samples may now be access via the `samples()` function.
                     // sample_count += buf.samples().len();
-                    println!("Decoded {} samples", buf.samples().len());
+                    // println!("Decoded {} samples", buf.samples().len());
                 }
 			}
 			Err(Error::IoError(_)) => {

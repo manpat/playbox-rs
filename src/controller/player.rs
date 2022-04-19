@@ -32,7 +32,7 @@ impl PlayerController {
 			let framerate = 44100;
 			let freq = 20.0;
 
-			let attack_t = framerate as f32 * 0.001;
+			let attack_t = framerate as f32 * 0.005;
 			let release_t = framerate as f32 * 0.1;
 
 			let sound_t = attack_t + release_t;
@@ -172,12 +172,13 @@ impl PlayerController {
 
 				let sampler_node = audio::nodes::SamplerNode::new(self.footstep_sound_id);
 				let mixer_node = audio::nodes::MixerNode::new(gain);
+				let global_mixer_node = self.footstep_mixer;
 
-				engine.audio.update_graph(|graph| {
+				engine.audio.queue_update(move |graph| {
 					let mixer_id = graph.add_node(mixer_node, true);
 					let sampler_id = graph.add_node(sampler_node, false);
 
-					graph.add_send_chain(&[sampler_id, mixer_id, self.footstep_mixer]);
+					graph.add_send_chain(&[sampler_id, mixer_id, global_mixer_node]);
 				});
 			}
 		}

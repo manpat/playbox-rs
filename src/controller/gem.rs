@@ -29,10 +29,13 @@ impl GemController {
 					let dist = (gem.position - player.position).length();
 					if dist < 2.5 {
 						gem.state = GemState::Collecting(0.0);
-						engine.audio.update_graph(|graph| {
-							let sampler_node = audio::nodes::SamplerNode::new(self.chime_sound_id);
+
+						let gem_sound_mixer = self.gem_sound_mixer;
+						let sampler_node = audio::nodes::SamplerNode::new(self.chime_sound_id);
+
+						engine.audio.queue_update(move |graph| {
 							let sampler_id = graph.add_node(sampler_node, false);
-							graph.add_send(sampler_id, self.gem_sound_mixer);
+							graph.add_send(sampler_id, gem_sound_mixer);
 						});
 					}
 				}

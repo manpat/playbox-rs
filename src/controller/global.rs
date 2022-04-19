@@ -136,7 +136,7 @@ impl GlobalController {
 		}
 
 		if input_state.active(self.actions.play_sound) {
-			engine.audio.update_graph(|graph| {
+			engine.audio.update_graph_immediate(|graph| {
 				let node_id = graph.add_node(SamplerNode::new(self.pluck_sound_id), false);
 				graph.add_send(node_id, self.soundbus);
 			});
@@ -151,7 +151,7 @@ impl GlobalController {
 		// }
 
 		// if input_state.active(self.actions.play_file_stream_sound) {
-		// 	engine.audio.update_graph(|graph| {
+		// 	engine.audio.update_graph_immediate(|graph| {
 		// 		let node_id = graph.add_node(SamplerNode::new(self.file_ogg_sound_id), false);
 		// 		graph.add_send(node_id, self.soundbus);
 		// 	});
