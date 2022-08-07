@@ -16,7 +16,7 @@ pub struct PlayerView {
 }
 
 impl PlayerView {
-	pub fn new(gfx: &mut gfx::Context) -> Result<PlayerView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>) -> Result<PlayerView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,

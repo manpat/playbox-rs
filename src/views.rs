@@ -17,14 +17,14 @@ use toybox::perf::Instrumenter;
 
 
 pub struct ViewContext<'engine> {
-	pub gfx: gfx::RenderState<'engine>,
+	pub gfx: gfx::DrawContext<'engine>,
 	pub resources: &'engine gfx::Resources,
 	pub perf: &'engine mut Instrumenter,
 	pub imgui: &'engine imgui::Ui<'static>,
 }
 
 impl<'engine> ViewContext<'engine> {
-	pub fn new(gfx: gfx::RenderState<'engine>, perf: &'engine mut Instrumenter, imgui: &'engine imgui::Ui<'static>) -> ViewContext<'engine> {
+	pub fn new(gfx: gfx::DrawContext<'engine>, perf: &'engine mut Instrumenter, imgui: &'engine imgui::Ui<'static>) -> ViewContext<'engine> {
 		let resources = gfx.resources();
 		ViewContext {
 			gfx,

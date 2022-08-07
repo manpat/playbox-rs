@@ -14,7 +14,7 @@ pub struct SceneView {
 }
 
 impl SceneView {
-	pub fn new(gfx: &mut gfx::Context, scene: &model::Scene) -> Result<SceneView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>, scene: &model::Scene) -> Result<SceneView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,

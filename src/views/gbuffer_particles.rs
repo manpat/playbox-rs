@@ -12,7 +12,7 @@ pub struct GBufferParticlesView {
 }
 
 impl GBufferParticlesView {
-	pub fn new(gfx: &mut gfx::Context) -> Result<GBufferParticlesView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>) -> Result<GBufferParticlesView, Box<dyn Error>> {
 		gfx.add_shader_import("gbuffer_particle", include_str!("../shaders/gbuffer_particle.common.glsl"));
 
 		let draw_shader = gfx.new_simple_shader(

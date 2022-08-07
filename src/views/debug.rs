@@ -16,7 +16,7 @@ pub struct DebugView {
 }
 
 impl DebugView {
-	pub fn new(gfx: &mut gfx::Context, scene: &model::Scene) -> Result<DebugView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>, scene: &model::Scene) -> Result<DebugView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_2D_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -25,7 +25,7 @@ impl DebugView {
 		let mut vao = gfx.new_vao();
 
 		let vertex_buffer = gfx.new_buffer::<ColorVertex2D>(gfx::BufferUsage::Stream);
-		let mut index_buffer = gfx.new_buffer::<u16>(gfx::BufferUsage::Static);
+		let mut index_buffer = gfx.new_buffer(gfx::BufferUsage::Static);
 
 		vao.bind_vertex_buffer(0, vertex_buffer);
 		vao.bind_index_buffer(index_buffer);

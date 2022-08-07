@@ -15,9 +15,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut engine = toybox::Engine::new("playbox")?;
 
-	engine.gfx.add_shader_import("global", shaders::GLOBAL_COMMON);
-
-	let mut uniform_buffer = engine.gfx.new_buffer(gfx::BufferUsage::Stream);
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
@@ -26,12 +23,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut blob_shadow_model = model::BlobShadowModel::new();
 
-	let mut player_view = views::PlayerView::new(&mut engine.gfx)?;
-	let mut debug_view = views::DebugView::new(&mut engine.gfx, &scene)?;
-	let mut scene_view = views::SceneView::new(&mut engine.gfx, &scene)?;
-	let mut blob_shadow_view = views::BlobShadowView::new(&mut engine.gfx)?;
-	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut engine.gfx)?;
-	let mut gbuffer_particles_view = views::GBufferParticlesView::new(&mut engine.gfx)?;
 
 	let mut global_controller = controller::GlobalController::new(&mut engine)?;
 	let mut player_controller = controller::PlayerController::new(&mut engine);
@@ -41,23 +32,38 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut audio_test_controller = controller::AudioTestController::new(&mut engine, &scene);
 	let debug_controller = controller::DebugController::new(&mut engine);
 
-	let test_fbo = engine.gfx.new_framebuffer(
+
+	let view_resource_scope_token = engine.gfx.new_resource_scope();
+	let mut view_resource_context = engine.gfx.resource_context(&view_resource_scope_token);
+
+	view_resource_context.add_shader_import("global", shaders::GLOBAL_COMMON);
+	let mut uniform_buffer = view_resource_context.new_buffer(gfx::BufferUsage::Stream);
+
+	let mut player_view = views::PlayerView::new(&mut view_resource_context)?;
+	let mut debug_view = views::DebugView::new(&mut view_resource_context, &scene)?;
+	let mut scene_view = views::SceneView::new(&mut view_resource_context, &scene)?;
+	let mut blob_shadow_view = views::BlobShadowView::new(&mut view_resource_context)?;
+	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut view_resource_context)?;
+	let mut gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
+
+	let test_fbo = view_resource_context.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::Backbuffer)
 			.add_depth()
 			.add_color(0, gfx::TextureFormat::R11G11B10F)
 			.add_color(3, gfx::TextureFormat::color())
 	);
 
-	let test_fbo2 = engine.gfx.new_framebuffer(
+	let test_fbo2 = view_resource_context.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(3))
 			.add_depth()
 			.add_color(0, gfx::TextureFormat::color())
 	);
 
-	let post_effect_compute_shader = engine.gfx.new_compute_shader(shaders::TEST_POST_EFFECT_COMPUTE)?;
+	let post_effect_compute_shader = view_resource_context.new_compute_shader(shaders::TEST_POST_EFFECT_COMPUTE)?;
 
-	let composite_shader = engine.gfx.new_simple_shader(shaders::FULLSCREEN_QUAD_VERT,
+	let composite_shader = view_resource_context.new_simple_shader(shaders::FULLSCREEN_QUAD_VERT,
 		include_str!("shaders/final_composite.frag.glsl"))?;
+
 
 	'main: loop {
 		engine.process_events();
@@ -93,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload_single(&uniforms);
 
-		let mut view_ctx = views::ViewContext::new(engine.gfx.render_state(), &mut engine.instrumenter, engine.imgui.frame());
+		let mut view_ctx = views::ViewContext::new(engine.gfx.draw_context(), &mut engine.instrumenter, engine.imgui.frame());
 
 		view_ctx.gfx.set_clear_color(Color::grey_a(0.1, 0.0));
 		view_ctx.gfx.clear(gfx::ClearMode::ALL);

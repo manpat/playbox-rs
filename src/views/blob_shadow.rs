@@ -9,7 +9,7 @@ pub struct BlobShadowView {
 }
 
 impl BlobShadowView {
-	pub fn new(gfx: &mut gfx::Context) -> Result<BlobShadowView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>) -> Result<BlobShadowView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_INSTANCED_TRANFORM_VERT,
 			crate::shaders::FLAT_COLOR_PATTERN_ALPHA_FRAG,

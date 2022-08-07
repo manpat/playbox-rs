@@ -16,7 +16,7 @@ pub struct MeshBuilderTestView {
 }
 
 impl MeshBuilderTestView {
-	pub fn new(gfx: &mut gfx::Context) -> Result<Self, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>) -> Result<Self, Box<dyn Error>> {
 		let shader_3d = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_VERT,
 			crate::shaders::FLAT_COLOR_PATTERN_ALPHA_FRAG,

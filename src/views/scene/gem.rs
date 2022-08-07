@@ -20,7 +20,7 @@ pub struct GemView {
 }
 
 impl GemView {
-	pub fn new(gfx: &mut gfx::Context, scene: &model::Scene) -> Result<GemView, Box<dyn Error>> {
+	pub fn new(gfx: &mut gfx::ResourceContext<'_>, scene: &model::Scene) -> Result<GemView, Box<dyn Error>> {
 		let shader = gfx.new_simple_shader(
 			crate::shaders::COLOR_3D_INSTANCED_TRANFORM_VERT,
 			crate::shaders::FLAT_COLOR_FRAG,
@@ -92,7 +92,7 @@ impl GemView {
 	}
 
 	#[instrument(skip_all)]
-	pub fn draw(&self, gfx: &mut gfx::RenderState<'_>) {
+	pub fn draw(&self, gfx: &mut gfx::DrawContext<'_>) {
 		if self.instance_buffer.is_empty() {
 			return
 		}
