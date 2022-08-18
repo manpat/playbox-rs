@@ -15,7 +15,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut engine = toybox::Engine::new("playbox")?;
 
-
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
 	let mut debug_model = model::Debug::new();
@@ -44,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut scene_view = views::SceneView::new(&mut view_resource_context, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&mut view_resource_context)?;
 	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut view_resource_context)?;
-	let mut gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
+	let mut _gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
 
 	let test_fbo = view_resource_context.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::Backbuffer)
@@ -98,6 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload_single(&uniforms);
+
 
 		let mut view_ctx = views::ViewContext::new(engine.gfx.draw_context(), &mut engine.instrumenter, engine.imgui.frame());
 
@@ -162,9 +162,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 			debug_view.draw(&mut view_ctx, &debug_model);
 			mesh_builder_test_view.draw_2d(&mut view_ctx);
 		}
-			
+
 		engine.end_frame();
 	}
+
 
 	Ok(())
 }
