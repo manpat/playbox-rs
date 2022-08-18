@@ -1,5 +1,9 @@
 #![feature(array_chunks)]
 
+// Disabled because it doesn't seem to track drops properly
+// #![feature(must_not_suspend)]
+// #![deny(must_not_suspend)]
+
 use toybox::prelude::*;
 use std::error::Error;
 
@@ -14,6 +18,50 @@ fn main() -> Result<(), Box<dyn Error>> {
 	std::env::set_var("RUST_BACKTRACE", "1");
 
 	let mut engine = toybox::Engine::new("playbox")?;
+
+	execute_main_loop(&mut engine, run_main_scene())?;
+
+	Ok(())
+}
+
+
+
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+struct Uniforms {
+	projection_view: Mat4,
+	projection_view_inverse: Mat4,
+	ui_projection_view: Mat4,
+	// NOTE: align to Vec4s
+}
+
+
+fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
+	let projection_view = {
+		let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
+		let camera_orientation = camera_orientation.to_mat4();
+
+		Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
+			* camera_orientation
+			* Mat4::translate(-camera.position)
+	};
+
+	Uniforms {
+		projection_view,
+		projection_view_inverse: projection_view.inverse(),
+
+		ui_projection_view: {
+			Mat4::scale(Vec3::new(1.0 / aspect, 1.0, 1.0))
+		}
+	}
+}
+
+
+
+
+async fn run_main_scene() -> Result<(), Box<dyn Error>> {
+	let mut engine = NextFrame.await;
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
@@ -63,13 +111,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let composite_shader = view_resource_context.new_simple_shader(shaders::FULLSCREEN_QUAD_VERT,
 		include_str!("shaders/final_composite.frag.glsl"))?;
 
+	drop(engine);
+
 
 	'main: loop {
-		engine.process_events();
-
-		if engine.should_quit() {
-			break 'main
-		}
+		let mut engine_ref = NextFrame.await;
+		let mut engine = &mut *engine_ref;
 
 		global_controller.update(&mut engine);
 
@@ -162,43 +209,146 @@ fn main() -> Result<(), Box<dyn Error>> {
 			debug_view.draw(&mut view_ctx, &debug_model);
 			mesh_builder_test_view.draw_2d(&mut view_ctx);
 		}
-
-		engine.end_frame();
 	}
-
 
 	Ok(())
 }
 
 
 
+use std::cell::Cell;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct Uniforms {
-	projection_view: Mat4,
-	projection_view_inverse: Mat4,
-	ui_projection_view: Mat4,
-	// NOTE: align to Vec4s
+thread_local! {
+	static CURRENT_ENGINE_PTR: Cell<*mut toybox::Engine> = Cell::new(std::ptr::null_mut());
 }
 
 
-fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
-	let projection_view = {
-		let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
-		let camera_orientation = camera_orientation.to_mat4();
 
-		Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
-			* camera_orientation
-			* Mat4::translate(-camera.position)
+use std::future::{Future, IntoFuture};
+use std::task::{Context, Poll, Wake};
+use std::pin::Pin;
+use std::sync::Arc;
+
+
+// #[must_not_suspend]
+struct EngineRef {
+	_priv: ()
+}
+
+impl std::ops::Deref for EngineRef {
+	type Target = toybox::Engine;
+
+	fn deref(&self) -> &toybox::Engine {
+		CURRENT_ENGINE_PTR.with(|engine_ptr| {
+			unsafe {
+				&*engine_ptr.get()
+			}
+		})
+	}
+}
+
+impl std::ops::DerefMut for EngineRef {
+	fn deref_mut(&mut self) -> &mut toybox::Engine {
+		CURRENT_ENGINE_PTR.with(|engine_ptr| {
+			unsafe {
+				&mut *engine_ptr.get()
+			}
+		})
+	}
+}
+
+impl std::ops::Drop for EngineRef {
+	fn drop(&mut self) {
+		CURRENT_ENGINE_PTR.with(|engine_ptr| {
+			engine_ptr.set(std::ptr::null_mut())
+		})
+	}
+}
+
+
+
+struct NextFrameFuture(Option<()>);
+
+impl Future for NextFrameFuture {
+	type Output = EngineRef;
+
+	fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+		CURRENT_ENGINE_PTR.with(|engine_ptr| {
+			// Ensure we suspend the first frame we're polled, and consume the engine ptr.
+			if let Some(_) = self.0.take() {
+				engine_ptr.set(std::ptr::null_mut());
+				Poll::Pending
+
+			} else {
+				Poll::Ready(EngineRef {
+					_priv: ()
+				})
+			}
+		})
+	}
+}
+
+
+struct NextFrame;
+
+impl IntoFuture for NextFrame {
+	type Output = EngineRef;
+	type IntoFuture = NextFrameFuture;
+
+	fn into_future(self) -> NextFrameFuture {
+		NextFrameFuture(Some(()))
+	}
+}
+
+
+
+
+struct NullWaker;
+
+impl Wake for NullWaker {
+	fn wake(self: Arc<Self>) {}
+	fn wake_by_ref(self: &Arc<Self>) {}
+}
+
+
+fn execute_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<(), Box<dyn Error>>
+	where F: Future<Output=Result<(), Box<dyn Error>>>
+{
+	// Pin the future so it can be polled.
+	let mut future = unsafe {
+		Pin::new_unchecked(&mut future)
 	};
 
-	Uniforms {
-		projection_view,
-		projection_view_inverse: projection_view.inverse(),
+	// Create a new context to be passed to the future.
+	let waker = Arc::new(NullWaker).into();
 
-		ui_projection_view: {
-			Mat4::scale(Vec3::new(1.0 / aspect, 1.0, 1.0))
+	// Run the future to completion.
+	loop {
+		engine.process_events();
+
+		if engine.should_quit() {
+			break
 		}
+
+		CURRENT_ENGINE_PTR.with(|engine_ptr| {
+			engine_ptr.set(engine);
+		});
+
+		let mut context = Context::from_waker(&waker);
+
+		if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+			result?;
+			break
+		}
+
+		CURRENT_ENGINE_PTR.with(|engine_ptr| {
+			assert!(engine_ptr.get().is_null(), "EngineRef held across suspend point");
+		});
+
+		engine.end_frame();
 	}
+
+	engine.end_frame();
+
+	Ok(())
 }
