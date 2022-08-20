@@ -19,9 +19,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let mut engine = toybox::Engine::new("playbox")?;
 
-	execute_main_loop(&mut engine, run_main_scene())?;
+	let mut main_resource_context = engine.gfx.resource_context(None);
+	main_resource_context.add_shader_import("global", shaders::GLOBAL_COMMON);
 
-	Ok(())
+	run_main_loop(&mut engine, main_game_loop())
 }
 
 
@@ -60,13 +61,25 @@ fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
 
 
 
-async fn run_main_scene() -> Result<(), Box<dyn Error>> {
+async fn main_game_loop() -> Result<(), Box<dyn Error>> {
+	load_and_play_scene("assets/scene.toy", "main").await?;
+	load_and_play_scene("assets/scene.toy", "second").await?;
+	load_and_play_scene("assets/scene.toy", "main").await?;
+
+	Ok(())
+}
+
+
+
+
+
+async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scene_name: impl Into<String>) -> Result<(), Box<dyn Error>> {
 	let mut engine = NextFrame.await;
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
 	let mut debug_model = model::Debug::new();
-	let mut scene = model::Scene::new()?;
+	let mut scene = model::Scene::new(project_path, scene_name)?;
 
 	let mut blob_shadow_model = model::BlobShadowModel::new();
 
@@ -82,8 +95,6 @@ async fn run_main_scene() -> Result<(), Box<dyn Error>> {
 
 	let view_resource_scope_token = engine.gfx.new_resource_scope();
 	let mut view_resource_context = engine.gfx.resource_context(&view_resource_scope_token);
-
-	view_resource_context.add_shader_import("global", shaders::GLOBAL_COMMON);
 	let mut uniform_buffer = view_resource_context.new_buffer(gfx::BufferUsage::Stream);
 
 	let mut player_view = views::PlayerView::new(&mut view_resource_context)?;
@@ -231,6 +242,7 @@ use std::sync::Arc;
 
 
 // #[must_not_suspend]
+/// Holds temporary ownership of the engine through CURRENT_ENGINE_PTR.
 struct EngineRef {
 	_priv: ()
 }
@@ -280,6 +292,8 @@ impl Future for NextFrameFuture {
 				Poll::Pending
 
 			} else {
+				assert!(!engine_ptr.get().is_null(), "CURRENT_ENGINE_PTR unexpectedly null");
+
 				Poll::Ready(EngineRef {
 					_priv: ()
 				})
@@ -311,7 +325,7 @@ impl Wake for NullWaker {
 }
 
 
-fn execute_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<(), Box<dyn Error>>
+fn run_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<(), Box<dyn Error>>
 	where F: Future<Output=Result<(), Box<dyn Error>>>
 {
 	// Pin the future so it can be polled.
@@ -330,6 +344,7 @@ fn execute_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<()
 			break
 		}
 
+		// Set up context for the future - which will either consume it when polled, or complete.
 		CURRENT_ENGINE_PTR.with(|engine_ptr| {
 			engine_ptr.set(engine);
 		});
@@ -341,6 +356,7 @@ fn execute_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<()
 			break
 		}
 
+		// If the future has not completed, then it must have consumed its context.
 		CURRENT_ENGINE_PTR.with(|engine_ptr| {
 			assert!(engine_ptr.get().is_null(), "EngineRef held across suspend point");
 		});
