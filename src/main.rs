@@ -5,14 +5,16 @@
 // #![deny(must_not_suspend)]
 
 use toybox::prelude::*;
-use std::error::Error;
 
 mod views;
 mod model;
 mod controller;
 mod shaders;
+mod executor;
 
 mod intersect;
+
+use executor::NextFrame;
 
 fn main() -> Result<(), Box<dyn Error>> {
 	std::env::set_var("RUST_BACKTRACE", "1");
@@ -22,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut main_resource_context = engine.gfx.resource_context(None);
 	main_resource_context.add_shader_import("global", shaders::GLOBAL_COMMON);
 
-	run_main_loop(&mut engine, main_game_loop())
+	executor::run_main_loop(&mut engine, main_game_loop())
 }
 
 
@@ -60,16 +62,102 @@ fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
 
 
 
-
-async fn main_game_loop() -> Result<(), Box<dyn Error>> {
-	load_and_play_scene("assets/scene.toy", "main").await?;
-	load_and_play_scene("assets/scene.toy", "second").await?;
-	load_and_play_scene("assets/scene.toy", "main").await?;
-
-	Ok(())
+enum MainMenuCommand {
+	PlayScene(&'static str),
+	Quit,
 }
 
 
+async fn main_game_loop() -> Result<(), Box<dyn Error>> {
+	loop {
+		match main_menu().await? {
+			MainMenuCommand::PlayScene(scene) => {
+				load_and_play_scene("assets/scene.toy", scene).await?;
+			}
+
+			MainMenuCommand::Quit => return Ok(())
+		}
+	}
+}
+
+
+
+
+async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
+	let mut engine = NextFrame.await;
+
+	let mut global_controller = controller::GlobalController::new(&mut engine)?;
+
+	let scene_list: Vec<_> = {
+		let scene_data = std::fs::read("assets/scene.toy")?;
+		let source_data = toy::load(&scene_data)?;
+		source_data.scenes.iter()
+			.map(|s| s.name.clone())
+			.collect()
+	};
+
+	let view_resource_scope_token = engine.gfx.new_resource_scope();
+	let mut view_resource_context = engine.gfx.resource_context(&view_resource_scope_token);
+
+	drop(engine);
+
+
+	'main: loop {
+		let mut engine = NextFrame.await;
+
+		global_controller.update(&mut engine);
+		if global_controller.should_quit() {
+			break 'main
+		}
+
+		engine.imgui.set_input_enabled(true);
+		engine.imgui.set_visible(true);
+
+
+		let mut view_ctx = views::ViewContext::new(&mut engine);
+
+		view_ctx.gfx.set_clear_color(Color::grey(0.1));
+		view_ctx.gfx.clear(gfx::ClearMode::ALL);
+
+
+		let ui = engine.imgui.frame();
+
+		if let Some(_window) = imgui::Window::new("Main Menu")
+			.size([300.0, -1.0], imgui::Condition::Once)
+			.position([30.0, 30.0], imgui::Condition::Appearing)
+			.begin(ui)
+		{
+			if ui.button("Main Scene") {
+				return Ok(MainMenuCommand::PlayScene("main"));
+			}
+
+			if ui.button("Second Scene") {
+				return Ok(MainMenuCommand::PlayScene("second"));
+			}
+
+			if ui.button("Quit") {
+				break 'main
+			}
+		}
+
+		if let Some(_window) = imgui::Window::new("Scene List")
+			.size([300.0, -1.0], imgui::Condition::Once)
+			.position([350.0, 30.0], imgui::Condition::Appearing)
+			.begin(ui)
+		{
+			if let Some(_list) = imgui::ListBox::new("scene list")
+				.size([-1.0, 0.0])
+				.begin(ui)
+			{
+				for scene in scene_list.iter() {
+					ui.text(format!("{scene}"));
+				}
+			}
+		}
+	}
+
+	Ok(MainMenuCommand::Quit)
+}
 
 
 
@@ -126,8 +214,7 @@ async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scene_na
 
 
 	'main: loop {
-		let mut engine_ref = NextFrame.await;
-		let mut engine = &mut *engine_ref;
+		let mut engine = NextFrame.await;
 
 		global_controller.update(&mut engine);
 
@@ -157,7 +244,7 @@ async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scene_na
 		uniform_buffer.upload_single(&uniforms);
 
 
-		let mut view_ctx = views::ViewContext::new(engine.gfx.draw_context(), &mut engine.instrumenter, engine.imgui.frame());
+		let mut view_ctx = views::ViewContext::new(&mut engine);
 
 		view_ctx.gfx.set_clear_color(Color::grey_a(0.1, 0.0));
 		view_ctx.gfx.clear(gfx::ClearMode::ALL);
@@ -226,145 +313,3 @@ async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scene_na
 }
 
 
-
-use std::cell::Cell;
-
-thread_local! {
-	static CURRENT_ENGINE_PTR: Cell<*mut toybox::Engine> = Cell::new(std::ptr::null_mut());
-}
-
-
-
-use std::future::{Future, IntoFuture};
-use std::task::{Context, Poll, Wake};
-use std::pin::Pin;
-use std::sync::Arc;
-
-
-// #[must_not_suspend]
-/// Holds temporary ownership of the engine through CURRENT_ENGINE_PTR.
-struct EngineRef {
-	_priv: ()
-}
-
-impl std::ops::Deref for EngineRef {
-	type Target = toybox::Engine;
-
-	fn deref(&self) -> &toybox::Engine {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			unsafe {
-				&*engine_ptr.get()
-			}
-		})
-	}
-}
-
-impl std::ops::DerefMut for EngineRef {
-	fn deref_mut(&mut self) -> &mut toybox::Engine {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			unsafe {
-				&mut *engine_ptr.get()
-			}
-		})
-	}
-}
-
-impl std::ops::Drop for EngineRef {
-	fn drop(&mut self) {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			engine_ptr.set(std::ptr::null_mut())
-		})
-	}
-}
-
-
-
-struct NextFrameFuture(Option<()>);
-
-impl Future for NextFrameFuture {
-	type Output = EngineRef;
-
-	fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			// Ensure we suspend the first frame we're polled, and consume the engine ptr.
-			if let Some(_) = self.0.take() {
-				engine_ptr.set(std::ptr::null_mut());
-				Poll::Pending
-
-			} else {
-				assert!(!engine_ptr.get().is_null(), "CURRENT_ENGINE_PTR unexpectedly null");
-
-				Poll::Ready(EngineRef {
-					_priv: ()
-				})
-			}
-		})
-	}
-}
-
-
-struct NextFrame;
-
-impl IntoFuture for NextFrame {
-	type Output = EngineRef;
-	type IntoFuture = NextFrameFuture;
-
-	fn into_future(self) -> NextFrameFuture {
-		NextFrameFuture(Some(()))
-	}
-}
-
-
-
-
-struct NullWaker;
-
-impl Wake for NullWaker {
-	fn wake(self: Arc<Self>) {}
-	fn wake_by_ref(self: &Arc<Self>) {}
-}
-
-
-fn run_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<(), Box<dyn Error>>
-	where F: Future<Output=Result<(), Box<dyn Error>>>
-{
-	// Pin the future so it can be polled.
-	let mut future = unsafe {
-		Pin::new_unchecked(&mut future)
-	};
-
-	// Create a new context to be passed to the future.
-	let waker = Arc::new(NullWaker).into();
-
-	// Run the future to completion.
-	loop {
-		engine.process_events();
-
-		if engine.should_quit() {
-			break
-		}
-
-		// Set up context for the future - which will either consume it when polled, or complete.
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			engine_ptr.set(engine);
-		});
-
-		let mut context = Context::from_waker(&waker);
-
-		if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
-			result?;
-			break
-		}
-
-		// If the future has not completed, then it must have consumed its context.
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			assert!(engine_ptr.get().is_null(), "EngineRef held across suspend point");
-		});
-
-		engine.end_frame();
-	}
-
-	engine.end_frame();
-
-	Ok(())
-}

@@ -24,8 +24,12 @@ pub struct ViewContext<'engine> {
 }
 
 impl<'engine> ViewContext<'engine> {
-	pub fn new(gfx: gfx::DrawContext<'engine>, perf: &'engine mut Instrumenter, imgui: &'engine imgui::Ui<'static>) -> ViewContext<'engine> {
+	pub fn new(engine: &'engine mut toybox::Engine) -> ViewContext<'engine> {
+		let gfx = engine.gfx.draw_context();
+		let perf = &mut engine.instrumenter;
+		let imgui = engine.imgui.frame();
 		let resources = gfx.resources();
+
 		ViewContext {
 			gfx,
 			resources,

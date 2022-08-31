@@ -448,7 +448,7 @@ impl DelayLineNode {
 impl Node for DelayLineNode {
 	fn has_stereo_output(&self, _: &EvaluationContext<'_>) -> bool { false }
 
-	fn process(&mut self, ProcessContext{inputs, output, eval_ctx}: ProcessContext<'_>) {
+	fn process(&mut self, ProcessContext{inputs, output, eval_ctx: _}: ProcessContext<'_>) {
 		assert!(inputs.len() == 1);
 		assert!(!output.stereo());
 
