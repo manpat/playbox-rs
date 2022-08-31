@@ -1,6 +1,6 @@
 use toybox::prelude::*;
 
-use crate::model::{self, scene::GemState};
+use crate::platformer3d::model::{self, scene::GemState};
 
 pub struct GemController {
 	chime_sound_id: audio::SoundId,

@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
 use gfx::mesh::{Mesh, MeshData};
 
-use crate::model;
+use crate::platformer3d::model;
 
 use super::build_entity_transformed;
 

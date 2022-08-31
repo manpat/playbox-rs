@@ -1,6 +1,7 @@
 use toybox::prelude::*;
 use gfx::vertex::ColorVertex2D;
-use crate::model;
+use crate::platformer3d::model;
+use crate::platformer3d::views;
 
 pub struct SrgbView {
 	shader: gfx::Shader,
@@ -52,7 +53,7 @@ impl SrgbView {
 		self.gradient_mesh.upload(&mesh_data);
 	}
 
-	pub fn draw(&self, ctx: &mut crate::views::ViewContext) {
+	pub fn draw(&self, ctx: &mut views::ViewContext) {
 		ctx.gfx.bind_shader(self.shader);
 		self.gradient_mesh.draw(&mut ctx.gfx, gfx::DrawMode::Triangles);
 	}

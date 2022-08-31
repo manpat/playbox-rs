@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use gfx::vertex::ColorVertex;
 use gfx::mesh::*;
 
-use crate::model::Player;
+use crate::platformer3d::model::Player;
 
 pub struct PlayerView {
 	shader: gfx::Shader,

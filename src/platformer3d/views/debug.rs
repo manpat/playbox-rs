@@ -1,6 +1,6 @@
 use toybox::prelude::*;
 use gfx::vertex::ColorVertex2D;
-use crate::model;
+use crate::platformer3d::model;
 
 mod srgb;
 mod perf;

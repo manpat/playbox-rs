@@ -1,5 +1,6 @@
 use toybox::prelude::*;
 
+
 pub struct GBufferParticlesView {
 	draw_shader: gfx::Shader,
 	spawn_shader: gfx::Shader,
@@ -13,19 +14,21 @@ pub struct GBufferParticlesView {
 
 impl GBufferParticlesView {
 	pub fn new(gfx: &mut gfx::ResourceContext<'_>) -> Result<GBufferParticlesView, Box<dyn Error>> {
-		gfx.add_shader_import("gbuffer_particle", include_str!("../shaders/gbuffer_particle.common.glsl"));
+		use crate::shaders::*;
+		
+		gfx.add_shader_import("gbuffer_particle", GBUFFER_PARTICLE_COMMON);
 
 		let draw_shader = gfx.new_simple_shader(
-			include_str!("../shaders/gbuffer_particle.vert.glsl"),
-			include_str!("../shaders/gbuffer_particle.frag.glsl"),
+			GBUFFER_PARTICLE_VERT,
+			GBUFFER_PARTICLE_FRAG,
 		)?;
 
 		let spawn_shader = gfx.new_compute_shader(
-			include_str!("../shaders/gbuffer_particle_spawn.compute.glsl"),
+			GBUFFER_PARTICLE_SPAWN_COMPUTE,
 		)?;
 
 		let update_shader = gfx.new_compute_shader(
-			include_str!("../shaders/gbuffer_particle_update.compute.glsl"),
+			GBUFFER_PARTICLE_UPDATE_COMPUTE,
 		)?;
 
 		let mut particle_buffer = gfx.new_buffer::<Particle>(gfx::BufferUsage::Static);

@@ -1,7 +1,7 @@
 use toybox::prelude::*;
 use toybox::audio::nodes::*;
 
-use crate::model;
+use crate::platformer3d::model;
 
 use std::iter;
 

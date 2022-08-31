@@ -11,3 +11,11 @@ pub const FLAT_COLOR_PATTERN_ALPHA_FRAG: &'static str = include_str!("shaders/fl
 pub const BASIC_TEXTURED_FRAG: &'static str = include_str!("shaders/basic_textured.frag.glsl");
 
 pub const TEST_POST_EFFECT_COMPUTE: &'static str = include_str!("shaders/test_post_effect.compute.glsl");
+
+
+
+pub const GBUFFER_PARTICLE_COMMON: &'static str = include_str!("shaders/gbuffer_particle.common.glsl");
+pub const GBUFFER_PARTICLE_VERT: &'static str = include_str!("shaders/gbuffer_particle.vert.glsl");
+pub const GBUFFER_PARTICLE_FRAG: &'static str = include_str!("shaders/gbuffer_particle.frag.glsl");
+pub const GBUFFER_PARTICLE_SPAWN_COMPUTE: &'static str = include_str!("shaders/gbuffer_particle_spawn.compute.glsl");
+pub const GBUFFER_PARTICLE_UPDATE_COMPUTE: &'static str = include_str!("shaders/gbuffer_particle_update.compute.glsl");

@@ -1,7 +1,7 @@
 use toybox::prelude::*;
 use toybox::input::raw::Scancode;
 
-use crate::model::{self, Player, Camera, BlobShadowModel};
+use crate::platformer3d::model::{self, Player, Camera, BlobShadowModel};
 use crate::intersect::{Ray, scene_raycast};
 
 
