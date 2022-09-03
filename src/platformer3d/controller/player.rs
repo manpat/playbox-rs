@@ -57,7 +57,7 @@ impl PlayerController {
 		let footstep_mixer = engine.audio.add_node_with_send(mixer_node, engine.audio.output_node());
 
 		PlayerController {
-			actions: PlayerActions::new_active(&mut engine.input),
+			actions: PlayerActions::new_active(engine),
 			move_speed: 0.0,
 			prev_angle_diff: 0.0,
 			next_foot_update: 0,

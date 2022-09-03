@@ -114,7 +114,7 @@ impl AudioTestController {
 		});
 
 		AudioTestController {
-			actions: Actions::new_active(&mut engine.input),
+			actions: Actions::new_active(engine),
 
 			plink_sound_key,
 			plink_mixer_node,

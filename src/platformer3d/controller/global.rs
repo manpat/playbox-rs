@@ -108,7 +108,7 @@ impl GlobalController {
 		let soundbus = engine.audio.add_node_with_send(MixerNode::new(0.1), engine.audio.output_node());
 
 		Ok(GlobalController {
-			actions: GlobalActions::new_active(&mut engine.input),
+			actions: GlobalActions::new_active(engine),
 
 			pluck_sound_id,
 			// stereo_sound_id,

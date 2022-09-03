@@ -23,7 +23,7 @@ pub struct CameraController {
 impl CameraController {
 	pub fn new(engine: &mut toybox::Engine) -> Self {
 		CameraController {
-			actions: CameraActions::new_active(&mut engine.input),
+			actions: CameraActions::new_active(engine),
 			zoom: 12.0,
 		}
 	}
