@@ -29,8 +29,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let debug_controller = controller::DebugController::new(&mut engine);
 
 
-	let view_resource_scope_token = engine.gfx.new_resource_scope();
-	let mut view_resource_context = engine.gfx.resource_context(&view_resource_scope_token);
+	let resource_scope_token = engine.new_resource_scope();
+	let mut view_resource_context = engine.gfx.resource_context(&resource_scope_token);
 	let mut uniform_buffer = view_resource_context.new_buffer(gfx::BufferUsage::Stream);
 
 	let mut player_view = views::PlayerView::new(&mut view_resource_context)?;

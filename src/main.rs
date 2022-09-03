@@ -63,8 +63,8 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 			.collect()
 	};
 
-	let view_resource_scope_token = engine.gfx.new_resource_scope();
-	let _view_resource_context = engine.gfx.resource_context(&view_resource_scope_token);
+	let _resource_scope_token = engine.new_resource_scope();
+	// let view_resource_context = engine.gfx.resource_context(&resource_scope_token);
 
 	drop(engine);
 
