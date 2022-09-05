@@ -34,8 +34,7 @@ impl GemController {
 						let sampler_node = audio::nodes::SamplerNode::new(self.chime_sound_id);
 
 						engine.audio.queue_update(move |graph| {
-							let sampler_id = graph.add_node(sampler_node, false);
-							graph.add_send(sampler_id, gem_sound_mixer);
+							graph.add_node(sampler_node, gem_sound_mixer);
 						});
 					}
 				}

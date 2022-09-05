@@ -31,7 +31,11 @@ impl AudioTestController {
 		// let buffer = super::load_audio_buffer("assets/chime.ogg").unwrap();
 
 		let plink_sound_key = engine.audio.add_sound(buffer);
-		let plink_mixer_node = engine.audio.add_node_with_send(MixerNode::new(1.0), engine.audio.output_node());
+		let plink_mixer_node = engine.audio.update_graph_immediate(|graph| {
+			let node_id = graph.add_node(MixerNode::new(1.0), graph.output_node());
+			graph.set_node_pinned(node_id, true);
+			node_id
+		});
 
 
 		// let drone_mixer_node = engine.audio.add_node_with_send(MixerNode::new_stereo(0.001), engine.audio.output_node());
@@ -84,9 +88,8 @@ impl AudioTestController {
 			.collect();
 
 		engine.audio.update_graph_immediate(|graph| {
-			let mixer_node = graph.add_node(MixerNode::new_stereo(0.3), false);
-
-			graph.add_send_chain(&[mixer_node, graph.output_node()]);
+			let mixer_node = graph.add_node(MixerNode::new_stereo(0.3), graph.output_node());
+			graph.set_node_pinned(mixer_node, true);
 
 			for emitter in emitters.iter() {
 				let pan_parameter = emitter.pan_parameter.clone();
@@ -95,10 +98,8 @@ impl AudioTestController {
 				let freq_parameter = emitter.freq_parameter.clone();
 				let feedback_parameter = emitter.feedback_parameter.clone();
 
-				let osc_node = graph.add_node(EmitterNode::new(freq_parameter), false);
-
-				let delay_line_node = graph.add_node(DelayLineNode::new(8000, feedback_parameter), true);
-
+				let osc_node = EmitterNode::new(freq_parameter);
+				let delay_line_node = DelayLineNode::new(8000, feedback_parameter);
 				let spatialise_node = SpatialiseNode {
 					pan_parameter,
 					attenuation_parameter,
@@ -107,9 +108,9 @@ impl AudioTestController {
 					filter: LowPass::new(),
 				};
 
-				let spatialise_node = graph.add_node(spatialise_node, true);
-
-				graph.add_send_chain(&[osc_node, delay_line_node, spatialise_node, mixer_node]);
+				let spatialise_node = graph.add_node(spatialise_node, mixer_node);
+				let delay_line_node = graph.add_node(delay_line_node, spatialise_node);
+				graph.add_node(osc_node, delay_line_node);
 			}
 		});
 
@@ -290,6 +291,8 @@ struct SpatialiseNode {
 impl Node for SpatialiseNode {
 	fn has_stereo_output(&self, _: &EvaluationContext<'_>) -> bool { true }
 
+	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Effect }
+
 	fn process(&mut self, ProcessContext{inputs, output, eval_ctx}: ProcessContext<'_>) {
 		assert!(inputs.len() == 1);
 		assert!(output.stereo());
@@ -351,6 +354,8 @@ impl EmitterNode {
 
 impl Node for EmitterNode {
 	fn has_stereo_output(&self, _: &EvaluationContext<'_>) -> bool { false }
+
+	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Source }
 
 	fn process(&mut self, ProcessContext{eval_ctx, inputs, output}: ProcessContext<'_>) {
 		assert!(inputs.is_empty());
@@ -447,6 +452,8 @@ impl DelayLineNode {
 
 impl Node for DelayLineNode {
 	fn has_stereo_output(&self, _: &EvaluationContext<'_>) -> bool { false }
+
+	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Effect }
 
 	fn process(&mut self, ProcessContext{inputs, output, eval_ctx: _}: ProcessContext<'_>) {
 		assert!(inputs.len() == 1);

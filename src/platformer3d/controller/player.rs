@@ -175,10 +175,8 @@ impl PlayerController {
 				let global_mixer_node = self.footstep_mixer;
 
 				engine.audio.queue_update(move |graph| {
-					let mixer_id = graph.add_node(mixer_node, true);
-					let sampler_id = graph.add_node(sampler_node, false);
-
-					graph.add_send_chain(&[sampler_id, mixer_id, global_mixer_node]);
+					let mixer_id = graph.add_node(mixer_node, global_mixer_node);
+					graph.add_node(sampler_node, mixer_id);
 				});
 			}
 		}

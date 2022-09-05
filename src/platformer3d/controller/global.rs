@@ -136,9 +136,9 @@ impl GlobalController {
 		}
 
 		if input_state.active(self.actions.play_sound) {
-			engine.audio.update_graph_immediate(|graph| {
-				let node_id = graph.add_node(SamplerNode::new(self.pluck_sound_id), false);
-				graph.add_send(node_id, self.soundbus);
+			let GlobalController { pluck_sound_id, soundbus, .. } = *self;
+			engine.audio.queue_update(move |graph| {
+				graph.add_node(SamplerNode::new(pluck_sound_id), soundbus);
 			});
 		}
 
