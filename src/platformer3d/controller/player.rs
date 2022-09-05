@@ -1,5 +1,6 @@
 use toybox::prelude::*;
 use toybox::input::raw::Scancode;
+use toybox::utility::ResourceScopeID;
 
 use crate::platformer3d::model::{self, Player, Camera, BlobShadowModel};
 use crate::intersect::{Ray, scene_raycast};
@@ -27,7 +28,7 @@ pub struct PlayerController {
 }
 
 impl PlayerController {
-	pub fn new(engine: &mut toybox::Engine) -> PlayerController {
+	pub fn new(engine: &mut toybox::Engine, resource_scope_id: ResourceScopeID) -> PlayerController {
 		let footstep_sound_id = {
 			let framerate = 44100;
 			let freq = 20.0;
@@ -53,8 +54,12 @@ impl PlayerController {
 			engine.audio.add_sound(buffer)
 		};
 
-		let mixer_node = audio::nodes::MixerNode::new(1.0);
-		let footstep_mixer = engine.audio.add_node_with_send(mixer_node, engine.audio.output_node());
+		let footstep_mixer = engine.audio.update_graph_immediate(|graph| {
+			let node = audio::nodes::MixerNode::new(1.0);
+			let node_id = graph.add_node(node, graph.output_node());
+			graph.pin_node_to_scope(node_id, resource_scope_id);
+			node_id
+		});
 
 		PlayerController {
 			actions: PlayerActions::new_active(engine),

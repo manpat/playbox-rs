@@ -1,5 +1,6 @@
 use toybox::prelude::*;
 use toybox::input::raw::Scancode;
+use toybox::utility::ResourceScopeID;
 
 use audio::nodes::{MixerNode, SamplerNode};
 
@@ -31,7 +32,7 @@ pub struct GlobalController {
 }
 
 impl GlobalController {
-	pub fn new(engine: &mut toybox::Engine) -> Result<GlobalController, Box<dyn Error>> {
+	pub fn new(engine: &mut toybox::Engine, resource_scope_id: ResourceScopeID) -> Result<GlobalController, Box<dyn Error>> {
 		let pluck_sound_id = {
 			let framerate = 44100;
 			let freq = 440.0;
@@ -105,7 +106,11 @@ impl GlobalController {
 		// engine.audio.get_bus_mut(soundbus_bottom).unwrap()
 		// 	.set_send_bus(soundbus_top);
 
-		let soundbus = engine.audio.add_node_with_send(MixerNode::new(0.1), engine.audio.output_node());
+		let soundbus = engine.audio.update_graph_immediate(|graph| {
+			let node_id = graph.add_node(MixerNode::new(0.1), graph.output_node());
+			graph.pin_node_to_scope(node_id, resource_scope_id);
+			node_id
+		});
 
 		Ok(GlobalController {
 			actions: GlobalActions::new_active(engine),

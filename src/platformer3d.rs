@@ -11,6 +11,7 @@ use crate::shaders;
 
 pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scene_name: impl Into<String>) -> Result<(), Box<dyn Error>> {
 	let mut engine = NextFrame.await;
+	let resource_scope_token = engine.new_resource_scope();
 
 	let mut player = model::Player::new();
 	let mut camera = model::Camera::new();
@@ -20,16 +21,15 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let mut blob_shadow_model = model::BlobShadowModel::new();
 
 
-	let mut global_controller = controller::GlobalController::new(&mut engine)?;
-	let mut player_controller = controller::PlayerController::new(&mut engine);
+	let mut global_controller = controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
+	let mut player_controller = controller::PlayerController::new(&mut engine, resource_scope_token.id());
 	let mut camera_controller = controller::CameraController::new(&mut engine);
 	let mut debug_camera_controller = controller::DebugCameraController::new(&mut engine);
-	let mut gem_controller = controller::GemController::new(&mut engine)?;
-	let mut audio_test_controller = controller::AudioTestController::new(&mut engine, &scene);
+	let mut gem_controller = controller::GemController::new(&mut engine, resource_scope_token.id())?;
+	let mut audio_test_controller = controller::AudioTestController::new(&mut engine, &scene, resource_scope_token.id());
 	let debug_controller = controller::DebugController::new(&mut engine);
 
 
-	let resource_scope_token = engine.new_resource_scope();
 	let mut view_resource_context = engine.gfx.resource_context(&resource_scope_token);
 	let mut uniform_buffer = view_resource_context.new_buffer(gfx::BufferUsage::Stream);
 

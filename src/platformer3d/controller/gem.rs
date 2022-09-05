@@ -1,4 +1,5 @@
 use toybox::prelude::*;
+use toybox::utility::ResourceScopeID;
 
 use crate::platformer3d::model::{self, scene::GemState};
 
@@ -9,16 +10,18 @@ pub struct GemController {
 
 
 impl GemController {
-	pub fn new(engine: &mut toybox::Engine) -> Result<GemController, Box<dyn Error>> {
+	pub fn new(engine: &mut toybox::Engine, resource_scope_id: ResourceScopeID) -> Result<GemController, Box<dyn Error>> {
 		Ok(GemController {
 			chime_sound_id: {
 				let source = super::load_audio_buffer("assets/chime.ogg")?;
 				engine.audio.add_sound(source)
 			},
 
-			gem_sound_mixer: {
-				engine.audio.add_node_with_send(audio::nodes::MixerNode::new(0.5), engine.audio.output_node())
-			},
+			gem_sound_mixer: engine.audio.update_graph_immediate(|graph| {
+				let node_id = graph.add_node(audio::nodes::MixerNode::new(0.5), graph.output_node());
+				graph.pin_node_to_scope(node_id, resource_scope_id);
+				node_id
+			}),
 		})
 	}
 

@@ -52,8 +52,9 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 
 async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 	let mut engine = NextFrame.await;
+	let resource_scope_token = engine.new_resource_scope();
 
-	let mut global_controller = platformer3d::controller::GlobalController::new(&mut engine)?;
+	let mut global_controller = platformer3d::controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 
 	let scene_list: Vec<_> = {
 		let scene_data = std::fs::read("assets/scene.toy")?;
@@ -63,7 +64,6 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 			.collect()
 	};
 
-	let _resource_scope_token = engine.new_resource_scope();
 	// let view_resource_context = engine.gfx.resource_context(&resource_scope_token);
 
 	drop(engine);

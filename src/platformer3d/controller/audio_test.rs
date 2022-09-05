@@ -1,5 +1,6 @@
 use toybox::prelude::*;
 use toybox::audio::nodes::*;
+use toybox::utility::ResourceScopeID;
 
 use crate::platformer3d::model;
 
@@ -15,12 +16,13 @@ pub struct AudioTestController {
 	actions: Actions,
 	plink_sound_key: audio::SoundId,
 	plink_mixer_node: audio::NodeId,
+	resource_scope_id: ResourceScopeID,
 
 	emitters: Vec<Emitter>,
 }
 
 impl AudioTestController {
-	pub fn new(engine: &mut toybox::Engine, scene: &model::Scene) -> AudioTestController {
+	pub fn new(engine: &mut toybox::Engine, scene: &model::Scene, resource_scope_id: ResourceScopeID) -> AudioTestController {
 		let buffer = (0..44100/4)
 			.map(|index| {
 				let t = index as f32 / 44100.0;
@@ -33,7 +35,7 @@ impl AudioTestController {
 		let plink_sound_key = engine.audio.add_sound(buffer);
 		let plink_mixer_node = engine.audio.update_graph_immediate(|graph| {
 			let node_id = graph.add_node(MixerNode::new(1.0), graph.output_node());
-			graph.set_node_pinned(node_id, true);
+			graph.pin_node_to_scope(node_id, resource_scope_id);
 			node_id
 		});
 
@@ -89,7 +91,7 @@ impl AudioTestController {
 
 		engine.audio.update_graph_immediate(|graph| {
 			let mixer_node = graph.add_node(MixerNode::new_stereo(0.3), graph.output_node());
-			graph.set_node_pinned(mixer_node, true);
+			graph.pin_node_to_scope(mixer_node, resource_scope_id);
 
 			for emitter in emitters.iter() {
 				let pan_parameter = emitter.pan_parameter.clone();
@@ -116,6 +118,7 @@ impl AudioTestController {
 
 		AudioTestController {
 			actions: Actions::new_active(engine),
+			resource_scope_id,
 
 			plink_sound_key,
 			plink_mixer_node,
@@ -157,8 +160,13 @@ impl AudioTestController {
 		}
 
 		if engine.input.frame_state().active(self.actions.plink) {
-			let node = SamplerNode::new(self.plink_sound_key);
-			engine.audio.add_node_with_send(node, self.plink_mixer_node);
+			let AudioTestController {plink_sound_key, plink_mixer_node, resource_scope_id, ..} = *self;
+
+			engine.audio.queue_update(move |graph| {
+				let node = SamplerNode::new(plink_sound_key);
+				let node_id = graph.add_node(node, plink_mixer_node);
+				graph.pin_node_to_scope(node_id, resource_scope_id);
+			});
 		}
 
 		let ui = engine.imgui.frame();
@@ -293,6 +301,7 @@ impl Node for SpatialiseNode {
 
 	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Effect }
 
+	#[instrument(skip_all, name = "SpatialiseNode::process")]
 	fn process(&mut self, ProcessContext{inputs, output, eval_ctx}: ProcessContext<'_>) {
 		assert!(inputs.len() == 1);
 		assert!(output.stereo());
@@ -357,6 +366,7 @@ impl Node for EmitterNode {
 
 	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Source }
 
+	#[instrument(skip_all, name = "EmitterNode::process")]
 	fn process(&mut self, ProcessContext{eval_ctx, inputs, output}: ProcessContext<'_>) {
 		assert!(inputs.is_empty());
 
@@ -455,6 +465,7 @@ impl Node for DelayLineNode {
 
 	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Effect }
 
+	#[instrument(skip_all, name = "DelayLineNode::process")]
 	fn process(&mut self, ProcessContext{inputs, output, eval_ctx: _}: ProcessContext<'_>) {
 		assert!(inputs.len() == 1);
 		assert!(!output.stereo());
