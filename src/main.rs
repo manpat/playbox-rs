@@ -1,4 +1,5 @@
 #![feature(array_chunks)]
+#![feature(must_not_suspend)]
 
 // Disabled because it doesn't seem to track drops properly
 // #![feature(must_not_suspend)]
@@ -12,7 +13,7 @@ mod intersect;
 
 mod platformer3d;
 
-use executor::NextFrame;
+use executor::{start_loop, next_frame};
 
 fn main() -> Result<(), Box<dyn Error>> {
 	std::env::set_var("RUST_BACKTRACE", "1");
@@ -51,7 +52,7 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 
 
 async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
-	let mut engine = NextFrame.await;
+	let mut engine = start_loop().await;
 	let resource_scope_token = engine.new_resource_scope();
 
 	let mut global_controller = platformer3d::controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
@@ -66,12 +67,8 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 
 	// let view_resource_context = engine.gfx.resource_context(&resource_scope_token);
 
-	drop(engine);
-
 
 	'main: loop {
-		let mut engine = NextFrame.await;
-
 		global_controller.update(&mut engine);
 		if global_controller.should_quit() {
 			break 'main
@@ -120,6 +117,8 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 				}
 			}
 		}
+
+		engine = next_frame(engine).await;
 	}
 
 	Ok(MainMenuCommand::Quit)

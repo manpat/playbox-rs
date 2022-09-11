@@ -6,84 +6,91 @@ use std::task::{Context, Poll, Wake};
 use std::pin::Pin;
 use std::sync::Arc;
 
-thread_local! {
-	static CURRENT_ENGINE_PTR: Cell<*mut toybox::Engine> = Cell::new(std::ptr::null_mut());
+
+
+fn exchange_global_engine_ptr(new_ptr: *mut toybox::Engine) -> *mut toybox::Engine {
+	thread_local! {
+		/// Pointer to the engine during execution of a future.
+		/// Whoever has this pointer has exclusive access to the engine.
+		/// Will be null outside of the executor context and when claimed by an EngineRef.
+		static CURRENT_ENGINE_PTR: Cell<*mut toybox::Engine> = Cell::new(std::ptr::null_mut());
+	}
+
+	CURRENT_ENGINE_PTR.with(|engine_ptr| engine_ptr.replace(new_ptr))
 }
 
 
 
 
-// #[must_not_suspend]
+
 /// Holds temporary ownership of the engine through CURRENT_ENGINE_PTR.
+#[must_not_suspend]
 pub struct EngineRef {
-	_priv: ()
+	engine_ptr: *mut toybox::Engine
+}
+
+impl EngineRef {
+	fn new() -> EngineRef {
+		let engine_ptr = exchange_global_engine_ptr(std::ptr::null_mut());
+		assert!(!engine_ptr.is_null(), "CURRENT_ENGINE_PTR unexpectedly null. Either not in executor context or EngineRef already exists.");
+		EngineRef { engine_ptr }
+	}
 }
 
 impl std::ops::Deref for EngineRef {
 	type Target = toybox::Engine;
 
 	fn deref(&self) -> &toybox::Engine {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			unsafe {
-				&*engine_ptr.get()
-			}
-		})
+		unsafe {
+			&*self.engine_ptr
+		}
 	}
 }
 
 impl std::ops::DerefMut for EngineRef {
 	fn deref_mut(&mut self) -> &mut toybox::Engine {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			unsafe {
-				&mut *engine_ptr.get()
-			}
-		})
+		unsafe {
+			&mut *self.engine_ptr
+		}
 	}
 }
 
 impl std::ops::Drop for EngineRef {
 	fn drop(&mut self) {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			engine_ptr.set(std::ptr::null_mut())
-		})
+		let prev_value = exchange_global_engine_ptr(self.engine_ptr);
+		assert!(prev_value.is_null(), "CURRENT_ENGINE_PTR is non-null while dropping EngineRef");
 	}
 }
 
 
 
-pub struct NextFrameFuture(Option<()>);
+struct YieldToExecutorFuture(Option<()>);
 
-impl Future for NextFrameFuture {
+impl Future for YieldToExecutorFuture {
 	type Output = EngineRef;
 
 	fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			// Ensure we suspend the first frame we're polled, and consume the engine ptr.
-			if let Some(_) = self.0.take() {
-				engine_ptr.set(std::ptr::null_mut());
-				Poll::Pending
-
-			} else {
-				assert!(!engine_ptr.get().is_null(), "CURRENT_ENGINE_PTR unexpectedly null");
-
-				Poll::Ready(EngineRef {
-					_priv: ()
-				})
-			}
-		})
+		// Ensure we suspend the first frame we're polled, and consume the engine ptr.
+		if let Some(_) = self.0.take() {
+			Poll::Pending
+		} else {
+			Poll::Ready(EngineRef::new())
+		}
 	}
 }
 
 
-pub struct NextFrame;
 
-impl IntoFuture for NextFrame {
-	type Output = EngineRef;
-	type IntoFuture = NextFrameFuture;
+// TODO(pat.m): could this also create a new resource scope?
+pub async fn start_loop() -> EngineRef {
+	EngineRef::new()
+}
 
-	fn into_future(self) -> NextFrameFuture {
-		NextFrameFuture(Some(()))
-	}
+
+
+pub async fn next_frame(engine_ref: EngineRef) -> EngineRef {
+	drop(engine_ref);
+	YieldToExecutorFuture(Some(())).await
 }
 
 
@@ -109,29 +116,26 @@ pub fn run_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<()
 	let waker = Arc::new(NullWaker).into();
 
 	// Run the future to completion.
-	loop {
+	'main: loop {
 		engine.process_events();
 
 		if engine.should_quit() {
-			break
+			break 'main
 		}
 
-		// Set up context for the future - which will either consume it when polled, or complete.
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			engine_ptr.set(engine);
-		});
+		// Pass exclusive access to the engine to the future through a global channel.
+		exchange_global_engine_ptr(engine);
 
-		let mut context = Context::from_waker(&waker);
-
-		if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+		if let Poll::Ready(result) = future.as_mut().poll(&mut Context::from_waker(&waker)) {
 			result?;
-			break
+			break 'main
 		}
 
-		// If the future has not completed, then it must have consumed its context.
-		CURRENT_ENGINE_PTR.with(|engine_ptr| {
-			assert!(engine_ptr.get().is_null(), "EngineRef held across suspend point");
-		});
+		// Reclaim exclusive access from the global channel. Assuming futures are wellbehaved,
+		// this will be the same engine ptr passed to exchange_global_engine_ptr above.
+		// If it is null then an EngineRef is likely still holding onto exclusive access.
+		let prev_engine_ptr = exchange_global_engine_ptr(std::ptr::null_mut());
+		assert!(!prev_engine_ptr.is_null(), "EngineRef held across suspend point");
 
 		engine.end_frame();
 	}

@@ -4,13 +4,13 @@ pub mod views;
 pub mod model;
 pub mod controller;
 
-use crate::executor::NextFrame;
+use crate::executor::{start_loop, next_frame};
 use crate::shaders;
 
 
 
 pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scene_name: impl Into<String>) -> Result<(), Box<dyn Error>> {
-	let mut engine = NextFrame.await;
+	let mut engine = start_loop().await;
 	let resource_scope_token = engine.new_resource_scope();
 
 	let mut player = model::Player::new();
@@ -58,12 +58,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let composite_shader = view_resource_context.new_simple_shader(shaders::FULLSCREEN_QUAD_VERT,
 		include_str!("shaders/final_composite.frag.glsl"))?;
 
-	drop(engine);
-
 
 	'main: loop {
-		let mut engine = NextFrame.await;
-
 		global_controller.update(&mut engine);
 
 		if global_controller.should_quit() {
@@ -155,6 +151,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			debug_view.draw(&mut view_ctx, &debug_model);
 			mesh_builder_test_view.draw_2d(&mut view_ctx);
 		}
+
+		engine = next_frame(engine).await;
 	}
 
 	Ok(())
