@@ -12,6 +12,7 @@ mod executor;
 mod intersect;
 
 mod platformer3d;
+mod balls;
 
 use executor::{start_loop, next_frame};
 
@@ -32,15 +33,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 enum MainMenuCommand {
 	PlayPlatformerScene(&'static str),
+	PlayBalls,
 	Quit,
 }
 
 
 async fn main_game_loop() -> Result<(), Box<dyn Error>> {
+	balls::play().await?;
+	
 	loop {
 		match main_menu().await? {
 			MainMenuCommand::PlayPlatformerScene(scene) => {
 				platformer3d::load_and_play_scene("assets/scene.toy", scene).await?;
+			}
+
+			MainMenuCommand::PlayBalls => {
+				balls::play().await?;
 			}
 
 			MainMenuCommand::Quit => return Ok(())
@@ -96,6 +104,10 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 
 			if ui.button("Second Scene") {
 				return Ok(MainMenuCommand::PlayPlatformerScene("second"));
+			}
+
+			if ui.button("Balls") {
+				return Ok(MainMenuCommand::PlayBalls);
 			}
 
 			if ui.button("Quit") {
