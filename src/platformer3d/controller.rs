@@ -18,6 +18,7 @@ pub use gem::*;
 use toybox::prelude::*;
 
 
+// TODO(pat.m): for thr love of god move this somewhere else and expand on it
 pub fn load_audio_buffer(asset_path: impl AsRef<std::path::Path>) -> Result<Vec<f32>, Box<dyn Error>> {
 	use symphonia::default;
 	use symphonia::core::io::MediaSourceStream;
@@ -62,7 +63,7 @@ pub fn load_audio_buffer(asset_path: impl AsRef<std::path::Path>) -> Result<Vec<
 	let track_id = track.id;
 
     let mut sample_buf = None;
-    let mut sample_count = 0;
+    // let mut sample_count = 0;
 
     let mut samples = Vec::new();
 

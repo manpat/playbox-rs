@@ -21,6 +21,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let mut blob_shadow_model = model::BlobShadowModel::new();
 
 
+	// TODO(pat.m): it would be cool to figure out how to tie a &mut Engine to a resource_scope_token
 	let mut global_controller = controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 	let mut player_controller = controller::PlayerController::new(&mut engine, resource_scope_token.id());
 	let mut camera_controller = controller::CameraController::new(&mut engine);
@@ -38,7 +39,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let mut scene_view = views::SceneView::new(&mut view_resource_context, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&mut view_resource_context)?;
 	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut view_resource_context)?;
-	let mut _gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
+	// let mut _gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
 
 	let test_fbo = view_resource_context.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::Backbuffer)
