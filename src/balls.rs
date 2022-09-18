@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use crate::executor::{start_loop, next_frame};
 use crate::shaders;
 
-use toybox::input::raw::Scancode;
+use toybox::input::raw::{Scancode, MouseButton};
 
 toybox::declare_input_context! {
 	struct Actions "Balls" {
@@ -12,6 +12,7 @@ toybox::declare_input_context! {
 		state right { "Right" [Scancode::D] }
 		state sprint { "Sprint" [Scancode::LShift] }
 		state crouch { "Crouch" [Scancode::LCtrl] }
+		trigger spawn_ball { "Spawn Ball" [MouseButton::Left] }
 		mouse mouse { "Mouse" [1.0] }
 
 		trigger toggle_debug { "Debug" [Scancode::Grave] }
@@ -57,29 +58,24 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		pos: Vec3,
 		vel: Vec3,
 		radius: f32,
+		bounce_elapsed: f32,
 	}
 
-	let mut balls = vec![
-		// Ball {pos: Vec3::new(-2.0, 1.0, 0.0), vel: Vec3::zero(), radius: 0.5},
-		// Ball {pos: Vec3::new(-1.0, 1.0, 0.0), vel: Vec3::zero(), radius: 0.3},
-		// Ball {pos: Vec3::new( 0.0, 1.0, 0.0), vel: Vec3::zero(), radius: 0.2},
-		// Ball {pos: Vec3::new( 1.0, 1.0, 0.0), vel: Vec3::zero(), radius: 0.1},
-		// Ball {pos: Vec3::new( 2.0, 1.0, 0.0), vel: Vec3::zero(), radius: 0.05},
-	];
-
 	let mut rng = thread_rng();
+	let mut balls = Vec::new();
 
-	for _ in 0..40 {
+	for _ in 0..100 {
 		balls.push(Ball {
-			pos: (random::<Vec3>() * 2.0 - 1.0) * 3.0,
-			vel: random::<Vec3>() * 2.0 - 1.0,
-			radius: rng.gen_range(0.05..0.5),
+			pos: (random::<Vec3>() * 2.0 - 1.0) * 3.0 + Vec3::from_y(2.0),
+			vel: (random::<Vec3>() * 2.0 - 1.0) * 3.0,
+			radius: rng.gen_range::<f32, _>(0.2..0.7).powf(1.5),
+			bounce_elapsed: 0.0,
 		})
 	}
 
 
 	let mixer_id = engine.audio.update_graph_immediate(|graph| {
-		let node = audio::nodes::MixerNode::new(1.0);
+		let node = audio::nodes::MixerNode::new(0.3);
 		let node_id = graph.add_node(node, graph.output_node());
 		graph.pin_node_to_scope(node_id, &resource_scope_token);
 		node_id
@@ -141,6 +137,22 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			};
 
 			camera.elevation = (0.4).lerp(camera.elevation, target_elevation);
+
+			if frame_state.active(actions.spawn_ball) {
+				let world_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+				let camera_orientation = camera_orientation
+					* Quat::from_pitch(camera.pitch);
+
+				let spawn_pos = world_pos + camera_orientation.forward() * 0.5;
+				let vel = camera_orientation.forward() * rng.gen_range(0.4..3.0);
+
+				balls.push(Ball {
+					pos: spawn_pos,
+					vel,
+					radius: rng.gen_range::<f32, _>(0.1..0.8).powf(1.5),
+					bounce_elapsed: 0.0,
+				})
+			}
 		}
 
 
@@ -150,6 +162,8 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			ball.vel.y -= 2.0/60.0;
 
 			ball.pos += ball.vel * 1.0/60.0;
+
+			ball.bounce_elapsed += 1.0/60.0;
 
 			let planes = [
 				Plane::new(Vec3::from_y(1.0), 0.0),
@@ -179,6 +193,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				}
 
 				ball.vel.y += -8.0*surface_dist;
+				ball.bounce_elapsed = 0.0;
 			}
 
 			// Wall bounces
@@ -193,17 +208,19 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					ball.vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
 
 
-					if impact_speed.abs() > 0.05 {
+					if impact_speed.abs() > 0.05 && ball.bounce_elapsed > 0.1 {
 						let radius = ball.radius;
 
 						engine.audio.queue_update(move |graph| {
-							let impact_gain = impact_speed.abs() * radius * 2.0;
+							let impact_gain = impact_speed.abs() * radius;
 							let dist_falloff = 1.0 / player_dist.powi(2);
 							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
 
 							let node = BoopNode::new(100.0 / radius.powf(1.0), gain);
 							graph.add_node(node, mixer_id);
 						});
+
+						ball.bounce_elapsed = 0.0;
 					}
 				}
 			}
@@ -236,7 +253,11 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		]);
 
 		for ball in balls.iter() {
-			draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(18, Mat2x3::uniform_scale(2.0*ball.radius)), ball.pos, Color::hsv(20.0, 0.7, 0.6));
+			let bounce_factor = (1.0 - ball.bounce_elapsed / 1.0).max(0.0);
+			let scale = 2.0 * ball.radius * (1.0 - bounce_factor.powi(10)*0.05);
+			let color = Color::hsv(30.0 - bounce_factor*20.0, 0.7 + bounce_factor*0.1, 0.6 - bounce_factor*0.1);
+
+			draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)), ball.pos, color);
 		}
 
 
@@ -377,7 +398,7 @@ impl Node for BoopNode {
 
 		for out_sample in output.iter_mut() {
 			let attack = (self.env_time / self.attack).min(1.0);
-			let release = (1.0 - (self.env_time - self.attack) / (sound_length - self.attack)).powf(4.0);
+			let release = (1.0 - (self.env_time - self.attack) / (sound_length - self.attack)).powi(8);
 
 			let envelope = (attack*release).clamp(0.0, 1.0);
 
