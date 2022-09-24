@@ -26,6 +26,8 @@ toybox::declare_input_context! {
 }
 
 
+const ZONE_SIZE: f32 = 3.0;
+
 
 pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut engine = start_loop().await;
@@ -54,6 +56,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut time = 0.0f32;
 
 
+
 	struct Ball {
 		pos: Vec3,
 		vel: Vec3,
@@ -64,12 +67,12 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut rng = thread_rng();
 	let mut balls = Vec::new();
 
-	for _ in 0..100 {
+	for _ in 0..250 {
 		balls.push(Ball {
-			pos: (random::<Vec3>() * 2.0 - 1.0) * 3.0 + Vec3::from_y(2.0),
-			vel: (random::<Vec3>() * 2.0 - 1.0) * 3.0,
+			pos: (random::<Vec3>() * 2.0 - 1.0) * ZONE_SIZE + Vec3::from_y(2.0),
+			vel: (random::<Vec3>() * 2.0 - 1.0) * 5.0,
 			radius: rng.gen_range::<f32, _>(0.2..0.7).powf(1.5),
-			bounce_elapsed: 0.0,
+			bounce_elapsed: 10.0,
 		})
 	}
 
@@ -143,14 +146,14 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				let camera_orientation = camera_orientation
 					* Quat::from_pitch(camera.pitch);
 
-				let spawn_pos = world_pos + camera_orientation.forward() * 0.5;
+				let spawn_pos = world_pos + camera_orientation.forward() * 0.6;
 				let vel = camera_orientation.forward() * rng.gen_range(0.4..3.0);
 
 				balls.push(Ball {
 					pos: spawn_pos,
 					vel,
 					radius: rng.gen_range::<f32, _>(0.1..0.8).powf(1.5),
-					bounce_elapsed: 0.0,
+					bounce_elapsed: 10.0,
 				})
 			}
 		}
@@ -169,10 +172,10 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				Plane::new(Vec3::from_y(1.0), 0.0),
 				Plane::new(Vec3::from_y(-1.0), -6.0),
 
-				Plane::new(Vec3::from_x(1.0), -3.0),
-				Plane::new(Vec3::from_x(-1.0), -3.0),
-				Plane::new(Vec3::from_z(1.0), -3.0),
-				Plane::new(Vec3::from_z(-1.0), -3.0),
+				Plane::new(Vec3::from_x(1.0), -ZONE_SIZE),
+				Plane::new(Vec3::from_x(-1.0), -ZONE_SIZE),
+				Plane::new(Vec3::from_z(1.0), -ZONE_SIZE),
+				Plane::new(Vec3::from_z(-1.0), -ZONE_SIZE),
 			];
 
 			let player_diff = ball.pos.to_xz() - camera.pos;
@@ -198,26 +201,36 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 			// Wall bounces
 			for plane in planes {
-				if let distance = plane.distance_to(ball.pos)
-					&& let surface_dist = distance - ball.radius
-					&& surface_dist < 0.0
-				{
+				let distance = plane.distance_to(ball.pos);
+				let surface_dist = distance - ball.radius;
+
+				if surface_dist < 0.0 {
 					let absorbtion_factor = 0.9;
 					let impact_speed = plane.normal.dot(ball.vel);
 					ball.pos += plane.normal * -surface_dist;
 					ball.vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
 
 
-					if impact_speed.abs() > 0.05 && ball.bounce_elapsed > 0.1 {
+					if impact_speed.abs() > 0.05 && ball.bounce_elapsed > 0.02 {
 						let radius = ball.radius;
 
 						engine.audio.queue_update(move |graph| {
+							use audio::*;
+
 							let impact_gain = impact_speed.abs() * radius;
 							let dist_falloff = 1.0 / player_dist.powi(2);
 							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
 
-							let node = BoopNode::new(100.0 / radius.powf(1.0), gain);
-							graph.add_node(node, mixer_id);
+							let freq = 100.0 / radius.powf(1.0);
+
+							let node = audio::node_builder::OscillatorGenerator::new(freq)
+								.envelope(0.01, 0.3)
+								.gain(gain)
+								.build();
+
+							if gain > 0.0001 {
+								graph.add_node(node, mixer_id);
+							}
 						});
 
 						ball.bounce_elapsed = 0.0;
@@ -234,8 +247,8 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		let mut mb = gfx::ColorMeshBuilder::new(&mut mesh_data);
 
 		let ground_plane = Mat3::from_columns([
-			Vec3::from_x(6.0),
-			Vec3::from_z(6.0),
+			Vec3::from_x(ZONE_SIZE * 2.0),
+			Vec3::from_z(ZONE_SIZE * 2.0),
 			Vec3::zero(),
 		]);
 
@@ -257,7 +270,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			let scale = 2.0 * ball.radius * (1.0 - bounce_factor.powi(10)*0.05);
 			let color = Color::hsv(30.0 - bounce_factor*20.0, 0.7 + bounce_factor*0.1, 0.6 - bounce_factor*0.1);
 
-			draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)), ball.pos, color);
+			draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(13, Mat2x3::uniform_scale(scale)), ball.pos, color);
 		}
 
 
@@ -272,7 +285,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 		for ball in balls.iter() {
 			let txform = Mat2x3::scale_translate(Vec2::splat(2.0 * ball.radius / (ball.pos.y - ball.radius + 1.0).max(0.0)), ball.pos.to_xz());
-			ground_mb.build(Polygon::from_matrix(18, txform))
+			ground_mb.build(Polygon::from_matrix(13, txform))
 		}
 
 		mesh.upload(&mesh_data);
@@ -349,66 +362,4 @@ fn build_uniforms(camera: &Camera, aspect: f32) -> Uniforms {
 		ui_projection_view: Mat4::identity()
 	}
 }
-
-
-use crate::audio::{system::EvaluationContext, nodes::*};
-
-pub struct BoopNode {
-	freq: f32,
-	gain: f32,
-	attack: f32,
-	release: f32,
-
-	osc_phase: f32,
-	env_time: f32,
-
-}
-
-impl BoopNode {
-	pub fn new(freq: f32, gain: f32) -> BoopNode {
-		BoopNode {
-			freq,
-			gain,
-			attack: 0.01,
-			release: 3.0,
-
-			osc_phase: 0.0,
-			env_time: 0.0,
-		}
-	}
-}
-
-
-impl Node for BoopNode {
-	fn has_stereo_output(&self, _: &EvaluationContext<'_>) -> bool { false }
-
-	fn node_type(&self, _: &EvaluationContext<'_>) -> NodeType { NodeType::Source }
-
-	fn finished_playing(&self, eval_ctx: &EvaluationContext<'_>) -> bool {
-		let sound_length = self.attack + self.release;
-		self.env_time > sound_length
-	}
-
-	#[instrument(skip_all, name = "BoopNode::process")]
-	fn process(&mut self, ProcessContext{eval_ctx, inputs, output}: ProcessContext<'_>) {
-		let frame_period = 1.0 / eval_ctx.sample_rate;
-		let osc_frame_period = TAU * self.freq / eval_ctx.sample_rate;
-
-		let sound_length = self.attack + self.release;
-
-		for out_sample in output.iter_mut() {
-			let attack = (self.env_time / self.attack).min(1.0);
-			let release = (1.0 - (self.env_time - self.attack) / (sound_length - self.attack)).powi(8);
-
-			let envelope = (attack*release).clamp(0.0, 1.0);
-
-			*out_sample = self.osc_phase.sin() * self.gain * envelope;
-			self.osc_phase += osc_frame_period;
-			self.env_time += frame_period
-		}
-
-		self.osc_phase %= TAU;
-	}
-}
-
 

@@ -1,7 +1,7 @@
 use toybox::prelude::*;
 
 use std::cell::Cell;
-use std::future::{Future, IntoFuture};
+use std::future::Future;
 use std::task::{Context, Poll, Wake};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -104,9 +104,13 @@ impl Wake for NullWaker {
 }
 
 
-pub fn run_main_loop<F>(engine: &mut toybox::Engine, mut future: F) -> Result<(), Box<dyn Error>>
+pub fn run_main_loop<F>(engine: &mut toybox::Engine, future: F) -> Result<(), Box<dyn Error>>
 	where F: Future<Output=Result<(), Box<dyn Error>>>
 {
+	use tracing::{info_span, Instrument};
+
+	let mut future = future.instrument(info_span!("executor::run_main_loop"));
+
 	// Pin the future so it can be polled.
 	let mut future = unsafe {
 		Pin::new_unchecked(&mut future)
