@@ -12,7 +12,8 @@ toybox::declare_input_context! {
 		state right { "Right" [Scancode::D] }
 		state sprint { "Sprint" [Scancode::LShift] }
 		state crouch { "Crouch" [Scancode::LCtrl] }
-		trigger spawn_ball { "Spawn Ball" [MouseButton::Left] }
+		state spawn_ball { "Spawn Ball" [MouseButton::Left] }
+		trigger remove_balls { "Remove Balls" [MouseButton::Right] }
 		mouse mouse { "Mouse" [1.0] }
 
 		trigger toggle_debug { "Debug" [Scancode::Grave] }
@@ -26,7 +27,7 @@ toybox::declare_input_context! {
 }
 
 
-const ZONE_SIZE: f32 = 3.0;
+const ZONE_SIZE: f32 = 8.0;
 
 
 pub async fn play() -> Result<(), Box<dyn Error>> {
@@ -57,22 +58,18 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 
 
-	struct Ball {
-		pos: Vec3,
-		vel: Vec3,
-		radius: f32,
-		bounce_elapsed: f32,
-	}
-
 	let mut rng = thread_rng();
 	let mut balls = Vec::new();
 
-	for _ in 0..250 {
+	for _ in 0..20 {
 		balls.push(Ball {
 			pos: (random::<Vec3>() * 2.0 - 1.0) * ZONE_SIZE + Vec3::from_y(2.0),
-			vel: (random::<Vec3>() * 2.0 - 1.0) * 5.0,
 			radius: rng.gen_range::<f32, _>(0.2..0.7).powf(1.5),
-			bounce_elapsed: 10.0,
+
+			ty: BallType::Bouncy {
+				vel: (random::<Vec3>() * 2.0 - 1.0) * 5.0,
+				bounce_elapsed: 10.0,
+			}
 		})
 	}
 
@@ -151,93 +148,57 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 				balls.push(Ball {
 					pos: spawn_pos,
-					vel,
-					radius: rng.gen_range::<f32, _>(0.1..0.8).powf(1.5),
-					bounce_elapsed: 10.0,
+					radius: rng.gen_range::<f32, _>(0.1..1.2).powf(1.0),
+
+					ty: BallType::Bouncy {
+						vel,
+						bounce_elapsed: 10.0,
+					}
 				})
 			}
-		}
 
+			if frame_state.active(actions.remove_balls) {
+				let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
 
-		// Update balls
-		for ball in balls.iter_mut() {
-			// gravity
-			ball.vel.y -= 2.0/60.0;
-
-			ball.pos += ball.vel * 1.0/60.0;
-
-			ball.bounce_elapsed += 1.0/60.0;
-
-			let planes = [
-				Plane::new(Vec3::from_y(1.0), 0.0),
-				Plane::new(Vec3::from_y(-1.0), -6.0),
-
-				Plane::new(Vec3::from_x(1.0), -ZONE_SIZE),
-				Plane::new(Vec3::from_x(-1.0), -ZONE_SIZE),
-				Plane::new(Vec3::from_z(1.0), -ZONE_SIZE),
-				Plane::new(Vec3::from_z(-1.0), -ZONE_SIZE),
-			];
-
-			let player_diff = ball.pos.to_xz() - camera.pos;
-			let player_radius = 0.5;
-			let player_dist = player_diff.length();
-			let surface_dist = player_dist - (ball.radius + player_radius);
-
-			if surface_dist < 0.0 && ball.pos.y < 2.0 {
-				let offset = (player_diff / player_dist).to_x0z() * -surface_dist;
-				ball.pos += offset;
-
-				let impact = offset * 3.0;
-
-				if ball.vel.dot(offset) < 0.0 {
-					ball.vel = (-ball.vel.to_xz()).to_x0z() + impact;
-				} else {
-					ball.vel += impact;
+				for ball in balls.iter_mut()
+					.filter(|ball| match ball.ty {
+						BallType::Bouncy{..} => (ball.pos - eye_pos).length() < 5.0,
+						_ => false
+					})
+				{
+					ball.ty = BallType::Popping {
+						elapsed: -((ball.pos - eye_pos).length() / 5.0 * 0.8)
+					};
 				}
 
-				ball.vel.y += -8.0*surface_dist;
-				ball.bounce_elapsed = 0.0;
-			}
+				engine.audio.queue_update(move |graph| {
+					use audio::*;
 
-			// Wall bounces
-			for plane in planes {
-				let distance = plane.distance_to(ball.pos);
-				let surface_dist = distance - ball.radius;
+					let fizz_cutoff = 600.0;
 
-				if surface_dist < 0.0 {
-					let absorbtion_factor = 0.9;
-					let impact_speed = plane.normal.dot(ball.vel);
-					ball.pos += plane.normal * -surface_dist;
-					ball.vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
+					let fizz = audio::node_builder::NoiseGenerator::new()
+						.low_pass(fizz_cutoff)
+						.low_pass(fizz_cutoff)
+						.envelope(0.01, 1.8);
 
+					let bong_1 = audio::node_builder::OscillatorGenerator::new(80.0);
+					let bong_2 = audio::node_builder::OscillatorGenerator::new(150.0).gain(0.5);
+					let bong_3 = audio::node_builder::OscillatorGenerator::new(200.0).gain(0.35);
 
-					if impact_speed.abs() > 0.05 && ball.bounce_elapsed > 0.02 {
-						let radius = ball.radius;
+					let bong = (bong_1, bong_2, bong_3)
+						.envelope(0.3, 0.9);
 
-						engine.audio.queue_update(move |graph| {
-							use audio::*;
+					let node = (fizz, bong)
+						.gain(0.9)
+						.build();
 
-							let impact_gain = impact_speed.abs() * radius;
-							let dist_falloff = 1.0 / player_dist.powi(2);
-							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
-
-							let freq = 100.0 / radius.powf(1.0);
-
-							let node = audio::node_builder::OscillatorGenerator::new(freq)
-								.envelope(0.01, 0.3)
-								.gain(gain)
-								.build();
-
-							if gain > 0.0001 {
-								graph.add_node(node, mixer_id);
-							}
-						});
-
-						ball.bounce_elapsed = 0.0;
-					}
-				}
+					graph.add_node(node, mixer_id);
+				});
 			}
 		}
+
+
+		update_balls(&mut engine, &mut balls, &camera, mixer_id);
 
 
 		use gfx::geom::*;
@@ -266,11 +227,25 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		]);
 
 		for ball in balls.iter() {
-			let bounce_factor = (1.0 - ball.bounce_elapsed / 1.0).max(0.0);
-			let scale = 2.0 * ball.radius * (1.0 - bounce_factor.powi(10)*0.05);
-			let color = Color::hsv(30.0 - bounce_factor*20.0, 0.7 + bounce_factor*0.1, 0.6 - bounce_factor*0.1);
+			match ball.ty {
+				BallType::Bouncy { bounce_elapsed, .. } => {
+					let bounce_factor = (1.0 - bounce_elapsed / 1.0).max(0.0);
+					let scale = 2.0 * ball.radius * (1.0 - bounce_factor.powi(10)*0.05);
+					let color = Color::hsv(30.0 - bounce_factor*20.0, 0.7 + bounce_factor*0.1, 0.6 - bounce_factor*0.1);
 
-			draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(13, Mat2x3::uniform_scale(scale)), ball.pos, color);
+					draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(13, Mat2x3::uniform_scale(scale)), ball.pos, color);
+				}
+
+				BallType::Popping { elapsed } => {
+					let pop_amt = (elapsed / BALL_POP_TIME).clamp(0.0, 1.0);
+					let whiteness = (pop_amt + 0.4).clamp(0.2, 1.0).powi(2);
+
+					let scale = (2.0 + pop_amt.powi(10)) * ball.radius;
+					let color = Color::rgb(1.0, whiteness, whiteness);
+
+					draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(13, Mat2x3::uniform_scale(scale)), ball.pos, color);
+				}
+			}
 		}
 
 
@@ -363,3 +338,149 @@ fn build_uniforms(camera: &Camera, aspect: f32) -> Uniforms {
 	}
 }
 
+
+
+
+
+
+const BALL_POP_TIME: f32 = 0.4;
+
+#[derive(Copy, Clone)]
+enum BallType {
+	Bouncy {
+		vel: Vec3,
+		bounce_elapsed: f32,
+	},
+
+	Popping {
+		elapsed: f32,
+	}
+}
+
+struct Ball {
+	pos: Vec3,
+	radius: f32,
+	ty: BallType,
+}
+
+fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Camera, mixer_id: audio::NodeId) {
+	let mut rng = thread_rng();
+
+	for ball in balls.iter_mut() {
+		match &mut ball.ty {
+			BallType::Bouncy { vel, bounce_elapsed } => {
+				// gravity
+				vel.y -= 4.0/60.0;
+
+				ball.pos += *vel * 1.0/60.0;
+
+				*bounce_elapsed += 1.0/60.0;
+
+				let planes = [
+					Plane::new(Vec3::from_y(1.0), 0.0),
+					Plane::new(Vec3::from_y(-1.0), -6.0),
+
+					Plane::new(Vec3::from_x(1.0), -ZONE_SIZE),
+					Plane::new(Vec3::from_x(-1.0), -ZONE_SIZE),
+					Plane::new(Vec3::from_z(1.0), -ZONE_SIZE),
+					Plane::new(Vec3::from_z(-1.0), -ZONE_SIZE),
+				];
+
+				let player_diff = ball.pos.to_xz() - camera.pos;
+				let player_radius = 0.5;
+				let player_dist = player_diff.length();
+				let surface_dist = player_dist - (ball.radius + player_radius);
+
+				if surface_dist < 0.0 && ball.pos.y < 2.0 {
+					let offset = (player_diff / player_dist).to_x0z() * -surface_dist;
+					ball.pos += offset;
+
+					let impact = offset * 3.0;
+
+					if vel.dot(offset) < 0.0 {
+						*vel = (-vel.to_xz()).to_x0z() + impact;
+					} else {
+						*vel += impact;
+					}
+
+					vel.y += -8.0*surface_dist;
+					*bounce_elapsed = 0.0;
+				}
+
+				// Wall bounces
+				for plane in planes {
+					let distance = plane.distance_to(ball.pos);
+					let surface_dist = distance - ball.radius;
+
+					if surface_dist < 0.0 {
+						let absorbtion_factor = 0.9;
+						let impact_speed = plane.normal.dot(*vel);
+						ball.pos += plane.normal * -surface_dist;
+						*vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
+
+
+						if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.02 {
+							let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
+							let eye_dist = (ball.pos - camera.pos.to_x0z() - Vec3::from_y(camera.elevation)).length();
+							let dist_falloff = 1.0 / eye_dist.powi(2);
+							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
+
+							let freq = 100.0 * 2.0f32.powf((1.0 + 5.0 / ball.radius).floor() / 9.0);
+
+							let release = 0.1 + ball.radius / 2.0;
+
+							if gain > 0.0001 {
+								engine.audio.queue_update(move |graph| {
+									use audio::*;
+									let node = audio::node_builder::OscillatorGenerator::new(freq)
+										.envelope(0.01, release)
+										.gain(gain)
+										.build();
+
+									graph.add_node(node, mixer_id);
+								});
+							}
+
+
+							*bounce_elapsed = 0.0;
+						}
+					}
+				}
+			}
+
+			BallType::Popping { elapsed } => {
+				*elapsed += 1.0/60.0;
+
+				if *elapsed >= BALL_POP_TIME {
+					let eye_dist = (ball.pos - camera.pos.to_x0z() - Vec3::from_y(camera.elevation)).length();
+					let gain = 2.0 * ball.radius / eye_dist.powi(2);
+
+					let freq = rng.gen_range(600.0 .. 800.0);
+
+					engine.audio.queue_update(move |graph| {
+						use audio::*;
+
+						let noise = audio::node_builder::NoiseGenerator::new()
+							.low_pass(4000.0);
+
+						let osc = audio::node_builder::OscillatorGenerator::new(freq);
+
+						let node = (noise, osc)
+							.envelope(0.01, 0.4)
+							.gain(gain)
+							.build();
+
+						graph.add_node(node, mixer_id);
+					});
+				}
+			}
+		}
+	}
+
+	balls.retain(|ball| {
+		match ball.ty {
+			BallType::Popping { elapsed } => elapsed < BALL_POP_TIME,
+			_ => true
+		}
+	});
+}
