@@ -30,7 +30,7 @@ toybox::declare_input_context! {
 }
 
 
-const ZONE_SIZE: f32 = 8.0;
+const ZONE_SIZE: f32 = 6.0;
 
 
 pub async fn play() -> Result<(), Box<dyn Error>> {
@@ -248,6 +248,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					ty: BallType::Grenade {
 						vel,
 						countdown: 3.0,
+						bounce_elapsed: 10.0,
 					}
 				})
 			}
@@ -446,6 +447,7 @@ enum BallType {
 	Grenade {
 		vel: Vec3,
 		countdown: f32,
+		bounce_elapsed: f32,
 	},
 }
 
@@ -473,6 +475,8 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 	];
 
 	let player_diff = *ball_pos - eye_pos;
+	let player_diff = Vec3 { y: player_diff.y.max(0.0), .. player_diff};
+
 	let player_radius = 0.5;
 	let player_dist = player_diff.length();
 	let surface_dist = player_dist - (ball_radius + player_radius);
@@ -540,7 +544,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 				*bounce_elapsed += 1.0/60.0;
 
 				if let Some(Bounce {impact_speed}) = bounce(&mut ball.pos, vel, ball.radius, eye_pos) {
-					if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.02  {
+					if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.1  {
 						let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
 						let eye_dist = (ball.pos - eye_pos).length();
 						let dist_falloff = 1.0 / eye_dist.powi(2);
@@ -572,7 +576,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 
 				if *elapsed >= BALL_POP_TIME {
 					let eye_dist = (ball.pos - camera.pos.to_x0z() - Vec3::from_y(camera.elevation)).length();
-					let gain = 2.0 * ball.radius / eye_dist.powi(2);
+					let gain = 2.0 * ball.radius / eye_dist.powi(1);
 
 					let freq = rng.gen_range(600.0 .. 800.0);
 
@@ -594,8 +598,9 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 				}
 			}
 
-			BallType::Grenade { countdown, vel } => {
+			BallType::Grenade { countdown, bounce_elapsed, vel } => {
 				*countdown -= 1.0/60.0;
+				*bounce_elapsed += 1.0/60.0;
 
 				if *countdown > GRENADE_TEASE_TIME {
 					// gravity
@@ -604,7 +609,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 					ball.pos += *vel / 60.0;
 
 					if let Some(Bounce {impact_speed}) = bounce(&mut ball.pos, vel, ball.radius, eye_pos) {
-						if impact_speed.abs() > 0.05 {
+						if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.1 {
 							let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
 							let eye_dist = (ball.pos - eye_pos).length();
 							let dist_falloff = 1.0 / eye_dist.powi(2);
@@ -626,6 +631,8 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 								});
 							}
 						}
+
+						*bounce_elapsed = 0.0;
 					}
 				} else if *countdown < 0.0 {
 					if explosion_point.is_some() {
