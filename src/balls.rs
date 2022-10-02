@@ -265,25 +265,29 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		let mut mb = PatternMeshBuilder::new(&mut mesh_data);
 
 
-		mb.set_xy_plane(
-			Vec3::from_x(ZONE_SIZE * 2.0),
-			Vec3::from_z(ZONE_SIZE * 2.0)
-		);
-		mb.set_origin(Vec3::zero());
-		mb.set_colors(ground_color_0, ground_color_1);
-		mb.pattern = 3;
-		mb.build(Quad::unit());
+		// Ground plane
+		let mut gmb = mb.on_plane_ref(Mat3::from_columns([
+			Vec3::from_x(1.0),
+			Vec3::from_z(1.0),
+			Vec3::zero()
+		]));
+		gmb.set_colors(ground_color_0, ground_color_1);
+		gmb.pattern = 3;
+		gmb.build(Quad::unit().uniform_scale(2.0 * ZONE_SIZE));
 
+
+		// Billboards
 		let quat = Quat::from_yaw(camera.yaw)
 			* Quat::from_pitch(camera.pitch);
 
-		mb.set_xy_plane(
+		let mut bmb = mb.on_plane_ref(Mat3::from_columns([
 			quat.right(),
-			quat.up()
-		);
+			quat.up(),
+			Vec3::zero()
+		]));
 
 		for ball in balls.iter() {
-			mb.set_origin(ball.pos);
+			bmb.set_origin(ball.pos);
 
 			match ball.ty {
 				BallType::Bouncy { bounce_elapsed, hue, .. } => {
@@ -293,9 +297,9 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					let color = Color::hsv(hue, 0.7, 0.8 + bounce_factor*0.2);
 					let color2 = Color::hsv(hue + 50.0, 0.6, 0.85);
 
-					mb.set_colors(color, color2);
-					mb.pattern = 4;
-					mb.build(Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)));
+					bmb.set_colors(color, color2);
+					bmb.pattern = 4;
+					bmb.build(Polygon::unit(18).uniform_scale(scale));
 				}
 
 				BallType::Popping { elapsed } => {
@@ -306,18 +310,18 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					let color = Color::rgb(1.0, whiteness, whiteness);
 					let color2 = Color::rgb(1.0, 0.3, 0.3);
 
-					mb.set_colors(color, color2);
-					mb.pattern = 2;
-					mb.build(Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)));
+					bmb.set_colors(color, color2);
+					bmb.pattern = 2;
+					bmb.build(Polygon::unit(18).uniform_scale(scale));
 				}
 
 				BallType::Grenade { countdown, .. } => {
 					let scale;
-					mb.pattern = 2;
+					bmb.pattern = 2;
 
 					if countdown > GRENADE_TEASE_TIME {
 						scale = 2.0 * ball.radius;
-						mb.set_color(grenade_color);
+						bmb.set_color(grenade_color);
 					} else {
 						let explode_amt = 1.0 - (countdown / GRENADE_TEASE_TIME).clamp(0.0, 1.0);
 						let whiteness = (explode_amt + 0.4).clamp(0.2, 1.0).powi(2);
@@ -325,26 +329,29 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 						let color = Color::rgb(1.0, whiteness, whiteness);
 						let color2 = Color::rgb(1.0, 0.3, 0.3);
 
-						mb.set_colors(color, color2);
+						bmb.set_colors(color, color2);
 					}
 
-					mb.build(Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)));
+					bmb.build(Polygon::unit(18).uniform_scale(scale));
 				}
 			}
 		}
 
 
-		mb.set_color(shadow_color);
-		mb.set_xy_plane(
+		// Drop shadows
+		let mut gmb = mb.on_plane_ref(Mat3::from_columns([
 			Vec3::from_x(1.0),
-			Vec3::from_z(1.0)
-		);
-		mb.set_origin(Vec3::from_y(0.01));
-		mb.pattern = 0;
+			Vec3::from_z(1.0),
+			Vec3::from_y(0.01)
+		]));
+
+		gmb.set_color(shadow_color);
+		gmb.pattern = 0;
 
 		for ball in balls.iter() {
-			let txform = Mat2x3::scale_translate(Vec2::splat(2.0 * ball.radius / (ball.pos.y - ball.radius + 1.0).max(0.0)), ball.pos.to_xz());
-			mb.build(Polygon::from_matrix(13, txform))
+			let scale = 2.0 * ball.radius / (ball.pos.y - ball.radius + 1.0).max(0.0);
+			let pos = ball.pos.to_xz();
+			gmb.build(Polygon::unit(13).uniform_scale(scale).translate(pos));
 		}
 
 		mesh.upload(&mesh_data);
@@ -749,7 +756,6 @@ pub struct PatternMeshBuilder<'md> {
 	pub data: &'md mut MeshData<PatternVertex>,
 	pub color_0: Color,
 	pub color_1: Color,
-	pub plane: Mat3,
 	pub pattern: u8,
 	pub shape_id: Wrapping<u8>,
 }
@@ -761,7 +767,6 @@ impl<'md> PatternMeshBuilder<'md> {
 			data,
 			color_0: Color::white(),
 			color_1: Color::black(),
-			plane: Mat3::identity(),
 			pattern: 0,
 			shape_id: Wrapping(0),
 		}
@@ -776,26 +781,16 @@ impl<'md> PatternMeshBuilder<'md> {
 		self.color_0 = color_0;
 		self.color_1 = color_1;
 	}
-
-	pub fn set_xy_plane(&mut self, right: Vec3, up: Vec3) {
-		self.plane.set_column_x(right);
-		self.plane.set_column_y(up);
-	}
-
-	pub fn set_origin(&mut self, origin: Vec3) {
-		self.plane.set_column_z(origin);
-	}
 }
 
-impl<'mb> PolyBuilder2D for PatternMeshBuilder<'mb> {
-	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
+impl<'mb> PolyBuilder3D for PatternMeshBuilder<'mb> {
+	fn extend_3d(&mut self, vs: impl IntoIterator<Item=Vec3>, is: impl IntoIterator<Item=u16>) {
 		let shape_id = self.shape_id.0;
 		self.shape_id += 1;
 
 		let vertices = vs.into_iter()
-			.map(|v2| self.plane * v2.extend(1.0))
-			.map(|v3| PatternVertex {
-				pos: v3,
+			.map(|pos| PatternVertex {
+				pos,
 				index: self.pattern,
 				shape_id,
 				color_0: self.color_0,
