@@ -4,6 +4,8 @@ use crate::shaders;
 
 use toybox::input::raw::{Scancode, MouseButton};
 
+use std::num::Wrapping;
+
 toybox::declare_input_context! {
 	struct Actions "Balls" {
 		state forward { "Forward" [Scancode::W] }
@@ -13,7 +15,8 @@ toybox::declare_input_context! {
 		state sprint { "Sprint" [Scancode::LShift] }
 		state crouch { "Crouch" [Scancode::LCtrl] }
 		state spawn_ball { "Spawn Ball" [MouseButton::Left] }
-		trigger remove_balls { "Remove Balls" [MouseButton::Right] }
+		trigger remove_balls { "Remove Balls" [Scancode::Space] }
+		trigger throw_grenade { "Throw Grenade" [MouseButton::Right] }
 		mouse mouse { "Mouse" [1.0] }
 
 		trigger toggle_debug { "Debug" [Scancode::Grave] }
@@ -41,10 +44,11 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 	let mut resource_ctx = engine.gfx.resource_context(&resource_scope_token);
 	let mut mesh = gfx::Mesh::new(&mut resource_ctx);
-	let mut mesh_data: gfx::MeshData<gfx::ColorVertex> = gfx::MeshData::new();
+	let mut mesh_data: gfx::MeshData<PatternVertex> = gfx::MeshData::new();
 
-	let shader = resource_ctx.new_simple_shader(shaders::COLOR_3D_VERT, shaders::FLAT_COLOR_FRAG)?;
-	let mut uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
+	let shader = resource_ctx.new_simple_shader(include_str!("shaders/balls_pattern.vert.glsl"), include_str!("shaders/balls_pattern.frag.glsl"))?;
+	let mut std_uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
+	let mut pattern_uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
 
 	let mut camera = Camera {
 		pos: Vec2::new(0.0, 5.0),
@@ -68,6 +72,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 			ty: BallType::Bouncy {
 				vel: (random::<Vec3>() * 2.0 - 1.0) * 5.0,
+				hue: rng.gen_range(0.0..360.0),
 				bounce_elapsed: 10.0,
 			}
 		})
@@ -75,12 +80,19 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 
 	let mixer_id = engine.audio.update_graph_immediate(|graph| {
-		let node = audio::nodes::MixerNode::new(0.3);
+		let node = audio::nodes::MixerNode::new(0.5);
 		let node_id = graph.add_node(node, graph.output_node());
 		graph.pin_node_to_scope(node_id, &resource_scope_token);
 		node_id
 	});
 
+
+	let mut background_color = Color::hsv(67.68, 0.216, 1.0).to_linear();
+	let mut ground_color_0 = Color::hsv(4.3, 0.259, 1.0).to_linear();
+	let mut ground_color_1 = Color::hsv(275.4, 0.188, 1.0).to_linear();
+	let mut shadow_color = Color::hsv(345.96, 0.29, 0.855).to_linear();
+
+	let mut grenade_color = Color::hsv(0.0, 0.21, 0.36).to_linear();
 
 	loop {
 		time += 1.0 / 60.0;
@@ -95,12 +107,36 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		if engine.input.frame_state().active(actions.toggle_debug) {
 			let currently_active = engine.input.is_context_active(debug_mouse_actions.context_id());
 			engine.input.set_context_active(debug_mouse_actions.context_id(), !currently_active);
+			engine.imgui.set_visible(!currently_active);
+			engine.imgui.set_input_enabled(!currently_active);
+		}
+
+		{
+			let colors = [
+				("background", &mut background_color),
+				("ground 0", &mut ground_color_0),
+				("ground 1", &mut ground_color_1),
+				("drop shadow", &mut shadow_color),
+				("grenade", &mut grenade_color),
+			];
+
+			for (name, color) in colors {
+				let Color { r, g, b, .. } = color.to_srgb();
+				let mut color_raw = [r, g, b];
+				if imgui::ColorEdit::new(name, &mut color_raw)
+					.build(engine.imgui.frame())
+				{
+					*color = Color::from(color_raw).to_linear();
+				}
+			}
+
 		}
 
 
 		// Camera control
 		{
-			let frame_state = engine.input.frame_state();
+			let Engine { input, audio, .. } = &mut *engine;
+			let frame_state = input.frame_state();
 
 			if let Some(mouse) = frame_state.mouse(actions.mouse) {
 				let (pitch_min, pitch_max) = (-PI/2.0, PI/2.0);
@@ -152,6 +188,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 					ty: BallType::Bouncy {
 						vel,
+						hue: rng.gen_range(0.0..360.0),
 						bounce_elapsed: 10.0,
 					}
 				})
@@ -171,7 +208,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					};
 				}
 
-				engine.audio.queue_update(move |graph| {
+				audio.queue_update(move |graph| {
 					use audio::*;
 
 					let fizz_cutoff = 600.0;
@@ -195,6 +232,25 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					graph.add_node(node, mixer_id);
 				});
 			}
+
+			if frame_state.active(actions.throw_grenade) {
+				let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+				let camera_orientation = camera_orientation
+					* Quat::from_pitch(camera.pitch);
+
+				let spawn_pos = eye_pos + camera_orientation.forward() * 1.0;
+				let vel = camera_orientation.forward() * 8.0;
+
+				balls.push(Ball {
+					pos: spawn_pos,
+					radius: 0.2,
+
+					ty: BallType::Grenade {
+						vel,
+						countdown: 3.0,
+					}
+				})
+			}
 		}
 
 
@@ -205,35 +261,40 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 		mesh_data.clear();
 
-		let mut mb = gfx::ColorMeshBuilder::new(&mut mesh_data);
+		let mut mb = PatternMeshBuilder::new(&mut mesh_data);
 
-		let ground_plane = Mat3::from_columns([
+
+		mb.set_xy_plane(
 			Vec3::from_x(ZONE_SIZE * 2.0),
-			Vec3::from_z(ZONE_SIZE * 2.0),
-			Vec3::zero(),
-		]);
-
-		mb.set_color(Color::hsv(200.0, 0.35, 0.6));
-		mb.on_plane_ref(ground_plane).build(Quad::unit());
+			Vec3::from_z(ZONE_SIZE * 2.0)
+		);
+		mb.set_origin(Vec3::zero());
+		mb.set_colors(ground_color_0, ground_color_1);
+		mb.pattern = 3;
+		mb.build(Quad::unit());
 
 		let quat = Quat::from_yaw(camera.yaw)
 			* Quat::from_pitch(camera.pitch);
 
-		// A Mat3x2 would be handy here.
-		let camera_plane = Mat3::from_columns([
-			quat.up(),
+		mb.set_xy_plane(
 			quat.right(),
-			Vec3::zero(),
-		]);
+			quat.up()
+		);
 
 		for ball in balls.iter() {
-			match ball.ty {
-				BallType::Bouncy { bounce_elapsed, .. } => {
-					let bounce_factor = (1.0 - bounce_elapsed / 1.0).max(0.0);
-					let scale = 2.0 * ball.radius * (1.0 - bounce_factor.powi(10)*0.05);
-					let color = Color::hsv(30.0 - bounce_factor*20.0, 0.7 + bounce_factor*0.1, 0.6 - bounce_factor*0.1);
+			mb.set_origin(ball.pos);
 
-					draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(13, Mat2x3::uniform_scale(scale)), ball.pos, color);
+			match ball.ty {
+				BallType::Bouncy { bounce_elapsed, hue, .. } => {
+					let bounce_factor = (1.0 - bounce_elapsed / 0.2).max(0.0);
+					let scale = 2.0 * ball.radius;
+
+					let color = Color::hsv(hue, 0.7, 0.8 + bounce_factor*0.2);
+					let color2 = Color::hsv(hue + 50.0, 0.6, 0.85);
+
+					mb.set_colors(color, color2);
+					mb.pattern = 4;
+					mb.build(Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)));
 				}
 
 				BallType::Popping { elapsed } => {
@@ -242,39 +303,76 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 					let scale = (2.0 + pop_amt.powi(10)) * ball.radius;
 					let color = Color::rgb(1.0, whiteness, whiteness);
+					let color2 = Color::rgb(1.0, 0.3, 0.3);
 
-					draw_billboard(&mut mb, camera_plane, Polygon::from_matrix(13, Mat2x3::uniform_scale(scale)), ball.pos, color);
+					mb.set_colors(color, color2);
+					mb.pattern = 2;
+					mb.build(Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)));
+				}
+
+				BallType::Grenade { countdown, .. } => {
+					let scale;
+					mb.pattern = 2;
+
+					if countdown > GRENADE_TEASE_TIME {
+						scale = 2.0 * ball.radius;
+						mb.set_color(grenade_color);
+					} else {
+						let explode_amt = 1.0 - (countdown / GRENADE_TEASE_TIME).clamp(0.0, 1.0);
+						let whiteness = (explode_amt + 0.4).clamp(0.2, 1.0).powi(2);
+						scale = (2.0 + 4.0 * explode_amt.powi(6)) * ball.radius;
+						let color = Color::rgb(1.0, whiteness, whiteness);
+						let color2 = Color::rgb(1.0, 0.3, 0.3);
+
+						mb.set_colors(color, color2);
+					}
+
+					mb.build(Polygon::from_matrix(18, Mat2x3::uniform_scale(scale)));
 				}
 			}
 		}
 
 
-		let ground_plane = Mat3::from_columns([
+		mb.set_color(shadow_color);
+		mb.set_xy_plane(
 			Vec3::from_x(1.0),
-			Vec3::from_z(1.0),
-			Vec3::from_y(0.01),
-		]);
-
-		mb.set_color(Color::hsv(210.0, 0.38, 0.5));
-		let mut ground_mb = mb.on_plane_ref(ground_plane);
+			Vec3::from_z(1.0)
+		);
+		mb.set_origin(Vec3::from_y(0.01));
+		mb.pattern = 0;
 
 		for ball in balls.iter() {
 			let txform = Mat2x3::scale_translate(Vec2::splat(2.0 * ball.radius / (ball.pos.y - ball.radius + 1.0).max(0.0)), ball.pos.to_xz());
-			ground_mb.build(Polygon::from_matrix(13, txform))
+			mb.build(Polygon::from_matrix(13, txform))
 		}
 
 		mesh.upload(&mesh_data);
 
 
+		#[repr(C)]
+		#[derive(Copy, Clone, Debug)]
+		struct PatternUniforms {
+			screen_dimensions: Vec2, //_pad2: [f32; 2],
+			time: f32, _pad: [f32; 3],
+		}
+
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
-		uniform_buffer.upload_single(&uniforms);
+		std_uniform_buffer.upload_single(&uniforms);
+		pattern_uniform_buffer.upload_single(&PatternUniforms {
+			screen_dimensions: engine.gfx.backbuffer_size().to_vec2(),
+			time,
+
+			_pad: <_>::default(),
+			// _pad2: <_>::default(),
+		});
 
 		let mut gfx = engine.gfx.draw_context();
 		gfx.set_backface_culling(false);
-		gfx.set_clear_color(Color::hsv(190.0, 0.3, 0.8));
+		gfx.set_clear_color(background_color);
 		gfx.clear(gfx::ClearMode::ALL);
 
-		gfx.bind_uniform_buffer(0, uniform_buffer);
+		gfx.bind_uniform_buffer(0, std_uniform_buffer);
+		gfx.bind_uniform_buffer(1, pattern_uniform_buffer);
 		gfx.bind_shader(shader);
 
 		mesh.draw(&mut gfx, gfx::DrawMode::Triangles);
@@ -283,19 +381,6 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	}
 
 	Ok(())
-}
-
-
-fn draw_billboard<MB>(mb: &mut MB, mut plane: Mat3, geom: impl gfx::traits::BuildableGeometry2D, pos: Vec3, color: Color)
-	where MB: PolyBuilder3D + ColoredPolyBuilder
-{
-	let Vec3{x, y, z} = pos;
-	plane.rows[0].z = x;
-	plane.rows[1].z = y;
-	plane.rows[2].z = z;
-
-	mb.set_color(color);
-	mb.on_plane_ref(plane).build(geom);
 }
 
 
@@ -312,7 +397,7 @@ struct Camera {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-struct Uniforms {
+struct StdUniforms {
 	projection_view: Mat4,
 	projection_view_inverse: Mat4,
 	ui_projection_view: Mat4,
@@ -320,7 +405,7 @@ struct Uniforms {
 }
 
 
-fn build_uniforms(camera: &Camera, aspect: f32) -> Uniforms {
+fn build_uniforms(camera: &Camera, aspect: f32) -> StdUniforms {
 	let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
 
 	let projection_view = {
@@ -330,7 +415,7 @@ fn build_uniforms(camera: &Camera, aspect: f32) -> Uniforms {
 			* Mat4::translate(-eye_pos)
 	};
 
-	Uniforms {
+	StdUniforms {
 		projection_view,
 		projection_view_inverse: projection_view.inverse(),
 
@@ -344,17 +429,24 @@ fn build_uniforms(camera: &Camera, aspect: f32) -> Uniforms {
 
 
 const BALL_POP_TIME: f32 = 0.4;
+const GRENADE_TEASE_TIME: f32 = 0.5;
 
 #[derive(Copy, Clone)]
 enum BallType {
 	Bouncy {
 		vel: Vec3,
+		hue: f32,
 		bounce_elapsed: f32,
 	},
 
 	Popping {
 		elapsed: f32,
-	}
+	},
+
+	Grenade {
+		vel: Vec3,
+		countdown: f32,
+	},
 }
 
 struct Ball {
@@ -363,12 +455,83 @@ struct Ball {
 	ty: BallType,
 }
 
+
+
+struct Bounce {
+	impact_speed: f32,
+}
+
+fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: Vec3) -> Option<Bounce> {
+	let planes = [
+		Plane::new(Vec3::from_y(1.0), 0.0),
+		Plane::new(Vec3::from_y(-1.0), -6.0),
+
+		Plane::new(Vec3::from_x(1.0), -ZONE_SIZE),
+		Plane::new(Vec3::from_x(-1.0), -ZONE_SIZE),
+		Plane::new(Vec3::from_z(1.0), -ZONE_SIZE),
+		Plane::new(Vec3::from_z(-1.0), -ZONE_SIZE),
+	];
+
+	let player_diff = *ball_pos - eye_pos;
+	let player_radius = 0.5;
+	let player_dist = player_diff.length();
+	let surface_dist = player_dist - (ball_radius + player_radius);
+
+	let mut total_impact_speed = 0.0;
+
+	if surface_dist < 0.0 && ball_pos.y < 2.0 {
+		let impact_normal = player_diff / player_dist;
+		let offset = impact_normal * -surface_dist;
+		*ball_pos += offset;
+
+		let impact = offset * 3.0;
+		let impact_speed = impact_normal.dot(*ball_vel);
+
+		if ball_vel.dot(offset) < 0.0 {
+			*ball_vel = (-ball_vel.to_xz()).to_x0z() + impact;
+		} else {
+			*ball_vel += impact;
+		}
+
+		ball_vel.y += -8.0*surface_dist;
+
+		total_impact_speed += impact_speed;
+	}
+
+	// Wall bounces
+	for plane in planes {
+		let distance = plane.distance_to(*ball_pos);
+		let surface_dist = distance - ball_radius;
+
+		if surface_dist < 0.0 {
+			let absorbtion_factor = 0.9;
+			let impact_speed = plane.normal.dot(*ball_vel);
+			*ball_pos += plane.normal * -surface_dist;
+			*ball_vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
+
+			total_impact_speed += impact_speed;
+		}
+	}
+
+	if total_impact_speed != 0.0 {
+		Some(Bounce {
+			impact_speed: total_impact_speed,
+		})
+	} else {
+		None
+	}
+}
+
+
 fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Camera, mixer_id: audio::NodeId) {
 	let mut rng = thread_rng();
 
+	let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+	let mut explosion_point = None;
+
 	for ball in balls.iter_mut() {
 		match &mut ball.ty {
-			BallType::Bouncy { vel, bounce_elapsed } => {
+			BallType::Bouncy { vel, bounce_elapsed, .. } => {
 				// gravity
 				vel.y -= 4.0/60.0;
 
@@ -376,74 +539,30 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 
 				*bounce_elapsed += 1.0/60.0;
 
-				let planes = [
-					Plane::new(Vec3::from_y(1.0), 0.0),
-					Plane::new(Vec3::from_y(-1.0), -6.0),
+				if let Some(Bounce {impact_speed}) = bounce(&mut ball.pos, vel, ball.radius, eye_pos) {
+					if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.02  {
+						let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
+						let eye_dist = (ball.pos - eye_pos).length();
+						let dist_falloff = 1.0 / eye_dist.powi(2);
+						let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
 
-					Plane::new(Vec3::from_x(1.0), -ZONE_SIZE),
-					Plane::new(Vec3::from_x(-1.0), -ZONE_SIZE),
-					Plane::new(Vec3::from_z(1.0), -ZONE_SIZE),
-					Plane::new(Vec3::from_z(-1.0), -ZONE_SIZE),
-				];
+						let freq = 100.0 * 2.0f32.powf((1.0 + 5.0 / ball.radius).floor() / 9.0);
 
-				let player_diff = ball.pos.to_xz() - camera.pos;
-				let player_radius = 0.5;
-				let player_dist = player_diff.length();
-				let surface_dist = player_dist - (ball.radius + player_radius);
+						let release = 0.1 + ball.radius / 2.0;
 
-				if surface_dist < 0.0 && ball.pos.y < 2.0 {
-					let offset = (player_diff / player_dist).to_x0z() * -surface_dist;
-					ball.pos += offset;
+						if gain > 0.0001 {
+							engine.audio.queue_update(move |graph| {
+								use audio::*;
+								let node = audio::node_builder::OscillatorGenerator::new(freq)
+									.envelope(0.01, release)
+									.gain(gain)
+									.build();
 
-					let impact = offset * 3.0;
-
-					if vel.dot(offset) < 0.0 {
-						*vel = (-vel.to_xz()).to_x0z() + impact;
-					} else {
-						*vel += impact;
-					}
-
-					vel.y += -8.0*surface_dist;
-					*bounce_elapsed = 0.0;
-				}
-
-				// Wall bounces
-				for plane in planes {
-					let distance = plane.distance_to(ball.pos);
-					let surface_dist = distance - ball.radius;
-
-					if surface_dist < 0.0 {
-						let absorbtion_factor = 0.9;
-						let impact_speed = plane.normal.dot(*vel);
-						ball.pos += plane.normal * -surface_dist;
-						*vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
-
-
-						if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.02 {
-							let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
-							let eye_dist = (ball.pos - camera.pos.to_x0z() - Vec3::from_y(camera.elevation)).length();
-							let dist_falloff = 1.0 / eye_dist.powi(2);
-							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
-
-							let freq = 100.0 * 2.0f32.powf((1.0 + 5.0 / ball.radius).floor() / 9.0);
-
-							let release = 0.1 + ball.radius / 2.0;
-
-							if gain > 0.0001 {
-								engine.audio.queue_update(move |graph| {
-									use audio::*;
-									let node = audio::node_builder::OscillatorGenerator::new(freq)
-										.envelope(0.01, release)
-										.gain(gain)
-										.build();
-
-									graph.add_node(node, mixer_id);
-								});
-							}
-
-
-							*bounce_elapsed = 0.0;
+								graph.add_node(node, mixer_id);
+							});
 						}
+
+						*bounce_elapsed = 0.0;
 					}
 				}
 			}
@@ -474,13 +593,208 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 					});
 				}
 			}
+
+			BallType::Grenade { countdown, vel } => {
+				*countdown -= 1.0/60.0;
+
+				if *countdown > GRENADE_TEASE_TIME {
+					// gravity
+					vel.y -= 9.0/60.0;
+
+					ball.pos += *vel / 60.0;
+
+					if let Some(Bounce {impact_speed}) = bounce(&mut ball.pos, vel, ball.radius, eye_pos) {
+						if impact_speed.abs() > 0.05 {
+							let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
+							let eye_dist = (ball.pos - eye_pos).length();
+							let dist_falloff = 1.0 / eye_dist.powi(2);
+							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
+
+							let freq = 2000.0;
+
+							let release = 0.1;
+
+							if gain > 0.0001 {
+								engine.audio.queue_update(move |graph| {
+									use audio::*;
+									let node = audio::node_builder::OscillatorGenerator::new(freq)
+										.envelope(0.01, release)
+										.gain(gain)
+										.build();
+
+									graph.add_node(node, mixer_id);
+								});
+							}
+						}
+					}
+				} else if *countdown < 0.0 {
+					if explosion_point.is_some() {
+						*countdown = 0.0;
+					} else {
+						explosion_point = Some(ball.pos);
+					}
+				}
+			}
+		}
+	}
+
+	if let Some(explosion_point) = explosion_point {
+		let dist_falloff = 1.0 / (explosion_point - eye_pos).length().powi(1);
+		let gain = 4.0 * dist_falloff;
+
+		engine.audio.queue_update(move |graph| {
+			use audio::*;
+
+			let hi_noise = audio::node_builder::NoiseGenerator::new()
+				.high_pass(5000.0)
+				.gain(2.0)
+				.envelope(0.01, 0.6);
+
+			let low_noise = audio::node_builder::NoiseGenerator::new()
+				.low_pass(100.0)
+				.gain(2.0)
+				.envelope(0.1, 0.8);
+
+			let osc = audio::node_builder::OscillatorGenerator::new(50.0)
+				.envelope(0.1, 0.5);
+
+			let node = (hi_noise, low_noise, osc)
+				.gain(gain)
+				.build();
+
+			graph.add_node(node, mixer_id);
+		});
+
+		for ball in balls.iter_mut() {
+			let explosion_diff = ball.pos - explosion_point;
+			let explosion_distance = explosion_diff.length() - ball.radius;
+			let explosion_dir = explosion_diff.normalize() + Vec3::from_y(1.0);
+
+			match &mut ball.ty {
+				BallType::Bouncy{vel, ..} => if explosion_distance < 2.0 {
+					// Pop
+					ball.ty = BallType::Popping {
+						elapsed: -((ball.pos - explosion_point).length() / 2.0 * 0.8)
+					};
+				} else if explosion_distance < 4.0 {
+					// Push away
+					let force = explosion_dir * (4.0 - explosion_distance) * 5.0;
+					*vel += force;
+				}
+
+				BallType::Grenade {vel, ..} => if explosion_distance < 4.0 {
+					// Push away
+					let force = explosion_dir * (4.0 - explosion_distance) * 5.0;
+					*vel += force;
+				}
+
+				_ => {}
+			}
 		}
 	}
 
 	balls.retain(|ball| {
 		match ball.ty {
 			BallType::Popping { elapsed } => elapsed < BALL_POP_TIME,
+			BallType::Grenade { countdown, .. } => countdown >= 0.0,
 			_ => true
 		}
 	});
+}
+
+
+
+
+use gfx::mesh::{MeshData, PolyBuilder2D};
+use gfx::vertex::{*};
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct PatternVertex {
+	pub pos: Vec3,
+	pub index: u8,
+	pub shape_id: u8,
+	pub color_0: Color,
+	pub color_1: Color,
+}
+
+
+impl Vertex for PatternVertex {
+	fn descriptor() -> Descriptor {
+		static COLOR_VERTEX_ATTRIBUTES: &'static [Attribute] = &[
+			Attribute::new(0*4, AttributeType::Vec3),
+			Attribute::new(3*4, AttributeType::Uint8(1)),
+			Attribute::new(4*4, AttributeType::Vec4),
+			Attribute::new(8*4, AttributeType::Vec4),
+			Attribute::new(3*4 + 1, AttributeType::Uint8(1)),
+		];
+
+		Descriptor {
+			attributes: COLOR_VERTEX_ATTRIBUTES,
+			size_bytes: std::mem::size_of::<Self>() as u32,
+		}
+	}
+}
+
+
+
+pub struct PatternMeshBuilder<'md> {
+	pub data: &'md mut MeshData<PatternVertex>,
+	pub color_0: Color,
+	pub color_1: Color,
+	pub plane: Mat3,
+	pub pattern: u8,
+	pub shape_id: Wrapping<u8>,
+}
+
+
+impl<'md> PatternMeshBuilder<'md> {
+	pub fn new(data: &'md mut MeshData<PatternVertex>) -> Self {
+		PatternMeshBuilder {
+			data,
+			color_0: Color::white(),
+			color_1: Color::black(),
+			plane: Mat3::identity(),
+			pattern: 0,
+			shape_id: Wrapping(0),
+		}
+	}
+
+	pub fn set_color(&mut self, color: Color) {
+		self.color_0 = color;
+		self.color_1 = color;
+	}
+
+	pub fn set_colors(&mut self, color_0: Color, color_1: Color) {
+		self.color_0 = color_0;
+		self.color_1 = color_1;
+	}
+
+	pub fn set_xy_plane(&mut self, right: Vec3, up: Vec3) {
+		self.plane.set_column_x(right);
+		self.plane.set_column_y(up);
+	}
+
+	pub fn set_origin(&mut self, origin: Vec3) {
+		self.plane.set_column_z(origin);
+	}
+}
+
+impl<'mb> PolyBuilder2D for PatternMeshBuilder<'mb> {
+	fn extend_2d(&mut self, vs: impl IntoIterator<Item=Vec2>, is: impl IntoIterator<Item=u16>) {
+		let shape_id = self.shape_id.0;
+		self.shape_id += 1;
+
+		let vertices = vs.into_iter()
+			.map(|v2| self.plane * v2.extend(1.0))
+			.map(|v3| PatternVertex {
+				pos: v3,
+				index: self.pattern,
+				shape_id,
+				color_0: self.color_0,
+				color_1: self.color_1,
+			});
+
+		self.data.extend(vertices, is);
+	}
 }
