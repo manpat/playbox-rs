@@ -128,6 +128,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			view_ctx.gfx.dispatch_compute(compute_w as u32, compute_h as u32, 1);
 
 			unsafe {
+				// Insert barrier because we fetch from color_0 in the next draw call
 				gfx::raw::MemoryBarrier(gfx::raw::TEXTURE_FETCH_BARRIER_BIT);
 			}
 
