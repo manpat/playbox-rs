@@ -21,14 +21,14 @@ impl SrgbView {
 
 		let gradient_mesh_src = scene.source_data.find_entity("SRGB_gradients")
 			.expect("Failed to find SRGB_gradients entity")
-			.mesh_data()
+			.mesh()
 			.expect("SRGB_gradients missing mesh data");
 
-		let color_data = gradient_mesh_src.color_data(None)
+		let color_layer = gradient_mesh_src.color_layers.get(0)
 			.expect("Missing color data");
 
 		let gradient_positions = gradient_mesh_src.positions.iter().map(Vec3::to_xy).collect();
-		let gradient_colors = color_data.data.iter().copied().map(Color::from).collect();
+		let gradient_colors = color_layer.data.iter().copied().map(Color::from).collect();
 		let gradient_indices = gradient_mesh_src.indices.clone();
 
 		let gradient_mesh = gfx::Mesh::new(gfx);

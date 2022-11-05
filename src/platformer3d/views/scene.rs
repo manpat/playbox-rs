@@ -97,15 +97,15 @@ fn build_entity_transformed(color_mesh_data: &mut MeshData<ColorVertex>,
 {
 	use itertools::Either::*;
 
-	let ent_mesh_data = entity.mesh_data().unwrap();
+	let ent_mesh_data = entity.mesh().unwrap();
 	let indices = ent_mesh_data.indices.iter().cloned();
 
-	let vert_color = match ent_mesh_data.color_data.get(0) {
+	let vert_color = match ent_mesh_data.color_layers.first() {
 		Some(color_layer) => Left(color_layer.data.iter().copied()),
 		None => Right(std::iter::repeat(Vec4::splat(1.0))),
 	};
 
-	if let Some(uv_layer) = ent_mesh_data.uv_data.get(0) {
+	if let Some(uv_layer) = ent_mesh_data.uv_layers.first() {
 		let ent_vertices = ent_mesh_data.positions.iter()
 			.zip(uv_layer.data.iter().zip(vert_color))
 			.map(move |(&pos, (&uv, color))| {

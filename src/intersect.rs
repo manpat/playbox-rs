@@ -37,7 +37,7 @@ fn entity_raycast(entity: &toy::EntityRef<'_>, ray: &Ray) -> Option<Vec3> {
 	let inv_transform = transform.inverse();
 	let ray_local = transform_ray(ray, &inv_transform);
 
-	let mesh_data = entity.mesh_data()?;
+	let mesh_data = entity.mesh()?;
 
 	let triangles = mesh_data.indices.array_chunks::<3>()
 		.map(|&[i0, i1, i2]| [
