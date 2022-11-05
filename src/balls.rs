@@ -65,7 +65,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut rng = thread_rng();
 	let mut balls = Vec::new();
 
-	for _ in 0..20 {
+	for _ in 0..1 {
 		balls.push(Ball {
 			pos: (random::<Vec3>() * 2.0 - 1.0) * ZONE_SIZE + Vec3::from_y(2.0),
 			radius: rng.gen_range::<f32, _>(0.2..0.7).powf(1.5),
@@ -184,7 +184,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 				balls.push(Ball {
 					pos: spawn_pos,
-					radius: rng.gen_range::<f32, _>(0.1..1.2).powf(1.0),
+					radius: rng.gen_range::<f32, _>(0.05..1.1),
 
 					ty: BallType::Bouncy {
 						vel,
@@ -496,7 +496,7 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 		*ball_pos += offset;
 
 		let impact = offset * 3.0;
-		let impact_speed = impact_normal.dot(*ball_vel);
+		let impact_speed = -impact_normal.dot(*ball_vel);
 
 		if ball_vel.dot(offset) < 0.0 {
 			*ball_vel = (-ball_vel.to_xz()).to_x0z() + impact;
@@ -506,27 +506,35 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 
 		ball_vel.y += -8.0*surface_dist;
 
-		total_impact_speed += impact_speed;
+		total_impact_speed += impact_speed.max(0.0);
 	}
 
 	// Wall bounces
 	for plane in planes {
 		let distance = plane.distance_to(*ball_pos);
-		let surface_dist = distance - ball_radius;
+		let penetration_dist = ball_radius - distance;
 
-		if surface_dist < 0.0 {
-			let absorbtion_factor = 0.9;
-			let impact_speed = plane.normal.dot(*ball_vel);
-			*ball_pos += plane.normal * -surface_dist;
-			*ball_vel -= plane.normal * impact_speed * 2.0 * absorbtion_factor;
+		if penetration_dist > 0.0 {
+			let absorbtion_factor = 0.7;
+			*ball_pos += plane.normal * penetration_dist;
 
-			total_impact_speed += impact_speed;
+			let impact_speed = -plane.normal.dot(*ball_vel);
+
+			// Zero velocity in this direction
+			let impulse_vector = plane.normal * impact_speed;
+			*ball_vel += impulse_vector;
+
+			if impact_speed > 0.1 && penetration_dist > 0.001 {
+				// Reflect and record impact
+				*ball_vel += impulse_vector * absorbtion_factor;
+				total_impact_speed += impact_speed.max(0.0);
+			}
 		}
 	}
 
-	if total_impact_speed != 0.0 {
+	if total_impact_speed > 0.0 {
 		Some(Bounce {
-			impact_speed: total_impact_speed,
+			impact_speed: dbg!(total_impact_speed),
 		})
 	} else {
 		None
@@ -544,28 +552,40 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 		match &mut ball.ty {
 			BallType::Bouncy { vel, bounce_elapsed, .. } => {
 				// gravity
-				vel.y -= 4.0/60.0;
+				if ball.pos.y > ball.radius {
+					vel.y -= 6.0/60.0;
+				}
 
 				ball.pos += *vel * 1.0/60.0;
+
+				// *vel *= (1.0 - 0.5/60.0);
 
 				*bounce_elapsed += 1.0/60.0;
 
 				if let Some(Bounce {impact_speed}) = bounce(&mut ball.pos, vel, ball.radius, eye_pos) {
-					if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.1  {
-						let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
+					if impact_speed > 0.05 && *bounce_elapsed > 0.1  {
+						let impact_gain = impact_speed * ball.radius.sqrt() * 0.3;
 						let eye_dist = (ball.pos - eye_pos).length();
 						let dist_falloff = 1.0 / eye_dist.powi(2);
-						let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
+						let gain = (impact_gain.powi(1)*dist_falloff).min(1.0);
 
-						let freq = 100.0 * 2.0f32.powf((1.0 + 5.0 / ball.radius).floor() / 9.0);
+						let freq = 80.0 * 2.0f32.powf((1.0 + 3.0 / ball.radius.sqrt()).floor() / 9.0);
 
-						let release = 0.1 + ball.radius / 2.0;
+						let release = 0.1 + ball.radius / 3.0;
 
 						if gain > 0.0001 {
 							engine.audio.queue_update(move |graph| {
-								use audio::*;
-								let node = audio::node_builder::OscillatorGenerator::new(freq)
+								use audio::{*, node_builder::*};
+
+								let low_osc = OscillatorGenerator::new(freq)
 									.envelope(0.01, release)
+									.gain(4.0);
+
+								let high_osc = (OscillatorGenerator::new(freq * 2.0), NoiseGenerator::new().low_pass(100.0))
+									.envelope(0.01, 0.08)
+									.gain(0.3);
+
+								let node = (low_osc, high_osc)
 									.gain(gain)
 									.build();
 
@@ -611,13 +631,15 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 
 				if *countdown > GRENADE_TEASE_TIME {
 					// gravity
-					vel.y -= 9.0/60.0;
+					if ball.pos.y > ball.radius + 0.01 {
+						vel.y -= 9.0/60.0;
+					}
 
 					ball.pos += *vel / 60.0;
 
 					if let Some(Bounce {impact_speed}) = bounce(&mut ball.pos, vel, ball.radius, eye_pos) {
-						if impact_speed.abs() > 0.05 && *bounce_elapsed > 0.1 {
-							let impact_gain = impact_speed.abs() * ball.radius.sqrt() * 0.3;
+						if impact_speed > 0.05 && *bounce_elapsed > 0.1 {
+							let impact_gain = impact_speed * ball.radius.sqrt() * 0.3;
 							let eye_dist = (ball.pos - eye_pos).length();
 							let dist_falloff = 1.0 / eye_dist.powi(2);
 							let gain = (impact_gain.powi(2)*dist_falloff).min(1.0);
