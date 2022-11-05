@@ -4,6 +4,22 @@ version = "0.1.0"
 edition = "2021"
 
 
+[dependencies]
+# smol = "1.2.*"
+
+
+
 [dependencies.toybox]
 git = "https://github.com/manpat/toybox-rs.git"
 features = ["tracy"]
+
+
+[patch."https://github.com/manpat/common-rs.git"]
+common = { path = "../common-rs" }
+
+[patch."https://github.com/manpat/toybox-rs.git"]
+toybox = { path = "../toybox-rs" }
+
+[patch."https://github.com/manpat/toy-rs.git"]
+toy = { path = "../toy-rs" }
+

@@ -37,7 +37,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut engine = start_loop().await;
 	let resource_scope_token = engine.new_resource_scope();
 
-	let mut global_controller = crate::platformer3d::controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
+	let mut global_controller = crate::global_controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 
 	let actions = Actions::new_active(&mut engine);
 	let debug_mouse_actions = DebugMouseActions::new(&mut engine);
@@ -534,7 +534,7 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 
 	if total_impact_speed > 0.0 {
 		Some(Bounce {
-			impact_speed: dbg!(total_impact_speed),
+			impact_speed: total_impact_speed,
 		})
 	} else {
 		None

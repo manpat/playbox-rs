@@ -11,6 +11,8 @@ mod shaders;
 mod executor;
 mod intersect;
 
+mod global_controller;
+
 mod platformer3d;
 mod balls;
 
@@ -39,8 +41,6 @@ enum MainMenuCommand {
 
 
 async fn main_game_loop() -> Result<(), Box<dyn Error>> {
-	balls::play().await?;
-	
 	loop {
 		match main_menu().await? {
 			MainMenuCommand::PlayPlatformerScene(scene) => {
@@ -63,7 +63,7 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 	let mut engine = start_loop().await;
 	let resource_scope_token = engine.new_resource_scope();
 
-	let mut global_controller = platformer3d::controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
+	let mut global_controller = global_controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 
 	let scene_list: Vec<_> = {
 		let scene_data = std::fs::read("assets/scene.toy")?;

@@ -22,7 +22,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 
 
 	// TODO(pat.m): it would be cool to figure out how to tie a &mut Engine to a resource_scope_token
-	let mut global_controller = controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
+	let mut global_controller = crate::global_controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 	let mut player_controller = controller::PlayerController::new(&mut engine, resource_scope_token.id());
 	let mut camera_controller = controller::CameraController::new(&mut engine);
 	let mut debug_camera_controller = controller::DebugCameraController::new(&mut engine);
