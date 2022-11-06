@@ -9,6 +9,7 @@ pub struct GBufferParticlesView {
 	particle_buffer: gfx::Buffer<Particle>,
 	control_buffer: gfx::Buffer<ControlBuffer>,
 
+	enabled: bool,
 	debug_spawn_rate: i32,
 }
 
@@ -44,12 +45,27 @@ impl GBufferParticlesView {
 			particle_buffer,
 			control_buffer,
 
+			enabled: false,
 			debug_spawn_rate: 512,
 		})
 	}
 
 	#[instrument(skip_all)]
 	pub fn update(&mut self, ctx: &mut super::ViewContext, fbo: gfx::FramebufferKey) {
+		if let Some(_) = imgui::Window::new("Particles").begin(ctx.imgui)
+		{
+			ctx.imgui.checkbox("Enabled", &mut self.enabled);
+
+			if self.enabled {
+				imgui::Slider::new("Spawn Rate", 0, 512)
+					.build(ctx.imgui, &mut self.debug_spawn_rate);
+			}
+		}
+
+		if !self.enabled {
+			return;
+		}
+
 		{
 			let _section = ctx.perf.scoped_section("particle spawn");
 
@@ -81,17 +97,14 @@ impl GBufferParticlesView {
 
 			ctx.gfx.dispatch_compute(part_count_x, part_count_y, 1);
 		}
-
-		if let Some(_) = imgui::Window::new("Particles").begin(ctx.imgui)
-		{
-			imgui::Slider::new("Spawn Rate", 0, 512)
-				.build(ctx.imgui, &mut self.debug_spawn_rate);
-		}
-
 	}
 
 	#[instrument(skip_all)]
 	pub fn draw(&self, ctx: &mut super::ViewContext) {
+		if !self.enabled {
+			return
+		}
+
 		let _section = ctx.perf.scoped_section("particles");
 
 		unsafe {

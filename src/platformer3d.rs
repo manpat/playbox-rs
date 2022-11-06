@@ -39,7 +39,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let mut scene_view = views::SceneView::new(&mut view_resource_context, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&mut view_resource_context)?;
 	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut view_resource_context)?;
-	// let mut _gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
+	let mut gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
 
 	let test_fbo = view_resource_context.new_framebuffer(
 		gfx::FramebufferSettings::new(gfx::TextureSize::Backbuffer)
@@ -144,8 +144,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			view_ctx.gfx.draw_arrays(gfx::DrawMode::Triangles, 6);
 		}
 
-		// gbuffer_particles_view.update(&mut view_ctx, test_fbo);
-		// gbuffer_particles_view.draw(&mut view_ctx);
+		gbuffer_particles_view.update(&mut view_ctx, test_fbo);
+		gbuffer_particles_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
 
