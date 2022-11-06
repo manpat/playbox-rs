@@ -266,11 +266,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 
 		// Ground plane
-		let mut gmb = mb.on_plane_ref(Mat3::from_columns([
-			Vec3::from_x(1.0),
-			Vec3::from_z(1.0),
-			Vec3::zero()
-		]));
+		let mut gmb = mb.on_plane_ref(gfx::OrthogonalOrientation::PositiveY);
 		gmb.set_colors(ground_color_0, ground_color_1);
 		gmb.pattern = 3;
 		gmb.build(Quad::unit().uniform_scale(2.0 * ZONE_SIZE));
@@ -280,11 +276,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		let quat = Quat::from_yaw(camera.yaw)
 			* Quat::from_pitch(camera.pitch);
 
-		let mut bmb = mb.on_plane_ref(Mat3::from_columns([
-			quat.right(),
-			quat.up(),
-			Vec3::zero()
-		]));
+		let mut bmb = mb.on_plane_ref(quat);
 
 		for ball in balls.iter() {
 			bmb.set_origin(ball.pos);
@@ -339,11 +331,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 
 		// Drop shadows
-		let mut gmb = mb.on_plane_ref(Mat3::from_columns([
-			Vec3::from_x(1.0),
-			Vec3::from_z(1.0),
-			Vec3::from_y(0.01)
-		]));
+		let mut gmb = mb.on_plane_ref(gfx::OrthogonalOrientation::PositiveY.to_surface().with_origin(Vec3::from_y(0.001)));
 
 		gmb.set_color(shadow_color);
 		gmb.pattern = 0;

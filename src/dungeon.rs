@@ -118,14 +118,15 @@ const ROOM_HEIGHT: f32 = 2.0;
 
 fn build_room(mb: &mut gfx::ColorMeshBuilder<&mut gfx::MeshData<gfx::ColorVertex>>, location: Vec2i) {
 	use gfx::geom::*;
+	use gfx::OrthogonalOrientation;
 
 	let origin = location.to_vec2() * ROOM_SIZE;
 	let origin = origin.to_x0y();
 
 	mb.set_color(Color::white());
-	mb.on_plane_ref(Mat3::from_columns([Vec3::from_x(1.0), Vec3::from_z(-1.0), origin + Vec3::from_y(0.0)]))
+	mb.on_plane_ref(OrthogonalOrientation::PositiveY.to_surface_with_origin(origin + Vec3::from_y(0.0)))
 		.build(Quad::unit().uniform_scale(ROOM_SIZE));
 
-	mb.on_plane_ref(Mat3::from_columns([Vec3::from_x(1.0), Vec3::from_z(1.0), origin + Vec3::from_y(ROOM_HEIGHT)]))
+	mb.on_plane_ref(OrthogonalOrientation::NegativeY.to_surface_with_origin(origin + Vec3::from_y(ROOM_HEIGHT)))
 		.build(Quad::unit().uniform_scale(ROOM_SIZE));
 }
