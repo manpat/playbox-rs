@@ -15,6 +15,7 @@ mod global_controller;
 
 mod platformer3d;
 mod balls;
+mod dungeon;
 
 use executor::{start_loop, next_frame};
 
@@ -36,6 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 enum MainMenuCommand {
 	PlayPlatformerScene(&'static str),
 	PlayBalls,
+	PlayDungeon,
 	Quit,
 }
 
@@ -49,6 +51,10 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 
 			MainMenuCommand::PlayBalls => {
 				balls::play().await?;
+			}
+
+			MainMenuCommand::PlayDungeon => {
+				dungeon::play().await?
 			}
 
 			MainMenuCommand::Quit => return Ok(())
@@ -108,6 +114,10 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 
 			if ui.button("Balls") {
 				return Ok(MainMenuCommand::PlayBalls);
+			}
+
+			if ui.button("Dungeon") {
+				return Ok(MainMenuCommand::PlayDungeon);
 			}
 
 			if ui.button("Quit") {

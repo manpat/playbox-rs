@@ -1,3 +1,4 @@
+use toybox::common::Mat4;
 
 pub const GLOBAL_COMMON: &'static str = include_str!("shaders/global.common.glsl");
 
@@ -20,3 +21,16 @@ pub const GBUFFER_PARTICLE_VERT: &'static str = include_str!("shaders/gbuffer_pa
 pub const GBUFFER_PARTICLE_FRAG: &'static str = include_str!("shaders/gbuffer_particle.frag.glsl");
 pub const GBUFFER_PARTICLE_SPAWN_COMPUTE: &'static str = include_str!("shaders/gbuffer_particle_spawn.compute.glsl");
 pub const GBUFFER_PARTICLE_UPDATE_COMPUTE: &'static str = include_str!("shaders/gbuffer_particle_update.compute.glsl");
+
+
+
+
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct StdUniforms {
+	pub projection_view: Mat4,
+	pub projection_view_inverse: Mat4,
+	pub ui_projection_view: Mat4,
+	// NOTE: align to Vec4s
+}

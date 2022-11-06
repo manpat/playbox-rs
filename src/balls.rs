@@ -175,7 +175,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			camera.elevation = (0.4).lerp(camera.elevation, target_elevation);
 
 			if frame_state.active(actions.spawn_ball) {
-				let world_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+				let world_pos = camera.pos.to_x0y() + Vec3::from_y(camera.elevation);
 				let camera_orientation = camera_orientation
 					* Quat::from_pitch(camera.pitch);
 
@@ -195,7 +195,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			}
 
 			if frame_state.active(actions.remove_balls) {
-				let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+				let eye_pos = camera.pos.to_x0y() + Vec3::from_y(camera.elevation);
 
 				for ball in balls.iter_mut()
 					.filter(|ball| match ball.ty {
@@ -234,7 +234,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			}
 
 			if frame_state.active(actions.throw_grenade) {
-				let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+				let eye_pos = camera.pos.to_x0y() + Vec3::from_y(camera.elevation);
 				let camera_orientation = camera_orientation
 					* Quat::from_pitch(camera.pitch);
 
@@ -403,18 +403,8 @@ struct Camera {
 
 
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct StdUniforms {
-	projection_view: Mat4,
-	projection_view_inverse: Mat4,
-	ui_projection_view: Mat4,
-	// NOTE: align to Vec4s
-}
-
-
-fn build_uniforms(camera: &Camera, aspect: f32) -> StdUniforms {
-	let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+fn build_uniforms(camera: &Camera, aspect: f32) -> shaders::StdUniforms {
+	let eye_pos = camera.pos.to_x0y() + Vec3::from_y(camera.elevation);
 
 	let projection_view = {
 		Mat4::perspective(PI/3.0, aspect, 0.1, 1000.0)
@@ -423,7 +413,7 @@ fn build_uniforms(camera: &Camera, aspect: f32) -> StdUniforms {
 			* Mat4::translate(-eye_pos)
 	};
 
-	StdUniforms {
+	shaders::StdUniforms {
 		projection_view,
 		projection_view_inverse: projection_view.inverse(),
 
@@ -499,7 +489,7 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 		let impact_speed = -impact_normal.dot(*ball_vel);
 
 		if ball_vel.dot(offset) < 0.0 {
-			*ball_vel = (-ball_vel.to_xz()).to_x0z() + impact;
+			*ball_vel = (-ball_vel.to_xz()).to_x0y() + impact;
 		} else {
 			*ball_vel += impact;
 		}
@@ -545,7 +535,7 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Camera, mixer_id: audio::NodeId) {
 	let mut rng = thread_rng();
 
-	let eye_pos = camera.pos.to_x0z() + Vec3::from_y(camera.elevation);
+	let eye_pos = camera.pos.to_x0y() + Vec3::from_y(camera.elevation);
 	let mut explosion_point = None;
 
 	for ball in balls.iter_mut() {
@@ -575,7 +565,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 
 						if gain > 0.0001 {
 							engine.audio.queue_update(move |graph| {
-								use audio::{*, node_builder::*};
+								use audio::*;
 
 								let low_osc = OscillatorGenerator::new(freq)
 									.envelope(0.01, release)
@@ -602,7 +592,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 				*elapsed += 1.0/60.0;
 
 				if *elapsed >= BALL_POP_TIME {
-					let eye_dist = (ball.pos - camera.pos.to_x0z() - Vec3::from_y(camera.elevation)).length();
+					let eye_dist = (ball.pos - camera.pos.to_x0y() - Vec3::from_y(camera.elevation)).length();
 					let gain = 2.0 * ball.radius / eye_dist.powi(1);
 
 					let freq = rng.gen_range(600.0 .. 800.0);
