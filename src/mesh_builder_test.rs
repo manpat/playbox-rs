@@ -137,7 +137,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		}
 
 		camera_yaw = (0.5f32).lerp(camera_yaw, camera_yaw + camera_yaw_vel);
-		camera_pitch = (0.5f32).lerp(camera_pitch, (camera_pitch + camera_pitch_vel).clamp(-TAU/4.0, 0.2));
+		camera_pitch = (0.5f32).lerp(camera_pitch, (camera_pitch + camera_pitch_vel).clamp(-TAU/4.0 + 0.01 /* stop zfighting :) */, 0.2));
 
 
 		{
@@ -271,6 +271,16 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					pmb.set_color(colors[6]);
 					pmb.set_origin(Vec3::new(-1.0, 1.5, 1.0));
 					pmb.build(Polygon::unit(3).rotate(time*1.3));
+
+
+					pmb.set_color(colors[7]);
+					for i in 0..10 {
+						pmb.set_origin(Vec3::from_y_angle(i as f32 * TAU / 10.0) * 0.8);
+						Polygon::unit(3).scale(Vec2::new(0.3, 0.6)).build(&mut pmb);
+
+						pmb.set_origin(Vec3::from_y_angle(i as f32 * TAU / 10.0 + 0.5) * 1.2);
+						Polygon::unit(3).scale(Vec2::new(0.3, 0.6)).build(&mut pmb);
+					}
 				}
 			}
 
