@@ -38,7 +38,6 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let mut debug_view = views::DebugView::new(&mut view_resource_context, &scene)?;
 	let mut scene_view = views::SceneView::new(&mut view_resource_context, &scene)?;
 	let mut blob_shadow_view = views::BlobShadowView::new(&mut view_resource_context)?;
-	let mut mesh_builder_test_view = views::MeshBuilderTestView::new(&mut view_resource_context)?;
 	let mut gbuffer_particles_view = views::GBufferParticlesView::new(&mut view_resource_context)?;
 
 	let test_fbo = view_resource_context.new_framebuffer(
@@ -80,7 +79,6 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 		player_view.update(&player);
 		scene_view.update(&scene, &mut blob_shadow_model);
 		blob_shadow_view.update(&blob_shadow_model, &scene);
-		mesh_builder_test_view.update();
 
 		engine.imgui.set_input_enabled(debug_model.active);
 		engine.imgui.set_visible(true);
@@ -106,7 +104,6 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 
 		player_view.draw(&mut view_ctx);
 		blob_shadow_view.draw(&mut view_ctx);
-		mesh_builder_test_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.bind_framebuffer(None);
 
@@ -151,7 +148,6 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 
 		if debug_model.active {
 			debug_view.draw(&mut view_ctx, &debug_model);
-			mesh_builder_test_view.draw_2d(&mut view_ctx);
 		}
 
 		engine = next_frame(engine).await;
