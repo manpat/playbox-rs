@@ -16,6 +16,7 @@ mod global_controller;
 mod platformer3d;
 mod balls;
 mod dungeon;
+mod mesh_builder_test;
 
 use executor::{start_loop, next_frame};
 
@@ -38,6 +39,7 @@ enum MainMenuCommand {
 	PlayPlatformerScene(&'static str),
 	PlayBalls,
 	PlayDungeon,
+	MeshBuilderTest,
 	Quit,
 }
 
@@ -55,6 +57,10 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 
 			MainMenuCommand::PlayDungeon => {
 				dungeon::play().await?
+			}
+
+			MainMenuCommand::MeshBuilderTest => {
+				mesh_builder_test::play().await?
 			}
 
 			MainMenuCommand::Quit => return Ok(())
@@ -78,8 +84,6 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 			.map(|s| s.name.clone())
 			.collect()
 	};
-
-	// let view_resource_context = engine.gfx.resource_context(&resource_scope_token);
 
 
 	'main: loop {
@@ -118,6 +122,10 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 
 			if ui.button("Dungeon") {
 				return Ok(MainMenuCommand::PlayDungeon);
+			}
+
+			if ui.button("Mesh Builder Test") {
+				return Ok(MainMenuCommand::MeshBuilderTest);
 			}
 
 			if ui.button("Quit") {

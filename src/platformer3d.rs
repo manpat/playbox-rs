@@ -164,17 +164,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 
 
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-struct Uniforms {
-	projection_view: Mat4,
-	projection_view_inverse: Mat4,
-	ui_projection_view: Mat4,
-	// NOTE: align to Vec4s
-}
 
-
-fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
+fn build_uniforms(camera: &model::Camera, aspect: f32) -> shaders::StdUniforms {
 	let projection_view = {
 		let camera_orientation = Quat::from_pitch(-camera.pitch) * Quat::from_yaw(-camera.yaw);
 		let camera_orientation = camera_orientation.to_mat4();
@@ -184,7 +175,7 @@ fn build_uniforms(camera: &model::Camera, aspect: f32) -> Uniforms {
 			* Mat4::translate(-camera.position)
 	};
 
-	Uniforms {
+	shaders::StdUniforms {
 		projection_view,
 		projection_view_inverse: projection_view.inverse(),
 
