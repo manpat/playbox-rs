@@ -14,9 +14,7 @@ mod intersect;
 mod global_controller;
 
 mod platformer3d;
-mod balls;
-mod dungeon;
-mod mesh_builder_test;
+mod vignette;
 
 use executor::{start_loop, next_frame};
 
@@ -52,15 +50,15 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 			}
 
 			MainMenuCommand::PlayBalls => {
-				balls::play().await?;
+				vignette::balls::play().await?;
 			}
 
 			MainMenuCommand::PlayDungeon => {
-				dungeon::play().await?
+				vignette::dungeon::play().await?
 			}
 
 			MainMenuCommand::MeshBuilderTest => {
-				mesh_builder_test::play().await?
+				vignette::mesh_builder_test::play().await?
 			}
 
 			MainMenuCommand::Quit => return Ok(())

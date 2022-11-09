@@ -46,7 +46,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut mesh = gfx::Mesh::new(&mut resource_ctx);
 	let mut mesh_data: gfx::MeshData<PatternVertex> = gfx::MeshData::new();
 
-	let shader = resource_ctx.new_simple_shader(include_str!("shaders/balls_pattern.vert.glsl"), include_str!("shaders/balls_pattern.frag.glsl"))?;
+	let shader = resource_ctx.new_simple_shader(include_str!("../shaders/balls_pattern.vert.glsl"), include_str!("../shaders/balls_pattern.frag.glsl"))?;
 	let mut std_uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
 	let mut pattern_uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
 
