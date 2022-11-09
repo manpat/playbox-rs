@@ -112,10 +112,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 		{
 			let _scope = view_ctx.perf.scoped_section("post process");
 
-			let resources = view_ctx.resources;
-			let fbo_0 = resources.get(test_fbo);
-			let color_0 = fbo_0.color_attachment(0).unwrap();
-			let color_0_size = resources.get(color_0).size();
+			let color_0 = test_fbo.color_attachment(0);
+			let color_0_size = view_ctx.resources.get(color_0).size();
 
 			let compute_workgroups = (color_0_size + Vec2i::splat(15)) / 16;
 			let Vec2i{x: compute_w, y: compute_h} = compute_workgroups;
@@ -127,9 +125,9 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			// Insert barrier because we fetch from color_0 in the next draw call
 			view_ctx.gfx.insert_texture_barrier();
 
-			let color_1 = resources.get(test_fbo2).color_attachment(0).unwrap();
-			let depth_0 = resources.get(test_fbo).depth_stencil_attachment().unwrap();
-			let depth_1 = resources.get(test_fbo2).depth_stencil_attachment().unwrap();
+			let color_1 = test_fbo2.color_attachment(0);
+			let depth_0 = test_fbo.depth_stencil_attachment();
+			let depth_1 = test_fbo2.depth_stencil_attachment();
 
 			view_ctx.gfx.bind_texture(0, color_0);
 			view_ctx.gfx.bind_texture(1, color_1);
