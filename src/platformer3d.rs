@@ -124,10 +124,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			view_ctx.gfx.bind_shader(post_effect_compute_shader);
 			view_ctx.gfx.dispatch_compute(compute_w as u32, compute_h as u32, 1);
 
-			unsafe {
-				// Insert barrier because we fetch from color_0 in the next draw call
-				gfx::raw::MemoryBarrier(gfx::raw::TEXTURE_FETCH_BARRIER_BIT);
-			}
+			// Insert barrier because we fetch from color_0 in the next draw call
+			view_ctx.gfx.insert_texture_barrier();
 
 			let color_1 = resources.get(test_fbo2).color_attachment(0).unwrap();
 			let depth_0 = resources.get(test_fbo).depth_stencil_attachment().unwrap();

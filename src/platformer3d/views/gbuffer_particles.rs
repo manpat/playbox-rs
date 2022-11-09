@@ -80,9 +80,7 @@ impl GBufferParticlesView {
 			ctx.gfx.bind_shader(self.spawn_shader);
 			ctx.gfx.dispatch_compute(self.debug_spawn_rate as _, 1, 1);
 
-			unsafe {
-				gfx::raw::MemoryBarrier(gfx::raw::SHADER_STORAGE_BARRIER_BIT);
-			}
+			ctx.gfx.insert_shader_storage_barrier();
 		}
 
 		{
@@ -107,9 +105,7 @@ impl GBufferParticlesView {
 
 		let _section = ctx.perf.scoped_section("particles");
 
-		unsafe {
-			gfx::raw::MemoryBarrier(gfx::raw::SHADER_STORAGE_BARRIER_BIT);
-		}
+		ctx.gfx.insert_shader_storage_barrier();
 
 		ctx.gfx.bind_shader(self.draw_shader);
 		ctx.gfx.bind_shader_storage_buffer(0, self.particle_buffer);
