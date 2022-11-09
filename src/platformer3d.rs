@@ -113,9 +113,9 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			let _scope = view_ctx.perf.scoped_section("post process");
 
 			let color_0 = test_fbo.color_attachment(0);
-			let color_0_size = view_ctx.resources.get(color_0).size();
+			let backbuffer_size = view_ctx.gfx.backbuffer_size();
 
-			let compute_workgroups = (color_0_size + Vec2i::splat(15)) / 16;
+			let compute_workgroups = (backbuffer_size + Vec2i::splat(15)) / 16;
 			let Vec2i{x: compute_w, y: compute_h} = compute_workgroups;
 
 			view_ctx.gfx.bind_image_for_rw(0, color_0);
