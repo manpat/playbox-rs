@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use toybox::input::raw::Scancode;
 use toybox::utility::ResourceScopeID;
 
-use crate::platformer3d::model::{self, Player, Camera, BlobShadowModel};
+use crate::vignette::platformer3d::model::{self, Player, Camera, BlobShadowModel};
 use crate::intersect::{Ray, scene_raycast};
 
 

@@ -2,7 +2,7 @@ use toybox::prelude::*;
 use toybox::audio::nodes::*;
 use toybox::utility::ResourceScopeID;
 
-use crate::platformer3d::model;
+use crate::vignette::platformer3d::model;
 
 use std::iter;
 

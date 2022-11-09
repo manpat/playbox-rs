@@ -56,7 +56,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 	let post_effect_compute_shader = view_resource_context.new_compute_shader(shaders::TEST_POST_EFFECT_COMPUTE)?;
 
 	let composite_shader = view_resource_context.new_simple_shader(shaders::FULLSCREEN_QUAD_VERT,
-		include_str!("shaders/final_composite.frag.glsl"))?;
+		include_str!("../shaders/final_composite.frag.glsl"))?;
 
 
 	'main: loop {

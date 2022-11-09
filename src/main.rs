@@ -12,8 +12,6 @@ mod executor;
 mod intersect;
 
 mod global_controller;
-
-mod platformer3d;
 mod vignette;
 
 use executor::{start_loop, next_frame};
@@ -46,7 +44,7 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 	loop {
 		match main_menu().await? {
 			MainMenuCommand::PlayPlatformerScene(scene) => {
-				platformer3d::load_and_play_scene("assets/scene.toy", scene).await?;
+				vignette::platformer3d::load_and_play_scene("assets/scene.toy", scene).await?;
 			}
 
 			MainMenuCommand::PlayBalls => {

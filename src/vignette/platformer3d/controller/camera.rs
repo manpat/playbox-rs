@@ -1,7 +1,7 @@
 use toybox::prelude::*;
 use toybox::input::raw::Scancode;
 
-use crate::platformer3d::model::{self, Player, Camera};
+use crate::vignette::platformer3d::model::{self, Player, Camera};
 use model::camera::ControlMode;
 
 const CAMERA_PITCH_LIMIT: (f32, f32) = (-PI/2.0, -PI/16.0);

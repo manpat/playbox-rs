@@ -1,7 +1,7 @@
 use toybox::prelude::*;
 use toybox::input::{raw::Scancode, raw::MouseButton};
 
-use crate::platformer3d::model;
+use crate::vignette::platformer3d::model;
 
 toybox::declare_input_context! {
 	struct Actions "Debug" {
