@@ -22,6 +22,7 @@ toybox::declare_input_context! {
 #[derive(Copy, Clone, Debug)]
 enum Mode {
 	Cubes,
+	CubeFromPoints,
 	Tetrahedron,
 	Planes,
 	Billboards,
@@ -95,6 +96,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			if let Some(_) = ui.begin_combo("Mode", format!("{current_mode:?}")) {
 				let modes = [
 					Mode::Cubes,
+					Mode::CubeFromPoints,
 					Mode::Tetrahedron,
 					Mode::Planes,
 					Mode::Billboards,
@@ -167,8 +169,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 					mb.set_color(colors[4]);
 
-					Cuboid::unit()
-						.scale(Vec3::new(2.0, 0.2, 0.2))
+					Cuboid::with_size(Vec3::new(2.0, 0.2, 0.2))
 						.translate(Vec3::new(0.0, 1.0, 0.6))
 						.build(&mut mb);
 
@@ -183,6 +184,26 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 						.rotate_x(TAU/8.0)
 						.rotate_z(TAU/8.0)
 						.translate(Vec3::from_y(2.0))
+						.build(&mut mb);
+				}
+
+				Mode::CubeFromPoints => {
+					let start = Vec3::from_y(1.0 + (time*TAU/7.0).sin()) + Vec3::from_y_angle(time*TAU/9.0) * 0.5;
+					let end = Vec3::from_y_angle(time) + Vec3::from_y(1.0 + (time*TAU/4.0).sin()*0.4);
+
+					Cuboid::from_points(start, end)
+						.build(&mut mb);
+
+					mb.set_color(colors[3]);
+
+					Cuboid::with_size(Vec3::splat(0.1))
+						.translate(start)
+						.build(&mut mb);
+
+					mb.set_color(colors[4]);
+
+					Cuboid::with_size(Vec3::splat(0.1))
+						.translate(end)
 						.build(&mut mb);
 				}
 
@@ -223,7 +244,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 						.build(Quad::unit().uniform_scale(0.5));
 
 					mb.set_color(colors[4]);
-					let mut pmb = mb.on_plane_ref(BuilderSurface::from_orthogonal(OrthogonalOrientation::PositiveY).with_origin(Vec3::from_y(0.5)));
+					let mut pmb = mb.on_plane_ref(BuilderSurface::from(OrthogonalOrientation::PositiveY).with_origin(Vec3::from_y(0.5)));
 					Quad::unit().uniform_scale(0.5).build(&mut pmb);
 
 					pmb.set_color(colors[5]);

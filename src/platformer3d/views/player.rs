@@ -57,8 +57,8 @@ impl PlayerView {
 
 		let mut mb = ColorMeshBuilder::new(&mut self.mesh_data);
 		mb.set_color(body_color);
-		mb.extend_3d_fan_closed(5, body_vertices);
-		mb.extend_3d_fan(4, body_vertices[1..].iter().rev().cloned());
+		mb.extend_3d(body_vertices, gfx::mesh::iter_closed_fan_indices(5));
+		mb.extend_3d(body_vertices[1..].iter().rev().cloned(), gfx::mesh::iter_fan_indices(4));
 
 		for &foot_pos in player.feet_positions.iter() {
 			// TODO(pat.m): take orientation from scene intersection
