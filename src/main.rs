@@ -1,4 +1,5 @@
 #![feature(array_chunks)]
+#![feature(portable_simd)]
 #![feature(must_not_suspend)]
 
 // Disabled because it doesn't seem to track drops properly
@@ -36,6 +37,7 @@ enum MainMenuCommand {
 	PlayBalls,
 	PlayDungeon,
 	MeshBuilderTest,
+	SoundTest,
 	Quit,
 }
 
@@ -57,6 +59,10 @@ async fn main_game_loop() -> Result<(), Box<dyn Error>> {
 
 			MainMenuCommand::MeshBuilderTest => {
 				vignette::mesh_builder_test::play().await?
+			}
+
+			MainMenuCommand::SoundTest => {
+				vignette::sound_test::play().await?
 			}
 
 			MainMenuCommand::Quit => return Ok(())
@@ -122,6 +128,10 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 
 			if ui.button("Mesh Builder Test") {
 				return Ok(MainMenuCommand::MeshBuilderTest);
+			}
+
+			if ui.button("Sound Test") {
+				return Ok(MainMenuCommand::SoundTest);
 			}
 
 			if ui.button("Quit") {
