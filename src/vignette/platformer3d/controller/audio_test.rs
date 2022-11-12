@@ -228,7 +228,7 @@ struct Emitter {
 
 
 use std::sync::{Arc, atomic::AtomicU32, atomic::Ordering};
-use audio::system::EvaluationContext;
+use audio::EvaluationContext;
 
 #[derive(Clone, Debug)]
 struct FloatParameter {
