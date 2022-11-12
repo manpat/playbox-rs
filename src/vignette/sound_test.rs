@@ -13,7 +13,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut global_controller = crate::global_controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 
 	let buffer = VisualiserBuffer {
-		buffer: vec![0.0; 1<<13].into_boxed_slice().into(),
+		buffer: vec![0.0; 1<<11].into_boxed_slice().into(),
 		cursor: AtomicUsize::new(0),
 	};
 
@@ -29,6 +29,9 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		graph.pin_node_to_scope(mixer_id, &resource_scope_token);
 		mixer_id
 	});
+
+	let mut pulse_width = 0.25;
+	let mut base_frequency = 220.0;
 
 	'main: loop {
 		global_controller.update(&mut engine);
@@ -59,7 +62,159 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			.collapsible(false)
 			.begin(ui)
 		{
-			draw(ui, audio, mixer_id, &buffer);
+			use audio::node_builder::*;
+			use audio::generator as gen;
+
+			let window_width = ui.window_size()[0];
+
+			ui.plot_lines("##Samples", unsafe{buffer.get()})
+				.scale_min(-1.0)
+				.scale_max(1.0)
+				.graph_size([window_width - 20.0, 300.0])
+				.build();
+
+			ui.columns(2, "Controls", true);
+
+			{
+				if ui.button("Play") {
+					audio.queue_update(move |graph| {
+						let noise = NoiseGenerator::new().envelope(0.01, 0.2);
+						let osc = gen::GeneratorNode::new_sine(base_frequency).envelope(0.03, 0.5);
+						let node = (noise, osc).low_pass(200.0).build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				ui.same_line();
+
+				if ui.button("Play 2") {
+					audio.queue_update(move |graph| {
+						let noise = NoiseGenerator::new().envelope(0.3, 1.5);
+						let osc1 = gen::GeneratorNode::new_triangle(base_frequency / 2.0).envelope(0.2, 0.5);
+						let osc2 = gen::GeneratorNode::new_pulse(base_frequency, 0.1).envelope(0.03, 2.0);
+						let node = (noise, osc1, osc2).low_pass(200.0).high_pass(2.0).build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				ui.same_line();
+
+				if ui.button("Play 3") {
+					audio.queue_update(move |graph| {
+						let node = gen::GeneratorNode::new(base_frequency, |p| gen::pulse_wave(p, 0.1))
+							.envelope(0.03, 2.0)
+							.high_pass(10.0)
+							.build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				if ui.button("Sine") {
+					audio.queue_update(move |graph| {
+						let node = gen::GeneratorNode::new_sine(base_frequency)
+							.envelope(0.03, 2.0)
+							.build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				if ui.button("Triangle") {
+					audio.queue_update(move |graph| {
+						let node = gen::GeneratorNode::new_triangle(base_frequency)
+							.envelope(0.03, 2.0)
+							.build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				if ui.button("Square") {
+					audio.queue_update(move |graph| {
+						let node = gen::GeneratorNode::new_square(base_frequency)
+							.envelope(0.03, 2.0)
+							.build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				if ui.button("Saw") {
+					audio.queue_update(move |graph| {
+						let node = gen::GeneratorNode::new_saw(base_frequency)
+							.envelope(0.03, 2.0)
+							.build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				if ui.button("Pulse") {
+					audio.queue_update(move |graph| {
+						let node = gen::GeneratorNode::new(base_frequency, move |p| gen::pulse_wave(p, pulse_width))
+							.envelope(0.03, 2.0)
+							.high_pass(1.0)
+							.build();
+						graph.add_node(node, mixer_id);
+					});
+				}
+
+				ui.same_line();
+
+				imgui::Slider::new("Width", 0.0, 1.0)
+					.build(ui, &mut pulse_width);
+			}
+
+			ui.next_column();
+
+			imgui::Slider::new("Frequency", 22.0, 880.0)
+				.build(ui, &mut base_frequency);
+
+			
+			let midi_note_f = ((base_frequency as f64/ 440.0).log2() * 12.0 + 69.0);
+			let mut midi_note = midi_note_f.trunc() as i32;
+			let mut cents = (midi_note_f.fract() * 100.0) as i32;
+
+			if imgui::Slider::new("Midi Note", 16, 81)
+				.build(ui, &mut midi_note)
+			{
+				base_frequency = 440.0 * ((midi_note as f32 - 69.0 + cents as f32/100.0)/12.0).exp2() as f32;
+			}
+
+			if imgui::Slider::new("Cents", 0, 99)
+				.build(ui, &mut cents)
+			{
+				base_frequency = 440.0 * ((midi_note as f32 - 69.0 + cents as f32/100.0)/12.0).exp2() as f32;
+			}
+
+			if ui.button("Sync To Oscilloscope") {
+				base_frequency = 44100.0 / 256.0;
+			}
+
+
+			ui.columns(1, "##Stop it", false);
+			ui.separator();
+
+			let octave = midi_note / 12 - 1; // C0 is 12
+			let note_name = match midi_note % 12 {
+				0 => "C",
+				1 => "C#",
+				2 => "D",
+				3 => "D#",
+				4 => "E",
+				5 => "F",
+				6 => "F#",
+				7 => "G",
+				8 => "G#",
+				9 => "A",
+				10 => "A#",
+				11 => "B",
+				_ => "????"
+			};
+
+			let midi_note_diff = (midi_note_f.fract() * 100.0) as i32;
+
+			if midi_note_diff != 0 {
+				ui.label_text("Note", format!("{note_name}{octave} +{cents}cents"));
+			} else {
+				ui.label_text("Note", format!("{note_name}{octave}"));
+			}
 		}
 
 		engine = next_frame(engine).await;
@@ -67,39 +222,6 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 	Ok(())
 }
-
-
-fn draw(ui: &imgui::Ui<'static>, audio: &mut audio::AudioSystem, mixer_id: audio::NodeId, buffer: &VisualiserBuffer) {
-	use audio::node_builder::*;
-
-	if ui.button("Play") {
-		audio.queue_update(move |graph| {
-			let noise = NoiseGenerator::new().envelope(0.01, 0.2);
-			let osc = OscillatorGenerator::new(110.0).envelope(0.03, 0.5);
-			let node = (noise, osc).low_pass(200.0).build();
-			graph.add_node(node, mixer_id);
-		});
-	}
-
-	ui.same_line();
-
-	if ui.button("Play 2") {
-		audio.queue_update(move |graph| {
-			let noise = NoiseGenerator::new().envelope(0.3, 0.8);
-			let osc1 = OscillatorGenerator::new(55.0).envelope(0.2, 0.5);
-			let osc2 = OscillatorGenerator::new(220.0).envelope(0.03, 0.5);
-			let node = (noise, osc1, osc2).low_pass(200.0).build();
-			graph.add_node(node, mixer_id);
-		});
-	}
-
-	ui.plot_lines("##Samples", unsafe{buffer.get()})
-		.scale_min(-1.0)
-		.scale_max(1.0)
-		.graph_size([0.0, 300.0])
-		.build();
-}
-
 
 
 

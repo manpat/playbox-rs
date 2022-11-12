@@ -146,6 +146,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			use gfx::geom::*;
 			use gfx::traits::BuildableGeometry2D;
 			use gfx::traits::BuildableGeometry3D;
+			use gfx::{BuilderSurface, OrthogonalOrientation};
 
 			mesh_data_3d.clear();
 			
@@ -232,8 +233,6 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				}
 
 				Mode::Planes => {
-					use gfx::{BuilderSurface, OrthogonalOrientation};
-
 					mb.on_plane_ref(OrthogonalOrientation::PositiveX)
 						.build(Quad::unit().translate(Vec2::from_y(1.0)));
 
@@ -263,8 +262,6 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				}
 
 				Mode::Billboards => {
-					use gfx::{BuilderSurface, OrthogonalOrientation};
-
 					let camera_orientation = Quat::from_yaw(camera_yaw)
 						* Quat::from_pitch(camera_pitch);
 
