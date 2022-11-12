@@ -59,6 +59,8 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 		include_str!("../shaders/final_composite.frag.glsl"))?;
 
 
+	let mut texture_debug_selected_texture = 0;
+
 	'main: loop {
 		global_controller.update(&mut engine);
 
@@ -82,6 +84,41 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 
 		engine.imgui.set_input_enabled(debug_model.active);
 		engine.imgui.set_visible(true);
+
+		{
+			let toybox::Engine { imgui, gfx, .. } = &mut *engine;
+			let ui = imgui.frame();
+
+			if let Some(_window) = imgui::Window::new("Texture").begin(&ui) {
+				use gfx::IntoTextureKey;
+
+				let resources = gfx.draw_context().resources();
+
+				let textures = [
+					test_fbo.color_attachment(0).into_texture_key(resources),
+					test_fbo.color_attachment(3).into_texture_key(resources),
+					test_fbo2.color_attachment(0).into_texture_key(resources),
+				];
+
+
+				ui.radio_button("0:0", &mut texture_debug_selected_texture, 0);
+				ui.same_line();
+				ui.radio_button("0:3", &mut texture_debug_selected_texture, 1);
+				ui.same_line();
+				ui.radio_button("1:0", &mut texture_debug_selected_texture, 2);
+
+
+				let id = toybox::imgui_backend::texture_key_to_imgui_id(textures[texture_debug_selected_texture]);
+
+				let window_width = ui.window_size()[0];
+				let image_size = Vec2::splat(window_width - 50.0);
+
+				imgui::Image::new(id, image_size.to_array())
+					.uv0([0.0, 1.0])
+					.uv1([1.0, 0.0])
+					.build(ui);
+			}
+		}
 
 		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
 		uniform_buffer.upload_single(&uniforms);
