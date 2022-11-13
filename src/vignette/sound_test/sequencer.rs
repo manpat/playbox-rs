@@ -63,34 +63,18 @@ impl SequencerPanel {
 
 				let _id_token = ui.push_id(idx as i32);
 
-				let _style_token = (idx == cursor)
-					.then(|| {
-						ui.push_style_color(imgui::StyleColor::Text, [1.0, 1.0, 0.4, 1.0])
-					});
+				{
+					let _style_token = (idx == cursor)
+						.then(|| {
+							ui.push_style_color(imgui::StyleColor::Text, [1.0, 1.0, 0.4, 1.0])
+						});
 
-				let pitch_classes = [
-					audio::util::PitchClass::C,
-					audio::util::PitchClass::Cs,
-					audio::util::PitchClass::D,
-					audio::util::PitchClass::Ds,
-					audio::util::PitchClass::E,
-					audio::util::PitchClass::F,
-					audio::util::PitchClass::Fs,
-					audio::util::PitchClass::G,
-					audio::util::PitchClass::Gs,
-					audio::util::PitchClass::A,
-					audio::util::PitchClass::As,
-					audio::util::PitchClass::B,
-				];
 
-				let audio::util::Pitch{pitch_class, octave, cents} = *item;
-
-				ui.text(format!("{pitch_class}{octave} +{cents}cents"));
-
-				let mut pc_index = pitch_classes.iter().position(|&pc| pc == item.pitch_class).unwrap();
-				if ui.combo("Pitch Class", &mut pc_index, &pitch_classes, |v| format!("{v:?}").into()) {
-					item.pitch_class = pitch_classes[pc_index];
+					let audio::util::Pitch{pitch_class, octave, cents} = *item;
+					ui.text(format!("{pitch_class}{octave} +{cents}cents"));
 				}
+
+				pitch_class_selector(ui, &mut item.pitch_class);
 
 				imgui::Slider::new("Octave", 0, 8)
 					.build(ui, &mut item.octave);
@@ -100,3 +84,47 @@ impl SequencerPanel {
 }
 
 
+fn pitch_class_selector(ui: &imgui::Ui<'_>, pitch_class: &mut audio::util::PitchClass) -> bool {
+	let pitch_classes = [
+		audio::util::PitchClass::C,
+		audio::util::PitchClass::Cs,
+		audio::util::PitchClass::D,
+		audio::util::PitchClass::Ds,
+		audio::util::PitchClass::E,
+		audio::util::PitchClass::F,
+		audio::util::PitchClass::Fs,
+		audio::util::PitchClass::G,
+		audio::util::PitchClass::Gs,
+		audio::util::PitchClass::A,
+		audio::util::PitchClass::As,
+		audio::util::PitchClass::B,
+	];
+
+
+	// let mut pc_index = pitch_classes.iter().position(|&pc| pc == *pitch_class).unwrap();
+	// if ui.combo("Pitch Class", &mut pc_index, &pitch_classes, |v| format!("{v:?}").into()) {
+	// 	*pitch_class = pitch_classes[pc_index];
+	// 	true
+	// } else {
+	// 	false
+	// }
+
+	let mut changed = false;
+
+	for pc in pitch_classes {
+		let _style_token = (pc == *pitch_class)
+			.then(|| {
+				ui.push_style_color(imgui::StyleColor::FrameBg, [1.0, 1.0, 0.4, 1.0])
+			});
+
+		if ui.button(format!("{pc}")) {
+			*pitch_class = pc;
+			changed = true;
+		}
+
+		ui.same_line();
+	}
+
+	ui.new_line();
+	changed
+}
