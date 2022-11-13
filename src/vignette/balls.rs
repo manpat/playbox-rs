@@ -210,20 +210,22 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 				audio.queue_update(move |graph| {
 					use audio::*;
+					use audio::generator as gen;
+					use audio::envelope as env;
 
 					let fizz_cutoff = 600.0;
 
-					let fizz = audio::node_builder::NoiseGenerator::new()
+					let fizz = audio::NoiseGenerator::new()
 						.low_pass(fizz_cutoff)
 						.low_pass(fizz_cutoff)
-						.envelope(0.01, 1.8);
+						.envelope(env::AR::new(0.01, 1.8).exp(4.0));
 
-					let bong_1 = audio::node_builder::OscillatorGenerator::new(80.0);
-					let bong_2 = audio::node_builder::OscillatorGenerator::new(150.0).gain(0.5);
-					let bong_3 = audio::node_builder::OscillatorGenerator::new(200.0).gain(0.35);
+					let bong_1 = gen::GeneratorNode::new_sine(80.0);
+					let bong_2 = gen::GeneratorNode::new_sine(150.0).gain(0.5);
+					let bong_3 = gen::GeneratorNode::new_sine(200.0).gain(0.35);
 
 					let bong = (bong_1, bong_2, bong_3)
-						.envelope(0.3, 0.9);
+						.envelope(env::AR::new(0.3, 0.9).exp(4.0));
 
 					let node = (fizz, bong)
 						.gain(0.9)
@@ -521,6 +523,9 @@ fn bounce(ball_pos: &mut Vec3, ball_vel: &mut Vec3, ball_radius: f32, eye_pos: V
 
 
 fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Camera, mixer_id: audio::NodeId) {
+	use audio::generator as gen;
+	use audio::envelope as env;
+
 	let mut rng = thread_rng();
 
 	let eye_pos = camera.pos.to_x0y() + Vec3::from_y(camera.elevation);
@@ -555,12 +560,12 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 							engine.audio.queue_update(move |graph| {
 								use audio::*;
 
-								let low_osc = OscillatorGenerator::new(freq)
-									.envelope(0.01, release)
+								let low_osc = gen::GeneratorNode::new_triangle(freq)
+									.envelope(env::AR::new(0.01, release).exp(4.0))
 									.gain(4.0);
 
-								let high_osc = (OscillatorGenerator::new(freq * 2.0), NoiseGenerator::new().low_pass(100.0))
-									.envelope(0.01, 0.08)
+								let high_osc = (gen::GeneratorNode::new_sine(freq * 2.0), NoiseGenerator::new().low_pass(100.0))
+									.envelope(env::AR::new(0.01, 0.08).exp(4.0))
 									.gain(0.3);
 
 								let node = (low_osc, high_osc)
@@ -588,13 +593,13 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 					engine.audio.queue_update(move |graph| {
 						use audio::*;
 
-						let noise = audio::node_builder::NoiseGenerator::new()
+						let noise = audio::NoiseGenerator::new()
 							.low_pass(4000.0);
 
-						let osc = audio::node_builder::OscillatorGenerator::new(freq);
+						let osc = gen::GeneratorNode::new_triangle(freq);
 
 						let node = (noise, osc)
-							.envelope(0.01, 0.4)
+							.envelope(env::AR::new(0.01, 0.4).exp(4.0))
 							.gain(gain)
 							.build();
 
@@ -629,8 +634,8 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 							if gain > 0.0001 {
 								engine.audio.queue_update(move |graph| {
 									use audio::*;
-									let node = audio::node_builder::OscillatorGenerator::new(freq)
-										.envelope(0.01, release)
+									let node = gen::GeneratorNode::new_sine(freq)
+										.envelope(env::AR::new(0.01, release).exp(4.0))
 										.gain(gain)
 										.build();
 
@@ -659,18 +664,18 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 		engine.audio.queue_update(move |graph| {
 			use audio::*;
 
-			let hi_noise = audio::node_builder::NoiseGenerator::new()
+			let hi_noise = audio::NoiseGenerator::new()
 				.high_pass(5000.0)
 				.gain(2.0)
-				.envelope(0.01, 0.6);
+				.envelope(env::AR::new(0.01, 0.6).exp(4.0));
 
-			let low_noise = audio::node_builder::NoiseGenerator::new()
+			let low_noise = audio::NoiseGenerator::new()
 				.low_pass(100.0)
 				.gain(2.0)
-				.envelope(0.1, 0.8);
+				.envelope(env::AR::new(0.1, 0.8).exp(4.0));
 
-			let osc = audio::node_builder::OscillatorGenerator::new(50.0)
-				.envelope(0.1, 0.5);
+			let osc = gen::GeneratorNode::new_triangle(50.0)
+				.envelope(env::AR::new(0.1, 0.5).exp(4.0));
 
 			let node = (hi_noise, low_noise, osc)
 				.gain(gain)

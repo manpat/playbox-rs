@@ -40,32 +40,6 @@ impl AudioTestController {
 		});
 
 
-		// let drone_mixer_node = engine.audio.add_node_with_send(MixerNode::new_stereo(0.001), engine.audio.output_node());
-
-		// engine.audio.update_graph_immediate(move |graph| {
-		// 	let panner_node = graph.add_node(PannerNode::new(1.0), true);
-		// 	let mixer_node = graph.add_node(MixerNode::new(2.0), true);
-
-		// 	for freq in [55.0, 330.0] {
-		// 		let node = graph.add_node(OscillatorNode::new(freq), false);
-		// 		graph.add_send(node, mixer_node);
-		// 	}
-
-		// 	graph.add_send_chain(&[mixer_node, panner_node, drone_mixer_node]);
-		// });
-
-		// engine.audio.update_graph_immediate(move |graph| {
-		// 	let panner_node = graph.add_node(PannerNode::new(-1.0), true);
-		// 	let mixer_node = graph.add_node(MixerNode::new(1.0), true);
-
-		// 	for freq in [220.0, 110.0, 550.0] {
-		// 		let node = graph.add_node(OscillatorNode::new(freq), false);
-		// 		graph.add_send(node, mixer_node);
-		// 	}
-
-		// 	graph.add_send_chain(&[mixer_node, panner_node, drone_mixer_node]);
-		// });
-
 
 		let emitters: Vec<_> = scene.main_scene().entities_with_prefix("SOUND_")
 			.zip([1.0, 2.0/3.0, 3.0/4.0])

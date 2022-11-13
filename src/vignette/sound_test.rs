@@ -33,6 +33,12 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut pulse_width = 0.25;
 	let mut base_frequency = 220.0;
 
+	let mut env_attack = 0.03;
+	let mut env_release = 1.5;
+
+	let mut env_exp_attack = 1.0 / 4.0;
+	let mut env_exp_release = 4.0;
+
 	'main: loop {
 		global_controller.update(&mut engine);
 		if global_controller.should_quit() {
@@ -64,6 +70,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		{
 			use audio::node_builder::*;
 			use audio::generator as gen;
+			use audio::envelope as env;
 
 			let window_width = ui.window_size()[0];
 
@@ -78,8 +85,8 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			{
 				if ui.button("Play") {
 					audio.queue_update(move |graph| {
-						let noise = NoiseGenerator::new().envelope(0.01, 0.2);
-						let osc = gen::GeneratorNode::new_sine(base_frequency).envelope(0.03, 0.5);
+						let noise = NoiseGenerator::new().envelope(env::AR::new(0.01, 0.2).exp(4.0));
+						let osc = gen::GeneratorNode::new_sine(base_frequency).envelope(env::AR::new(0.03, 0.5).exp(4.0));
 						let node = (noise, osc).low_pass(200.0).build();
 						graph.add_node(node, mixer_id);
 					});
@@ -89,9 +96,9 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 				if ui.button("Play 2") {
 					audio.queue_update(move |graph| {
-						let noise = NoiseGenerator::new().envelope(0.3, 1.5);
-						let osc1 = gen::GeneratorNode::new_triangle(base_frequency / 2.0).envelope(0.2, 0.5);
-						let osc2 = gen::GeneratorNode::new_pulse(base_frequency, 0.1).envelope(0.03, 2.0);
+						let noise = NoiseGenerator::new().envelope(env::AR::new(0.3, 1.5).exp(4.0));
+						let osc1 = gen::GeneratorNode::new_triangle(base_frequency / 2.0).envelope(env::AR::new(0.2, 0.5).exp(4.0));
+						let osc2 = gen::GeneratorNode::new_pulse(base_frequency, 0.1).envelope(env::AR::new(0.03, 2.0).exp(4.0));
 						let node = (noise, osc1, osc2).low_pass(200.0).high_pass(2.0).build();
 						graph.add_node(node, mixer_id);
 					});
@@ -102,7 +109,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				if ui.button("Play 3") {
 					audio.queue_update(move |graph| {
 						let node = gen::GeneratorNode::new(base_frequency, |p| gen::pulse_wave(p, 0.1))
-							.envelope(0.03, 2.0)
+							.envelope(env::AR::new(env_attack, env_release).exp2(env_exp_attack, env_exp_release))
 							.high_pass(10.0)
 							.build();
 						graph.add_node(node, mixer_id);
@@ -112,7 +119,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				if ui.button("Sine") {
 					audio.queue_update(move |graph| {
 						let node = gen::GeneratorNode::new_sine(base_frequency)
-							.envelope(0.03, 2.0)
+							.envelope(env::AR::new(env_attack, env_release).exp2(env_exp_attack, env_exp_release))
 							.build();
 						graph.add_node(node, mixer_id);
 					});
@@ -121,7 +128,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				if ui.button("Triangle") {
 					audio.queue_update(move |graph| {
 						let node = gen::GeneratorNode::new_triangle(base_frequency)
-							.envelope(0.03, 2.0)
+							.envelope(env::AR::new(env_attack, env_release).exp2(env_exp_attack, env_exp_release))
 							.build();
 						graph.add_node(node, mixer_id);
 					});
@@ -130,7 +137,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				if ui.button("Square") {
 					audio.queue_update(move |graph| {
 						let node = gen::GeneratorNode::new_square(base_frequency)
-							.envelope(0.03, 2.0)
+							.envelope(env::AR::new(env_attack, env_release).exp2(env_exp_attack, env_exp_release))
 							.build();
 						graph.add_node(node, mixer_id);
 					});
@@ -139,7 +146,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				if ui.button("Saw") {
 					audio.queue_update(move |graph| {
 						let node = gen::GeneratorNode::new_saw(base_frequency)
-							.envelope(0.03, 2.0)
+							.envelope(env::AR::new(env_attack, env_release).exp2(env_exp_attack, env_exp_release))
 							.build();
 						graph.add_node(node, mixer_id);
 					});
@@ -148,7 +155,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				if ui.button("Pulse") {
 					audio.queue_update(move |graph| {
 						let node = gen::GeneratorNode::new(base_frequency, move |p| gen::pulse_wave(p, pulse_width))
-							.envelope(0.03, 2.0)
+							.envelope(env::AR::new(env_attack, env_release).exp2(env_exp_attack, env_exp_release))
 							.high_pass(1.0)
 							.build();
 						graph.add_node(node, mixer_id);
@@ -163,28 +170,58 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 			ui.next_column();
 
-			imgui::Slider::new("Frequency", 22.0, 880.0)
-				.build(ui, &mut base_frequency);
-
 			
 			let midi_note_f = ((base_frequency as f64/ 440.0).log2() * 12.0 + 69.0);
 			let mut midi_note = midi_note_f.trunc() as i32;
 			let mut cents = (midi_note_f.fract() * 100.0) as i32;
 
-			if imgui::Slider::new("Midi Note", 16, 81)
-				.build(ui, &mut midi_note)
 			{
-				base_frequency = 440.0 * ((midi_note as f32 - 69.0 + cents as f32/100.0)/12.0).exp2() as f32;
-			}
+				imgui::Slider::new("Frequency", 22.0, 880.0)
+					.flags(imgui::SliderFlags::LOGARITHMIC)
+					.build(ui, &mut base_frequency);
 
-			if imgui::Slider::new("Cents", 0, 99)
-				.build(ui, &mut cents)
-			{
-				base_frequency = 440.0 * ((midi_note as f32 - 69.0 + cents as f32/100.0)/12.0).exp2() as f32;
-			}
 
-			if ui.button("Sync To Oscilloscope") {
-				base_frequency = 44100.0 / 256.0;
+				if imgui::Slider::new("Midi Note", 16, 81)
+					.build(ui, &mut midi_note)
+				{
+					base_frequency = 440.0 * ((midi_note as f32 - 69.0 + cents as f32/100.0)/12.0).exp2() as f32;
+				}
+
+				if imgui::Slider::new("Cents", 0, 99)
+					.build(ui, &mut cents)
+				{
+					base_frequency = 440.0 * ((midi_note as f32 - 69.0 + cents as f32/100.0)/12.0).exp2() as f32;
+				}
+
+				if ui.button("Sync To Oscilloscope") {
+					base_frequency = 44100.0 / 256.0;
+				}
+
+				ui.same_line();
+				if ui.button("+ Octave") {
+					base_frequency *= 2.0;
+				}
+
+				ui.same_line();
+				if ui.button("- Octave") {
+					base_frequency /= 2.0;
+				}
+
+				ui.new_line();
+
+				imgui::Slider::new("Attack", 0.01, 4.0)
+					.build(ui, &mut env_attack);
+
+				imgui::Slider::new("Attack Curve", 0.01, 4.0)
+					.flags(imgui::SliderFlags::LOGARITHMIC)
+					.build(ui, &mut env_exp_attack);
+
+				imgui::Slider::new("Release", 0.01, 4.0)
+					.build(ui, &mut env_release);
+
+				imgui::Slider::new("Release Curve", 0.01, 4.0)
+					.flags(imgui::SliderFlags::LOGARITHMIC)
+					.build(ui, &mut env_exp_release);
 			}
 
 
