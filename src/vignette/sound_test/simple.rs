@@ -49,7 +49,6 @@ impl SimplePanel {
 			self.draw_controls(ui);
 
 			ui.table_next_column();
-			// ui.separator();
 
 			let midi_note_f = audio::util::frequency_to_midi_note(self.base_frequency);
 			let midi_note = midi_note_f.trunc() as i32;
