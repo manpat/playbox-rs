@@ -17,7 +17,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut global_controller = crate::global_controller::GlobalController::new(&mut engine, resource_scope_token.id())?;
 
 	let buffer = VisualiserBuffer {
-		buffer: vec![0.0; 1<<11].into_boxed_slice().into(),
+		buffer: vec![0.0; 1<<16].into_boxed_slice().into(),
 		cursor: AtomicUsize::new(0),
 	};
 
@@ -26,6 +26,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mixer_id = engine.audio.update_graph_immediate(|graph| {
 		let mixer_node = audio::nodes::MixerNode::new_stereo(1.0);
 		let vis_node = VisualiserNode { buffer: Arc::clone(&buffer) };
+
 		let vis_id = graph.add_node(vis_node, graph.output_node());
 		let mixer_id = graph.add_node(mixer_node, vis_id);
 
@@ -37,6 +38,9 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut simple_panel = simple::SimplePanel::new(mixer_id);
 	let mut seq_panel = sequencer::SequencerPanel::new(mixer_id);
 
+
+	let mut vis_buffer = vec![0.0; 1<<14];
+	let mut freeze_vis = false;
 
 	'main: loop {
 		global_controller.update(&mut engine);
@@ -69,11 +73,44 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		{
 			let window_width = ui.window_size()[0];
 
-			ui.plot_lines("##Samples", unsafe{buffer.get()})
+			let read_buffer = unsafe{buffer.get()};
+			if !freeze_vis {
+				let read_end = buffer.cursor.load(Ordering::Relaxed);
+				let buffer_size = read_buffer.len();
+				let vis_buffer_size = vis_buffer.len();
+
+				if read_end > vis_buffer_size {
+					let read_start = read_end - vis_buffer_size;
+					vis_buffer.copy_from_slice(&read_buffer[read_start..read_end]);
+				} else {
+					let write_split = vis_buffer_size - read_end;
+					let read_start = buffer_size - write_split;
+
+					vis_buffer[..write_split].copy_from_slice(&read_buffer[read_start..]);
+					vis_buffer[write_split..].copy_from_slice(&read_buffer[..read_end]);
+				}
+			}
+
+
+			ui.plot_lines("##Samples", &vis_buffer)
 				.scale_min(-1.0)
 				.scale_max(1.0)
 				.graph_size([window_width - 20.0, 300.0])
 				.build();
+
+
+			ui.checkbox("Freeze", &mut freeze_vis);
+
+			ui.same_line();
+			
+			let mut vis_buffer_size = vis_buffer.len() as u32;
+			if imgui::Slider::new("Samples", 100, read_buffer.len() as u32)
+				.build(ui, &mut vis_buffer_size)
+			{
+				vis_buffer.resize(vis_buffer_size as usize, 0.0);
+			}
+
+
 
 			if let Some(_tab_bar) = ui.tab_bar("Panel Tabs") {
 				if let Some(_item) = ui.tab_item("Simple") {
