@@ -25,10 +25,12 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 	let mixer_id = engine.audio.update_graph_immediate(|graph| {
 		let mixer_node = audio::nodes::MixerNode::new_stereo(1.0);
+		let compressor_node = audio::nodes::CompressorNode::new(0.02, 0.2, -8.0, -0.1);
 		let vis_node = VisualiserNode { buffer: Arc::clone(&buffer) };
 
 		let vis_id = graph.add_node(vis_node, graph.output_node());
-		let mixer_id = graph.add_node(mixer_node, vis_id);
+		let compress_id = graph.add_node(compressor_node, vis_id);
+		let mixer_id = graph.add_node(mixer_node, compress_id);
 
 		// Without this the mixer is freed
 		graph.pin_node_to_scope(mixer_id, &resource_scope_token);
@@ -102,7 +104,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			ui.checkbox("Freeze", &mut freeze_vis);
 
 			ui.same_line();
-			
+
 			let mut vis_buffer_size = vis_buffer.len() as u32;
 			if imgui::Slider::new("Samples", 100, read_buffer.len() as u32)
 				.build(ui, &mut vis_buffer_size)

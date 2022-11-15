@@ -11,6 +11,13 @@ pub struct SequencerPanel {
 
 	time: f32,
 	bpm: f32,
+	gain: f32,
+
+	lpf: f32,
+	hpf: f32,
+	q: f32,
+
+	selected_waveform: usize,
 }
 
 impl SequencerPanel {
@@ -31,6 +38,13 @@ impl SequencerPanel {
 			time: 0.0,
 
 			bpm: 80.0,
+			gain: 1.0,
+
+			lpf: 16000.0,
+			hpf: 1.0,
+			q: 0.0,
+
+			selected_waveform: 0,
 		}
 	}
 
@@ -41,14 +55,92 @@ impl SequencerPanel {
 		let cursor = self.time.trunc() as usize % self.sequence.len();
 		if self.sequence_cursor != cursor {
 			let frequency = self.sequence[cursor].to_frequency();
+			let gain = self.gain;
+			let lpf = self.lpf;
+			let hpf = self.hpf;
+			let q = self.q;
 			let mixer_id = self.mixer_id;
+			let selected_waveform = self.selected_waveform;
 
 			audio.queue_update(move |graph| {
 				let envelope = env::AR::new(0.02, 0.5).exp(4.0);
-				let node = gen::GeneratorNode::new_triangle(frequency)
-					.envelope(envelope)
-					.build();
-				graph.add_node(node, mixer_id);
+				match selected_waveform {
+					0 => {
+						let node = gen::GeneratorNode::new_sine(frequency)
+							.envelope(envelope)
+							.gain(gain)
+							.low_pass(lpf)
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
+					1 => {
+						let node = gen::GeneratorNode::new_triangle(frequency)
+							.envelope(envelope)
+							.gain(gain)
+							.low_pass(lpf)
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
+					2 => {
+						let node = gen::GeneratorNode::new_square(frequency)
+							.envelope(envelope)
+							.gain(gain)
+							.low_pass(lpf)
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
+					3 => {
+						let node = gen::GeneratorNode::new_saw(frequency)
+							.envelope(envelope)
+							.gain(gain)
+							.low_pass(lpf)
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
+					4 => {
+						let oscs = (gen::GeneratorNode::new_saw(frequency), gen::GeneratorNode::new_saw(frequency*1.01));
+
+						let node = oscs
+							.envelope(envelope)
+							.gain(gain)
+							.low_pass(lpf)
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
+					5 => {
+						let osc = gen::GeneratorNode::new_square(frequency);
+						let f = 2.0 * (PI * lpf / 44100.0).sin();
+						let fb = q + q / (1.0 - f);
+						let mut buf0 = 0.0;
+						let mut buf1 = 0.0;
+
+						let node = osc
+							.envelope(envelope)
+							.gain(gain)
+							.effect(move |sample: f32| {
+								let hp = sample - buf0;
+								let bp = buf0 - buf1;
+								buf0 = buf0 + f * (hp + fb * bp);
+								buf1 = buf1 + f * (buf0 - buf1);
+								buf1
+							})
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
+					_ => {}
+				}
 			});
 
 			self.sequence_cursor = cursor;
@@ -56,6 +148,24 @@ impl SequencerPanel {
 
 		imgui::Slider::new("BPM", 40.0, 240.0)
 			.build(ui, &mut self.bpm);
+
+		imgui::Slider::new("Gain", 0.0, 32.0)
+			.flags(imgui::SliderFlags::LOGARITHMIC)
+			.build(ui, &mut self.gain);
+
+		ui.combo_simple_string("Waveform", &mut self.selected_waveform, &["Sine", "Triangle", "Square", "Saw", "DoubleSaw", "FilterTest"]);
+
+		imgui::Slider::new("LPF", 1.0, 16000.0)
+			.flags(imgui::SliderFlags::LOGARITHMIC)
+			.build(ui, &mut self.lpf);
+
+		imgui::Slider::new("HPF", 1.0, 16000.0)
+			.flags(imgui::SliderFlags::LOGARITHMIC)
+			.build(ui, &mut self.hpf);
+
+		imgui::Slider::new("Q", 0.0, 1.0)
+			.build(ui, &mut self.q);
+
 
 		if let Some(_table) = ui.begin_table_with_flags("sequence", self.sequence.len(), imgui::TableFlags::BORDERS_INNER) {
 			for (idx, item) in self.sequence.iter_mut().enumerate() {
@@ -105,7 +215,7 @@ fn pitch_class_selector(ui: &imgui::Ui<'_>, pitch_class: &mut audio::util::Pitch
 	for pc in pitch_classes {
 		let _style_token = (pc == *pitch_class)
 			.then(|| {
-				ui.push_style_color(imgui::StyleColor::FrameBg, [1.0, 1.0, 0.4, 1.0])
+				ui.push_style_color(imgui::StyleColor::Button, [0.5, 0.5, 0.2, 1.0])
 			});
 
 		if ui.button(format!("{pc}")) {
