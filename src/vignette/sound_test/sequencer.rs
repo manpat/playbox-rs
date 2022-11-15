@@ -100,15 +100,6 @@ fn pitch_class_selector(ui: &imgui::Ui<'_>, pitch_class: &mut audio::util::Pitch
 		audio::util::PitchClass::B,
 	];
 
-
-	// let mut pc_index = pitch_classes.iter().position(|&pc| pc == *pitch_class).unwrap();
-	// if ui.combo("Pitch Class", &mut pc_index, &pitch_classes, |v| format!("{v:?}").into()) {
-	// 	*pitch_class = pitch_classes[pc_index];
-	// 	true
-	// } else {
-	// 	false
-	// }
-
 	let mut changed = false;
 
 	for pc in pitch_classes {
