@@ -161,6 +161,19 @@ impl SequencerPanel {
 						graph.add_node(node, mixer_id);
 					}
 
+					7 => {
+						let modulator = gen::GeneratorNode::new_sine(6.0)
+							.effect(move |sample: f32| frequency + 10.0 * (sample * 0.5 + 0.5));
+
+						let node = gen::GeneratorNode::new_triangle(modulator)
+							.envelope(envelope)
+							.gain(gain)
+							.low_pass(lpf)
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
 					_ => {}
 				}
 			});
@@ -176,7 +189,7 @@ impl SequencerPanel {
 			.build(ui, &mut self.gain);
 
 		ui.combo_simple_string("Waveform", &mut self.selected_waveform, &[
-			"Sine", "Triangle", "Square", "Saw", "DoubleSaw", "FilterTest", "FilteredNoise"]);
+			"Sine", "Triangle", "Square", "Saw", "DoubleSaw", "FilterTest", "FilteredNoise", "ModulatedTri"]);
 
 		imgui::Slider::new("LPF", 1.0, 16000.0)
 			.flags(imgui::SliderFlags::LOGARITHMIC)
