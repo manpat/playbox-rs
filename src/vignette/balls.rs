@@ -224,10 +224,10 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 					let bong_2 = gen::GeneratorNode::new_sine(150.0).gain(0.5);
 					let bong_3 = gen::GeneratorNode::new_sine(200.0).gain(0.35);
 
-					let bong = (bong_1, bong_2, bong_3)
+					let bong = (bong_1, bong_2, bong_3).add()
 						.envelope(env::AR::new(0.3, 0.9).exp(4.0));
 
-					let node = (fizz, bong)
+					let node = (fizz, bong).add()
 						.gain(0.9)
 						.build();
 
@@ -565,10 +565,12 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 									.gain(4.0);
 
 								let high_osc = (gen::GeneratorNode::new_sine(freq * 2.0), gen::Noise::new().low_pass(100.0))
+									.add()
 									.envelope(env::AR::new(0.01, 0.08).exp(4.0))
 									.gain(0.3);
 
 								let node = (low_osc, high_osc)
+									.add()
 									.gain(gain)
 									.build();
 
@@ -598,7 +600,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 
 						let osc = gen::GeneratorNode::new_triangle(freq);
 
-						let node = (noise, osc)
+						let node = (noise, osc).add()
 							.envelope(env::AR::new(0.01, 0.4).exp(4.0))
 							.gain(gain)
 							.build();
@@ -677,7 +679,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 			let osc = gen::GeneratorNode::new_triangle(50.0)
 				.envelope(env::AR::new(0.1, 0.5).exp(4.0));
 
-			let node = (hi_noise, low_noise, osc)
+			let node = (hi_noise, low_noise, osc).add()
 				.gain(gain)
 				.build();
 

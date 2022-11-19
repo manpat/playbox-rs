@@ -3,6 +3,8 @@ use audio::node_builder::*;
 use audio::generator as gen;
 use audio::envelope as env;
 
+use audio::Envelope;
+
 
 pub struct SimplePanel {
 	mixer_id: audio::NodeId,
@@ -126,7 +128,7 @@ impl SimplePanel {
 			audio.queue_update(move |graph| {
 				let noise = gen::Noise::new().envelope(env::AR::new(0.01, 0.2).exp(4.0));
 				let osc = gen::GeneratorNode::new_sine(base_frequency).envelope(env::AR::new(0.03, 0.5).exp(4.0));
-				let node = (noise, osc).low_pass(200.0).build();
+				let node = (noise, osc).add().low_pass(200.0).build();
 				graph.add_node(node, mixer_id);
 			});
 		}
@@ -138,7 +140,7 @@ impl SimplePanel {
 				let noise = gen::Noise::new().envelope(env::AR::new(0.3, 1.5).exp(4.0));
 				let osc1 = gen::GeneratorNode::new_triangle(base_frequency / 2.0).envelope(env::AR::new(0.2, 0.5).exp(4.0));
 				let osc2 = gen::GeneratorNode::new_pulse(base_frequency, 0.1).envelope(env::AR::new(0.03, 2.0).exp(4.0));
-				let node = (noise, osc1, osc2).low_pass(200.0).high_pass(2.0).build();
+				let node = (noise, osc1, osc2).add().low_pass(200.0).high_pass(2.0).build();
 				graph.add_node(node, mixer_id);
 			});
 		}
@@ -147,7 +149,16 @@ impl SimplePanel {
 
 		if ui.button("Play 3") {
 			audio.queue_update(move |graph| {
-				let node = gen::GeneratorNode::new(base_frequency, |p| gen::pulse_wave(p, 0.1))
+				let lfo_rate = env::Ramp::new((env_attack + env_release)*0.7, 16.0, 2.0).to_parameter();
+
+				let parts = (
+					gen::GeneratorNode::new_pulse(base_frequency*3.0, 0.3),
+					gen::GeneratorNode::new_square(base_frequency*2.0),
+					(gen::GeneratorNode::new_sine(base_frequency + 2.0), gen::GeneratorNode::new_triangle(base_frequency/2.0)).add(),
+					gen::GeneratorNode::new_triangle(lfo_rate).gain_bias(0.3, 0.7), // lfo
+				);
+
+				let node = parts.multiply()
 					.envelope(envelope)
 					.high_pass(10.0)
 					.build();

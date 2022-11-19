@@ -106,7 +106,7 @@ impl SequencerPanel {
 					}
 
 					4 => {
-						let oscs = (gen::GeneratorNode::new_saw(frequency), gen::GeneratorNode::new_saw(frequency*1.01));
+						let oscs = (gen::GeneratorNode::new_saw(frequency), gen::GeneratorNode::new_saw(frequency*1.01)).add();
 
 						let node = oscs
 							.envelope(envelope)
@@ -163,7 +163,8 @@ impl SequencerPanel {
 
 					7 => {
 						let modulator = gen::GeneratorNode::new_sine(6.0)
-							.effect(move |sample: f32| frequency + 10.0 * (sample * 0.5 + 0.5));
+							.effect(move |sample: f32| frequency + 10.0 * (sample * 0.5 + 0.5))
+							.to_parameter();
 
 						let node = gen::GeneratorNode::new_triangle(modulator)
 							.envelope(envelope)
