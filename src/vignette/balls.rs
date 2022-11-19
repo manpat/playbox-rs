@@ -215,7 +215,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 					let fizz_cutoff = 600.0;
 
-					let fizz = audio::NoiseGenerator::new()
+					let fizz = gen::Noise::new()
 						.low_pass(fizz_cutoff)
 						.low_pass(fizz_cutoff)
 						.envelope(env::AR::new(0.01, 1.8).exp(4.0));
@@ -564,7 +564,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 									.envelope(env::AR::new(0.01, release).exp(4.0))
 									.gain(4.0);
 
-								let high_osc = (gen::GeneratorNode::new_sine(freq * 2.0), NoiseGenerator::new().low_pass(100.0))
+								let high_osc = (gen::GeneratorNode::new_sine(freq * 2.0), gen::Noise::new().low_pass(100.0))
 									.envelope(env::AR::new(0.01, 0.08).exp(4.0))
 									.gain(0.3);
 
@@ -593,7 +593,7 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 					engine.audio.queue_update(move |graph| {
 						use audio::*;
 
-						let noise = audio::NoiseGenerator::new()
+						let noise = gen::Noise::new()
 							.low_pass(4000.0);
 
 						let osc = gen::GeneratorNode::new_triangle(freq);
@@ -664,12 +664,12 @@ fn update_balls(engine: &mut toybox::Engine, balls: &mut Vec<Ball>, camera: &Cam
 		engine.audio.queue_update(move |graph| {
 			use audio::*;
 
-			let hi_noise = audio::NoiseGenerator::new()
+			let hi_noise = gen::Noise::new()
 				.high_pass(5000.0)
 				.gain(2.0)
 				.envelope(env::AR::new(0.01, 0.6).exp(4.0));
 
-			let low_noise = audio::NoiseGenerator::new()
+			let low_noise = gen::Noise::new()
 				.low_pass(100.0)
 				.gain(2.0)
 				.envelope(env::AR::new(0.1, 0.8).exp(4.0));

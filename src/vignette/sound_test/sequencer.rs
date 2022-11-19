@@ -139,6 +139,28 @@ impl SequencerPanel {
 						graph.add_node(node, mixer_id);
 					}
 
+					6 => {
+						let osc = gen::Noise::new();
+						let f = 2.0 * (PI * frequency / 44100.0).sin();
+						let fb = q + q / (1.0 - f);
+						let mut buf0 = 0.0;
+						let mut buf1 = 0.0;
+
+						let node = osc
+							.envelope(envelope)
+							.gain(gain)
+							.effect(move |sample: f32| {
+								let hp = sample - buf0;
+								let bp = buf0 - buf1;
+								buf0 = buf0 + f * (hp + fb * bp);
+								buf1 = buf1 + f * (buf0 - buf1);
+								buf1
+							})
+							.high_pass(hpf)
+							.build();
+						graph.add_node(node, mixer_id);
+					}
+
 					_ => {}
 				}
 			});
@@ -153,7 +175,8 @@ impl SequencerPanel {
 			.flags(imgui::SliderFlags::LOGARITHMIC)
 			.build(ui, &mut self.gain);
 
-		ui.combo_simple_string("Waveform", &mut self.selected_waveform, &["Sine", "Triangle", "Square", "Saw", "DoubleSaw", "FilterTest"]);
+		ui.combo_simple_string("Waveform", &mut self.selected_waveform, &[
+			"Sine", "Triangle", "Square", "Saw", "DoubleSaw", "FilterTest", "FilteredNoise"]);
 
 		imgui::Slider::new("LPF", 1.0, 16000.0)
 			.flags(imgui::SliderFlags::LOGARITHMIC)
@@ -163,8 +186,12 @@ impl SequencerPanel {
 			.flags(imgui::SliderFlags::LOGARITHMIC)
 			.build(ui, &mut self.hpf);
 
+		let mut transformed_q = 1.0 - (1.0 - self.q).powf(1.0 / 2.0);
 		imgui::Slider::new("Q", 0.0, 1.0)
-			.build(ui, &mut self.q);
+			.build(ui, &mut transformed_q);
+
+		self.q = 1.0 - (1.0 - transformed_q).powf(2.0);
+		ui.text(format!("real Q: {:.3}", self.q));
 
 
 		if let Some(_table) = ui.begin_table_with_flags("sequence", self.sequence.len(), imgui::TableFlags::BORDERS_INNER) {
