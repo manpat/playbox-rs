@@ -2,10 +2,12 @@ use toybox::prelude::*;
 use audio::node_builder::*;
 use audio::generator as gen;
 use audio::envelope as env;
+use audio::effect;
+use audio::Envelope;
 
 
 pub struct SequencerPanel {
-	mixer_id: audio::NodeId,
+	global_state: super::GlobalAudioState,
 	sequence: Vec<audio::util::Pitch>,
 	sequence_cursor: usize,
 
@@ -21,7 +23,7 @@ pub struct SequencerPanel {
 }
 
 impl SequencerPanel {
-	pub fn new(mixer_id: audio::NodeId) -> SequencerPanel {
+	pub fn new(global_state: super::GlobalAudioState) -> SequencerPanel {
 		let fundamental = 45.0;
 
 		let sequence = [
@@ -32,7 +34,8 @@ impl SequencerPanel {
 		];
 
 		SequencerPanel {
-			mixer_id,
+			global_state,
+
 			sequence: sequence.into_iter().map(audio::util::Pitch::from_midi).collect(),
 			sequence_cursor: usize::MAX,
 			time: 0.0,
@@ -59,11 +62,11 @@ impl SequencerPanel {
 			let lpf = self.lpf;
 			let hpf = self.hpf;
 			let q = self.q;
-			let mixer_id = self.mixer_id;
+			let mixer_id = self.global_state.mixer_id;
 			let selected_waveform = self.selected_waveform;
 
 			audio.queue_update(move |graph| {
-				let envelope = env::AR::new(0.02, 0.5).exp(4.0);
+				let envelope = env::AR::new(0.02, 1.0).exp(3.0);
 				match selected_waveform {
 					0 => {
 						let node = gen::GeneratorNode::new_sine(frequency)
@@ -119,44 +122,22 @@ impl SequencerPanel {
 
 					5 => {
 						let osc = gen::GeneratorNode::new_square(frequency);
-						let f = 2.0 * (PI * lpf / 44100.0).sin();
-						let fb = q + q / (1.0 - f);
-						let mut buf0 = 0.0;
-						let mut buf1 = 0.0;
 
 						let node = osc
-							.envelope(envelope)
 							.gain(gain)
-							.effect(move |sample: f32| {
-								let hp = sample - buf0;
-								let bp = buf0 - buf1;
-								buf0 = buf0 + f * (hp + fb * bp);
-								buf1 = buf1 + f * (buf0 - buf1);
-								buf1
-							})
+							.effect(effect::ResonantLowPass::new(lpf, q))
 							.high_pass(hpf)
+							.envelope(envelope)
 							.build();
 						graph.add_node(node, mixer_id);
 					}
 
 					6 => {
-						let osc = gen::Noise::new();
-						let f = 2.0 * (PI * frequency / 44100.0).sin();
-						let fb = q + q / (1.0 - f);
-						let mut buf0 = 0.0;
-						let mut buf1 = 0.0;
-
-						let node = osc
-							.envelope(envelope)
+						let node = gen::Noise::new()
 							.gain(gain)
-							.effect(move |sample: f32| {
-								let hp = sample - buf0;
-								let bp = buf0 - buf1;
-								buf0 = buf0 + f * (hp + fb * bp);
-								buf1 = buf1 + f * (buf0 - buf1);
-								buf1
-							})
+							.effect(effect::ResonantLowPass::new(frequency, q))
 							.high_pass(hpf)
+							.envelope(envelope)
 							.build();
 						graph.add_node(node, mixer_id);
 					}
@@ -169,7 +150,6 @@ impl SequencerPanel {
 						let node = gen::GeneratorNode::new_triangle(modulator)
 							.envelope(envelope)
 							.gain(gain)
-							.low_pass(lpf)
 							.high_pass(hpf)
 							.build();
 						graph.add_node(node, mixer_id);
@@ -208,7 +188,16 @@ impl SequencerPanel {
 		ui.text(format!("real Q: {:.3}", self.q));
 
 
-		if let Some(_table) = ui.begin_table_with_flags("sequence", self.sequence.len(), imgui::TableFlags::BORDERS_INNER) {
+		let mut sequence_length = self.sequence.len() as u32;
+		if imgui::Slider::new("Length", 1, 16)
+			.build(ui, &mut sequence_length)
+		{
+			let last_pitch = self.sequence.last().unwrap().clone();
+			self.sequence.resize(sequence_length as usize, last_pitch);
+		}
+
+
+		if let Some(_table) = ui.begin_table_with_flags("sequence", self.sequence.len().min(4), imgui::TableFlags::BORDERS_INNER) {
 			for (idx, item) in self.sequence.iter_mut().enumerate() {
 				ui.table_next_column();
 
@@ -270,3 +259,4 @@ fn pitch_class_selector(ui: &imgui::Ui<'_>, pitch_class: &mut audio::util::Pitch
 	ui.new_line();
 	changed
 }
+

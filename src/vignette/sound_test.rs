@@ -23,22 +23,38 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 	let buffer: Arc<VisualiserBuffer> = Arc::new(buffer);
 
-	let mixer_id = engine.audio.update_graph_immediate(|graph| {
-		let mixer_node = audio::nodes::MixerNode::new_stereo(1.0);
-		let compressor_node = audio::nodes::CompressorNode::new(0.02, 0.2, -8.0, -0.1);
+	let global_audio_state = engine.audio.update_graph_immediate(|graph| {
+		use audio::*;
+
+		let mixer_node = nodes::MixerNode::new_stereo(1.0);
+		let compressor_node = nodes::CompressorNode::new(0.02, 0.2, -8.0, -0.1);
 		let vis_node = VisualiserNode { buffer: Arc::clone(&buffer) };
 
-		let vis_id = graph.add_node(vis_node, graph.output_node());
-		let compress_id = graph.add_node(compressor_node, vis_id);
-		let mixer_id = graph.add_node(mixer_node, compress_id);
+		// TODO(pat.m): the resonant filter seems kinda unstable at high cutoffs - I wonder if this is a precision issue
+		// or just something inherent in the filter I've implemented
+		let lpf_cutoff = AtomicFloatParameter::new(12000.0);
+		let lpf_q = AtomicFloatParameter::new(0.0);
+		let lpf_node = StereoEffectNode::new(effect::ResonantLowPass::new(lpf_cutoff.clone(), lpf_q.clone()));
+
+		let vis_id = graph.add_node(vis_node, None);
+		let lpf_id = graph.add_node(lpf_node, None);
+		let compress_id = graph.add_node(compressor_node, None);
+		let mixer_id = graph.add_node(mixer_node, None);
+
+		graph.add_send_chain(&[mixer_id, lpf_id, compress_id, vis_id, graph.output_node()]);
 
 		// Without this the mixer is freed
 		graph.pin_node_to_scope(mixer_id, &resource_scope_token);
-		mixer_id
+
+		GlobalAudioState {
+			mixer_id,
+			lpf_cutoff,
+			lpf_q,
+		}
 	});
 
-	let mut simple_panel = simple::SimplePanel::new(mixer_id);
-	let mut seq_panel = sequencer::SequencerPanel::new(mixer_id);
+	let mut simple_panel = simple::SimplePanel::new(global_audio_state.clone());
+	let mut seq_panel = sequencer::SequencerPanel::new(global_audio_state.clone());
 
 
 	let mut vis_buffer = vec![0.0; 1<<14];
@@ -110,6 +126,23 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				.build(ui, &mut vis_buffer_size)
 			{
 				vis_buffer.resize(vis_buffer_size as usize, 0.0);
+			}
+
+
+			let mut current_cutoff = global_audio_state.lpf_cutoff.read();
+			if imgui::Slider::new("Global LPF", 1.0, 16000.0)
+				.flags(imgui::SliderFlags::LOGARITHMIC)
+				.build(ui, &mut current_cutoff)
+			{
+				global_audio_state.lpf_cutoff.write(current_cutoff.max(0.0));
+			}
+
+
+			let mut current_q = global_audio_state.lpf_q.read();
+			if imgui::Slider::new("Global Q", 0.0, 1.0)
+				.build(ui, &mut current_q)
+			{
+				global_audio_state.lpf_q.write(current_q.clamp(0.0, 1.0));
 			}
 
 
@@ -201,3 +234,15 @@ impl audio::Node for VisualiserNode {
 		self.buffer.cursor.store(current_cursor % target_slice.len(), Ordering::Relaxed);
 	}
 }
+
+
+
+
+#[derive(Clone)]
+pub struct GlobalAudioState {
+	pub mixer_id: audio::NodeId,
+
+	pub lpf_cutoff: audio::AtomicFloatParameter,
+	pub lpf_q: audio::AtomicFloatParameter,
+}
+

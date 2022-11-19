@@ -7,7 +7,7 @@ use audio::Envelope;
 
 
 pub struct SimplePanel {
-	mixer_id: audio::NodeId,
+	global_state: super::GlobalAudioState,
 
 	pulse_width: f32,
 	base_frequency: f32,
@@ -21,9 +21,9 @@ pub struct SimplePanel {
 }
 
 impl SimplePanel {
-	pub fn new(mixer_id: audio::NodeId) -> SimplePanel {
+	pub fn new(global_state: super::GlobalAudioState) -> SimplePanel {
 		let mut simple = SimplePanel {
-			mixer_id,
+			global_state,
 
 			pulse_width: 0.25,
 			base_frequency: 220.0,
@@ -111,7 +111,7 @@ impl SimplePanel {
 
 	fn draw_play_buttons(&mut self, audio: &mut audio::AudioSystem, ui: &imgui::Ui<'static>) {
 		let SimplePanel {
-			mixer_id,
+			ref global_state,
 			base_frequency,
 			pulse_width,
 			env_attack,
@@ -120,6 +120,8 @@ impl SimplePanel {
 			env_exp_release,
 			..
 		} = *self;
+
+		let mixer_id = global_state.mixer_id;
 
 		let envelope = env::AR::new(env_attack, env_release)
 			.exp2(env_exp_attack, env_exp_release);
