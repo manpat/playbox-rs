@@ -2,6 +2,14 @@ use toybox::prelude::*;
 use crate::executor::{start_loop, next_frame};
 use crate::shaders;
 
+
+mod sprite_builder;
+
+use sprite_builder::*;
+
+
+
+
 toybox::declare_input_context! {
 	struct Actions "Dungeon" {
 		state forward { "Forward" [input::Scancode::W] }
@@ -56,6 +64,17 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let potion_pos = Vec2::new(2.0, -8.0);
 
 	let mut time = 0.0;
+
+
+	let sword_sprite = Sprite::new(Vec2i::new(0, 15*16), Vec2i::new(15, 16)).with_anchor(Anchor::S);
+	let potion_sprite = Sprite::new(Vec2i::new(16 + 8, 15*16 + 8), Vec2i::splat(7));
+	let drop_glow_sprite = Sprite::new(Vec2i::new(16, 15*16), Vec2i::splat(8));
+
+	let heart_sprite = Sprite::new(Vec2i::new(16, 15*16 + 8), Vec2i::splat(8));
+	let hand_sprites = [
+		Sprite::new(Vec2i::new(32 + 0*16, 15*16), Vec2i::splat(16)),
+		Sprite::new(Vec2i::new(32 + 1*16, 15*16), Vec2i::splat(16)),
+	];
 
 
 	while !global_controller.should_quit() {
@@ -132,6 +151,8 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		{
 			mesh_data.clear();
 
+			let mut mb = SpriteBuilder::new(&mut mesh_data);
+
 			if !player_has_sword {
 				let sword_world = sword_pos.to_x0y();
 
@@ -139,16 +160,16 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
 					.with_origin(sword_world + Vec3::from_y(0.05));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(16, 15*16), Vec2i::splat(8), 1.0, Vec2::zero(), Color::grey(0.1));
+				mb.tint_color = Color::grey(0.1);
+				mb.build_on_surface(&drop_glow_sprite, surface);
 
 
 				// Sword
 				let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(time))
 					.with_origin(sword_world + Vec3::from_y(0.2 + 0.15 * time.sin()));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(0, 15*16), Vec2i::new(15, 16), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+				mb.tint_color = Color::white();
+				mb.build_on_surface(&sword_sprite, surface);
 			}
 
 
@@ -159,15 +180,15 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
 					.with_origin(potion_world + Vec3::from_y(0.05));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(16, 15*16), Vec2i::splat(8), 1.0, Vec2::zero(), Color::grey(0.1));
+				mb.tint_color = Color::grey(0.1);
+				mb.build_on_surface(&drop_glow_sprite, surface);
 
 				// Potion
 				let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(player_orientation))
 					.with_origin(potion_world + Vec3::from_y(0.2 + 0.15 * time.sin()));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(16 + 8, 15*16 + 8), Vec2i::new(7, 7), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+				mb.tint_color = Color::white();
+				mb.build_on_surface(&potion_sprite.with_anchor(Anchor::S), surface);
 			}
 
 			dynamic_mesh.upload(&mesh_data);
@@ -179,15 +200,20 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			const UI_SCALE: f32 = 1.0 / 4.0;
 			let screen_left = -engine.gfx.aspect();
 			let screen_right = engine.gfx.aspect();
-			let icon_width = PIXEL_SIZE * UI_SCALE * 8.0;
+			let icon_width = PIXEL_WORLD_SIZE * UI_SCALE * 8.0;
+
+
+			let mut mb = SpriteBuilder::new(&mut mesh_data);
+			mb.scale_factor = UI_SCALE;
+			mb.tint_color = Color::white();
+
 
 			// Hearts
 			for i in 0..3 {
 				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
 					.with_origin(Vec3::new(screen_left + (i as f32) * icon_width + 0.05, 0.95, 0.0));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(16, 15*16 + 8), Vec2i::splat(8), UI_SCALE, Vec2::new(-0.5, 0.5), Color::grey(1.0));
+				mb.build_on_surface(&heart_sprite.with_anchor(Anchor::NW), surface);
 			}
 
 			if player_has_sword {
@@ -195,8 +221,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
 					.with_origin(Vec3::new(screen_right - 0.05, 0.95, 0.0));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(0, 15*16), Vec2i::new(15, 16), UI_SCALE, Vec2::splat(0.5), Color::grey(1.0));
+				mb.build_on_surface(&sword_sprite.with_anchor(Anchor::NE), surface);
 			}
 
 			if player_has_potion {
@@ -204,18 +229,18 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
 					.with_origin(Vec3::new(screen_left + 0.05, -0.95, 0.0));
 
-				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(16 + 8, 15*16 + 8), Vec2i::new(7, 7), UI_SCALE, Vec2::splat(-0.5), Color::grey(1.0));
+				mb.build_on_surface(&potion_sprite.with_anchor(Anchor::SW), surface);
 			}
 
 			// Hand
 			let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
 				.with_origin(Vec3::new(0.75, -1.0, 0.0));
 
-			let frame = (time * 2.0) as i32 % 2;
+			let frame = (time * 2.0) as usize % 2;
 
-			build_quad_on_surface(&mut mesh_data, surface,
-				Vec2i::new(32 + frame*16, 15*16), Vec2i::splat(16), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+			let hand_sprite = hand_sprites[frame];
+			mb.scale_factor = 1.0;
+			mb.build_on_surface(&hand_sprite.with_anchor(Anchor::S), surface);
 
 			ui_mesh.upload(&mesh_data);
 		}
@@ -271,11 +296,12 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 fn build_map() -> gfx::MeshData<TexturedVertex> {
 	let mut mesh_data = gfx::MeshData::new();
+	let mut mb = SpriteBuilder::new(&mut mesh_data);
 
-	build_room(&mut mesh_data, Vec2i::zero());
-	build_room(&mut mesh_data, Vec2i::new(0, -1));
-	build_room(&mut mesh_data, Vec2i::new(0, -2));
-	build_room(&mut mesh_data, Vec2i::new(1, -2));
+	build_room(&mut mb, Vec2i::zero());
+	build_room(&mut mb, Vec2i::new(0, -1));
+	build_room(&mut mb, Vec2i::new(0, -2));
+	build_room(&mut mb, Vec2i::new(1, -2));
 
 	mesh_data
 }
@@ -284,18 +310,21 @@ fn build_map() -> gfx::MeshData<TexturedVertex> {
 const ROOM_SIZE: f32 = 4.0;
 const ROOM_HEIGHT: f32 = 2.0;
 
-fn build_room(md: &mut gfx::MeshData<TexturedVertex>, location: Vec2i) {
+fn build_room(mb: &mut SpriteBuilder<'_>, location: Vec2i) {
 	use gfx::OrthogonalOrientation;
 
 	let origin = location.to_vec2() * ROOM_SIZE;
 	let origin = origin.to_x0y();
 
-	build_quad_on_surface(md, OrthogonalOrientation::PositiveY.to_surface_with_origin(origin + Vec3::from_y(0.0)),
-		Vec2i::new(15*16, 0), Vec2i::splat(16), 4.0, Vec2::zero(), Color::grey(0.04));
+	let floor_sprite = Sprite::new(Vec2i::new(15*16, 0), Vec2i::splat(16));
+	let ceil_sprite = floor_sprite;
 
-	build_quad_on_surface(md, OrthogonalOrientation::NegativeY.to_surface_with_origin(origin + Vec3::from_y(ROOM_HEIGHT)),
-		Vec2i::new(15*16, 0), Vec2i::splat(16), 4.0, Vec2::zero(), Color::grey(0.04));
+	mb.tint_color = Color::grey(0.04);
+	mb.scale_factor = 4.0;
+	mb.build_on_surface(&floor_sprite, OrthogonalOrientation::PositiveY.to_surface_with_origin(origin + Vec3::from_y(0.0)));
+	mb.build_on_surface(&ceil_sprite, OrthogonalOrientation::NegativeY.to_surface_with_origin(origin + Vec3::from_y(ROOM_HEIGHT)));
 }
+
 
 
 use std::path::Path;
@@ -316,70 +345,3 @@ fn load_texture(gfx: &mut gfx::ResourceContext<'_>, path: impl AsRef<Path>) -> R
 }
 
 
-
-// struct SpriteDef {
-// 	uv_pixel: Vec2i,
-// }
-
-
-const PIXEL_SIZE: f32 = 1.0 / 16.0;
-
-fn build_quad_on_surface(md: &mut gfx::MeshData<TexturedVertex>, surface: impl Into<gfx::BuilderSurface>,
-	uv_start: Vec2i, uv_size: Vec2i, scale_factor: f32, anchor: Vec2, color: Color)
-{
-	let vertices = [
-		Vec2::new(0.0, 0.0),
-		Vec2::new(1.0, 0.0),
-		Vec2::new(1.0, 1.0),
-		Vec2::new(0.0, 1.0),
-	];
-
-	let surface = surface.into().to_mat3();
-	let world_size = uv_size.to_vec2() * PIXEL_SIZE * scale_factor;
-
-	let uv_start = uv_start.to_vec2() / Vec2::splat(256.0);
-	let uv_size = uv_size.to_vec2() / Vec2::splat(256.0);
-
-	let vertices = vertices.into_iter()
-		.map(|uv| {
-			let v2 = (uv - Vec2::splat(0.5) - anchor) * world_size;
-			let uv = uv * uv_size + uv_start;
-
-			TexturedVertex {
-				pos: surface * v2.extend(1.0),
-				color: color.into(),
-				uv,
-			}
-		});
-
-	md.extend(vertices, gfx::util::iter_fan_indices(4));
-}
-
-
-
-
-use gfx::vertex::*;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct TexturedVertex {
-	pub pos: Vec3,
-	pub color: Vec4,
-	pub uv: Vec2,
-}
-
-
-impl Vertex for TexturedVertex {
-	fn descriptor() -> Descriptor {
-		static VERTEX_ATTRIBUTES: &'static [Attribute] = &[
-			Attribute::new(0*4, AttributeType::Vec3),
-			Attribute::new(3*4, AttributeType::Vec4),
-			Attribute::new(7*4, AttributeType::Vec2),
-		];
-
-		Descriptor {
-			attributes: VERTEX_ATTRIBUTES,
-			size_bytes: std::mem::size_of::<Self>() as u32,
-		}
-	}
-}
