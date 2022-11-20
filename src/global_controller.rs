@@ -19,7 +19,7 @@ pub struct GlobalController {
 }
 
 impl GlobalController {
-	pub fn new(engine: &mut toybox::Engine, resource_scope_id: ResourceScopeID) -> Result<GlobalController, Box<dyn Error>> {
+	pub fn new(engine: &mut toybox::Engine, _: ResourceScopeID) -> Result<GlobalController, Box<dyn Error>> {
 		Ok(GlobalController {
 			actions: GlobalActions::new_active(engine),
 

@@ -3,7 +3,6 @@ use audio::node_builder::*;
 use audio::generator as gen;
 use audio::envelope as env;
 use audio::effect;
-use audio::Envelope;
 
 
 pub struct SequencerPanel {

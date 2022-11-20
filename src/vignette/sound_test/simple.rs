@@ -91,8 +91,6 @@ impl SimplePanel {
 	}
 
 	fn rebuild_envelope(&mut self) {
-		use audio::Envelope;
-
 		let mut envelope = env::AR::new(self.env_attack, self.env_release)
 			.exp2(self.env_exp_attack, self.env_exp_release);
 
