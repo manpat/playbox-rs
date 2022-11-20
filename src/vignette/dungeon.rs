@@ -63,7 +63,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let sword_pos = Vec2::new(0.0, -5.0);
 	let potion_pos = Vec2::new(2.0, -8.0);
 
-	let mut time = 0.0;
+	let mut time = 0.0f32;
 
 
 	let sword_sprite = Sprite::new(Vec2i::new(0, 15*16), Vec2i::new(15, 16)).with_anchor(Anchor::S);
@@ -151,14 +151,14 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		{
 			mesh_data.clear();
 
-			let mut mb = SpriteBuilder::new(&mut mesh_data);
+			let mut mb = SpriteBuilder::new(&mut mesh_data).with_yaw(player_orientation);
 
 			if !player_has_sword {
 				let sword_world = sword_pos.to_x0y();
 
 				// Drop shadow
-				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
-					.with_origin(sword_world + Vec3::from_y(0.05));
+				let surface = gfx::OrthogonalOrientation::PositiveY
+					.to_surface_with_origin(sword_world + Vec3::from_y(0.05));
 
 				mb.tint_color = Color::grey(0.1);
 				mb.build_on_surface(&drop_glow_sprite, surface);
@@ -177,18 +177,15 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 				let potion_world = potion_pos.to_x0y();
 
 				// Drop shadow
-				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
-					.with_origin(potion_world + Vec3::from_y(0.05));
+				let surface = gfx::OrthogonalOrientation::PositiveY
+					.to_surface_with_origin(potion_world + Vec3::from_y(0.05));
 
 				mb.tint_color = Color::grey(0.1);
 				mb.build_on_surface(&drop_glow_sprite, surface);
 
 				// Potion
-				let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(player_orientation))
-					.with_origin(potion_world + Vec3::from_y(0.2 + 0.15 * time.sin()));
-
 				mb.tint_color = Color::white();
-				mb.build_on_surface(&potion_sprite.with_anchor(Anchor::S), surface);
+				mb.build(&potion_sprite.with_anchor(Anchor::S), potion_world + Vec3::from_y(0.2 + 0.15 * time.sin()));
 			}
 
 			dynamic_mesh.upload(&mesh_data);
@@ -198,49 +195,35 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			mesh_data.clear();
 
 			const UI_SCALE: f32 = 1.0 / 4.0;
-			let screen_left = -engine.gfx.aspect();
-			let screen_right = engine.gfx.aspect();
 			let icon_width = PIXEL_WORLD_SIZE * UI_SCALE * 8.0;
 
 
-			let mut mb = SpriteBuilder::new(&mut mesh_data);
+			let mut mb = SpriteBuilder::new(&mut mesh_data).for_screen(engine.gfx.aspect());
 			mb.scale_factor = UI_SCALE;
 			mb.tint_color = Color::white();
-
+			mb.margin = 0.05;
 
 			// Hearts
 			for i in 0..3 {
-				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
-					.with_origin(Vec3::new(screen_left + (i as f32) * icon_width + 0.05, 0.95, 0.0));
-
-				mb.build_on_surface(&heart_sprite.with_anchor(Anchor::NW), surface);
+				mb.build_with_anchor(&heart_sprite.with_anchor(Anchor::NW), Anchor::NW,
+					Vec2::from_x((i as f32) * icon_width));
 			}
 
 			if player_has_sword {
-				// Sword
-				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
-					.with_origin(Vec3::new(screen_right - 0.05, 0.95, 0.0));
-
-				mb.build_on_surface(&sword_sprite.with_anchor(Anchor::NE), surface);
+				mb.build_with_anchor(&sword_sprite.with_anchor(Anchor::NE), Anchor::NE, Vec2::zero());
 			}
 
 			if player_has_potion {
-				// Potion
-				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
-					.with_origin(Vec3::new(screen_left + 0.05, -0.95, 0.0));
-
-				mb.build_on_surface(&potion_sprite.with_anchor(Anchor::SW), surface);
+				mb.build_with_anchor(&potion_sprite.with_anchor(Anchor::SW), Anchor::SW, Vec2::zero());
 			}
 
 			// Hand
-			let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
-				.with_origin(Vec3::new(0.75, -1.0, 0.0));
-
 			let frame = (time * 2.0) as usize % 2;
 
 			let hand_sprite = hand_sprites[frame];
 			mb.scale_factor = 1.0;
-			mb.build_on_surface(&hand_sprite.with_anchor(Anchor::S), surface);
+			mb.margin = 0.0;
+			mb.build_with_anchor(&hand_sprite.with_anchor(Anchor::S), Anchor::S, Vec2::from_x(0.5));
 
 			ui_mesh.upload(&mesh_data);
 		}

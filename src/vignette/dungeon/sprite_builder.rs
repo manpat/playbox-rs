@@ -24,6 +24,21 @@ impl<'md> SpriteBuilder<'md> {
 		}
 	}
 
+	pub fn for_screen(self, aspect: f32) -> ScreenSpriteBuilder<'md> {
+		ScreenSpriteBuilder {
+			builder: self,
+			aspect,
+			margin: 0.0,
+		}
+	}
+
+	pub fn with_yaw(self, yaw: f32) -> SurfaceSpriteBuilder<'md> {
+		SurfaceSpriteBuilder {
+			builder: self,
+			surface: gfx::BuilderSurface::from_quat(Quat::from_yaw(yaw)),
+		}
+	}
+
 	pub fn build_on_surface(&mut self, sprite: &Sprite, surface: impl Into<gfx::BuilderSurface>) {
 		let vertices = [
 			Vec2::new(0.0, 0.0),
@@ -61,6 +76,97 @@ impl<'md> SpriteBuilder<'md> {
 		self.md.extend(vertices, gfx::util::iter_fan_indices(4));
 	}
 }
+
+
+
+
+pub struct ScreenSpriteBuilder<'md> {
+	pub builder: SpriteBuilder<'md>,
+	pub aspect: f32,
+	pub margin: f32,
+}
+
+impl<'md> ScreenSpriteBuilder<'md> {
+	pub fn build(&mut self, sprite: &Sprite, pos: Vec2) {
+		let surface = gfx::OrthogonalOrientation::PositiveZ
+			.to_surface_with_origin(pos.extend(0.0));
+
+		self.builder.build_on_surface(sprite, surface);
+	}
+
+	pub fn build_with_anchor(&mut self, sprite: &Sprite, anchor: Anchor, pos: Vec2) {
+		use Anchor::*;
+
+		// See: Mat4::ortho_aspect
+		let (r, t) = if self.aspect > 1.0 {
+			(self.aspect, 1.0)
+		} else {
+			(1.0, 1.0 / self.aspect)
+		};
+
+		let ne = Vec2::new(r, t) - Vec2::splat(self.margin);
+		let sw = -ne;
+		let center = Vec2::zero();
+
+		let anchor_pos = match anchor {
+			Center => center,
+			N => Vec2::new(center.x, ne.y),
+			E => Vec2::new(ne.x, center.y),
+			S => Vec2::new(center.x, sw.y),
+			W => Vec2::new(sw.x, center.y),
+			NE => ne,
+			NW => Vec2::new(sw.x, ne.y),
+			SE => Vec2::new(ne.x, sw.y),
+			SW => sw,
+		};
+
+		self.build(sprite, pos + anchor_pos);
+	}
+}
+
+impl<'md> std::ops::Deref for ScreenSpriteBuilder<'md> {
+	type Target = SpriteBuilder<'md>;
+	fn deref(&self) -> &Self::Target {
+		&self.builder
+	}
+}
+
+impl<'md> std::ops::DerefMut for ScreenSpriteBuilder<'md> {
+	fn deref_mut (&mut self) -> &mut Self::Target {
+		&mut self.builder
+	}
+}
+
+
+
+
+pub struct SurfaceSpriteBuilder<'md> {
+	pub builder: SpriteBuilder<'md>,
+	pub surface: gfx::BuilderSurface,
+}
+
+impl<'md> SurfaceSpriteBuilder<'md> {
+	pub fn build(&mut self, sprite: &Sprite, pos: Vec3) {
+		let surface = self.surface.with_origin(pos);
+		self.builder.build_on_surface(sprite, surface);
+	}
+}
+
+impl<'md> std::ops::Deref for SurfaceSpriteBuilder<'md> {
+	type Target = SpriteBuilder<'md>;
+	fn deref(&self) -> &Self::Target {
+		&self.builder
+	}
+}
+
+impl<'md> std::ops::DerefMut for SurfaceSpriteBuilder<'md> {
+	fn deref_mut (&mut self) -> &mut Self::Target {
+		&mut self.builder
+	}
+}
+
+
+
 
 
 
