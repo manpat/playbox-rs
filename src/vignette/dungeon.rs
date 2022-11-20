@@ -49,6 +49,12 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut player_position = Vec2::zero();
 	let mut player_orientation = 0.0;
 
+	let mut player_has_sword = false;
+	let mut player_has_potion = false;
+
+	let sword_pos = Vec2::new(0.0, -5.0);
+	let potion_pos = Vec2::new(2.0, -8.0);
+
 	let mut time = 0.0;
 
 
@@ -63,7 +69,11 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 			let ui = engine.imgui.frame();
 
-			if let Some(_window) = imgui::Window::new("Texture").begin(&ui) {
+			if let Some(_window) = imgui::Window::new("Dungeon").begin(&ui) {
+				ui.checkbox("Sword", &mut player_has_sword);
+				ui.checkbox("Potion", &mut player_has_potion);
+
+
 				let id = toybox::imgui_backend::texture_key_to_imgui_id(texture);
 
 				let window_width = ui.window_size()[0];
@@ -105,39 +115,60 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			}
 		}
 
+		// Update
+		{
+			let pickup_distance = 1.0;
 
+			if !player_has_sword && (player_position - sword_pos).length() < pickup_distance {
+				player_has_sword = true;
+			}
+
+			if !player_has_potion && (player_position - potion_pos).length() < pickup_distance {
+				player_has_potion = true;
+			}
+		}
+
+		// Build meshes
 		{
 			mesh_data.clear();
 
-			// Drop shadow
-			let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
-				.with_origin(Vec3::new(0.0, 0.05, -5.0));
+			if !player_has_sword {
+				let sword_world = sword_pos.to_x0y();
 
-			build_quad_on_surface(&mut mesh_data, surface,
-				Vec2i::new(16, 15*16), Vec2i::splat(8), 1.0, Vec2::zero(), Color::grey(0.1));
+				// Drop shadow
+				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
+					.with_origin(sword_world + Vec3::from_y(0.05));
 
-
-			// Sword
-			let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(time))
-				.with_origin(Vec3::new(0.0, 0.2 + 0.15 * time.sin(), -5.0));
-
-			build_quad_on_surface(&mut mesh_data, surface,
-				Vec2i::new(0, 15*16), Vec2i::new(15, 16), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+				build_quad_on_surface(&mut mesh_data, surface,
+					Vec2i::new(16, 15*16), Vec2i::splat(8), 1.0, Vec2::zero(), Color::grey(0.1));
 
 
-			// Drop shadow
-			let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
-				.with_origin(Vec3::new(2.0, 0.05, -8.0));
+				// Sword
+				let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(time))
+					.with_origin(sword_world + Vec3::from_y(0.2 + 0.15 * time.sin()));
 
-			build_quad_on_surface(&mut mesh_data, surface,
-				Vec2i::new(16, 15*16), Vec2i::splat(8), 1.0, Vec2::zero(), Color::grey(0.1));
+				build_quad_on_surface(&mut mesh_data, surface,
+					Vec2i::new(0, 15*16), Vec2i::new(15, 16), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+			}
 
-			// Potion
-			let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(player_orientation))
-				.with_origin(Vec3::new(2.0, 0.2 + 0.15 * time.sin(), -8.0));
 
-			build_quad_on_surface(&mut mesh_data, surface,
-				Vec2i::new(16 + 8, 15*16 + 8), Vec2i::new(7, 7), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+			if !player_has_potion {
+				let potion_world = potion_pos.to_x0y();
+
+				// Drop shadow
+				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveY)
+					.with_origin(potion_world + Vec3::from_y(0.05));
+
+				build_quad_on_surface(&mut mesh_data, surface,
+					Vec2i::new(16, 15*16), Vec2i::splat(8), 1.0, Vec2::zero(), Color::grey(0.1));
+
+				// Potion
+				let surface = gfx::BuilderSurface::from_quat(Quat::from_yaw(player_orientation))
+					.with_origin(potion_world + Vec3::from_y(0.2 + 0.15 * time.sin()));
+
+				build_quad_on_surface(&mut mesh_data, surface,
+					Vec2i::new(16 + 8, 15*16 + 8), Vec2i::new(7, 7), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
+			}
 
 			dynamic_mesh.upload(&mesh_data);
 		}
@@ -147,22 +178,41 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 			const UI_SCALE: f32 = 1.0 / 4.0;
 			let screen_left = -engine.gfx.aspect();
-			let item_width = PIXEL_SIZE * UI_SCALE * 8.0;
+			let screen_right = engine.gfx.aspect();
+			let icon_width = PIXEL_SIZE * UI_SCALE * 8.0;
 
 			// Hearts
 			for i in 0..3 {
 				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
-					.with_origin(Vec3::new(screen_left + (i as f32 + 1.0) * item_width, 0.9, 0.0));
+					.with_origin(Vec3::new(screen_left + (i as f32) * icon_width + 0.05, 0.95, 0.0));
 
 				build_quad_on_surface(&mut mesh_data, surface,
-					Vec2i::new(16, 15*16 + 8), Vec2i::splat(8), UI_SCALE, Vec2::zero(), Color::grey(1.0));
+					Vec2i::new(16, 15*16 + 8), Vec2i::splat(8), UI_SCALE, Vec2::new(-0.5, 0.5), Color::grey(1.0));
+			}
+
+			if player_has_sword {
+				// Sword
+				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
+					.with_origin(Vec3::new(screen_right - 0.05, 0.95, 0.0));
+
+				build_quad_on_surface(&mut mesh_data, surface,
+					Vec2i::new(0, 15*16), Vec2i::new(15, 16), UI_SCALE, Vec2::splat(0.5), Color::grey(1.0));
+			}
+
+			if player_has_potion {
+				// Potion
+				let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
+					.with_origin(Vec3::new(screen_left + 0.05, -0.95, 0.0));
+
+				build_quad_on_surface(&mut mesh_data, surface,
+					Vec2i::new(16 + 8, 15*16 + 8), Vec2i::new(7, 7), UI_SCALE, Vec2::splat(-0.5), Color::grey(1.0));
 			}
 
 			// Hand
 			let surface = gfx::BuilderSurface::from_orthogonal(gfx::OrthogonalOrientation::PositiveZ)
 				.with_origin(Vec3::new(0.75, -1.0, 0.0));
 
-				let frame = (time * 2.0) as i32 % 2;
+			let frame = (time * 2.0) as i32 % 2;
 
 			build_quad_on_surface(&mut mesh_data, surface,
 				Vec2i::new(32 + frame*16, 15*16), Vec2i::splat(16), 1.0, Vec2::from_y(-0.5), Color::grey(1.0));
