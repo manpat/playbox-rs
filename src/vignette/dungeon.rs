@@ -50,7 +50,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let mut mesh_data = gfx::MeshData::new();
 
 
-	let (texture, _image_size) = load_texture(&mut resource_ctx, "assets/dungeon.png")?;
+	let texture = load_texture(&mut resource_ctx, "assets/dungeon.png")?;
 
 
 
@@ -281,10 +281,10 @@ fn build_map() -> gfx::MeshData<TexturedVertex> {
 	let mut mesh_data = gfx::MeshData::new();
 	let mut mb = SpriteBuilder::new(&mut mesh_data);
 
-	build_room(&mut mb, Vec2i::zero());
-	build_room(&mut mb, Vec2i::new(0, -1));
-	build_room(&mut mb, Vec2i::new(0, -2));
-	build_room(&mut mb, Vec2i::new(1, -2));
+	build_room(&mut mb, Vec2i::zero(), [true, false, false, false]);
+	build_room(&mut mb, Vec2i::new(0, -1), [true, false, true, false]);
+	build_room(&mut mb, Vec2i::new(0, -2), [false, true, true, false]);
+	build_room(&mut mb, Vec2i::new(1, -2), [false, false, false, true]);
 
 	mesh_data
 }
@@ -293,30 +293,49 @@ fn build_map() -> gfx::MeshData<TexturedVertex> {
 const ROOM_SIZE: f32 = 4.0;
 const ROOM_HEIGHT: f32 = 2.0;
 
-fn build_room(mb: &mut SpriteBuilder<'_>, location: Vec2i) {
+fn build_room(mb: &mut SpriteBuilder<'_>, location: Vec2i, adjacency: [bool; 4]) {
 	use gfx::OrthogonalOrientation;
 
 	let origin = location.to_vec2() * ROOM_SIZE;
 	let origin = origin.to_x0y();
 
-	let floor_sprite = Sprite::new(Vec2i::new(15*16, 0), Vec2i::splat(16));
-	let ceil_sprite = floor_sprite;
+	let floor_sprite = Sprite::new(Vec2i::new(4*16, 0), Vec2i::splat(32));
+	let ceil_sprite = Sprite::new(Vec2i::new(6*16, 0), Vec2i::splat(32));
+	let wall_sprite = Sprite::new(Vec2i::new(2*16, 0), Vec2i::new(32, 16)).with_anchor(Anchor::S);
 
-	mb.tint_color = Color::grey(0.04);
-	mb.scale_factor = 4.0;
+	mb.tint_color = Color::grey(0.2);
+	mb.scale_factor = 2.0;
 	mb.build_on_surface(&floor_sprite, OrthogonalOrientation::PositiveY.to_surface_with_origin(origin + Vec3::from_y(0.0)));
 	mb.build_on_surface(&ceil_sprite, OrthogonalOrientation::NegativeY.to_surface_with_origin(origin + Vec3::from_y(ROOM_HEIGHT)));
+
+	if !adjacency[0] {
+		mb.build_on_surface(&wall_sprite, OrthogonalOrientation::PositiveZ.to_surface_with_origin(origin + Vec3::from_z(-ROOM_SIZE / 2.0)));
+	}
+
+	if !adjacency[1] {
+		mb.build_on_surface(&wall_sprite, OrthogonalOrientation::NegativeX.to_surface_with_origin(origin + Vec3::from_x(ROOM_SIZE / 2.0)));
+	}
+
+	if !adjacency[2] {
+		mb.build_on_surface(&wall_sprite, OrthogonalOrientation::NegativeZ.to_surface_with_origin(origin + Vec3::from_z(ROOM_SIZE / 2.0)));
+	}
+
+	if !adjacency[3] {
+		mb.build_on_surface(&wall_sprite, OrthogonalOrientation::PositiveX.to_surface_with_origin(origin + Vec3::from_x(-ROOM_SIZE / 2.0)));
+	}
 }
 
 
 
 use std::path::Path;
 
-fn load_texture(gfx: &mut gfx::ResourceContext<'_>, path: impl AsRef<Path>) -> Result<(gfx::TextureKey, Vec2i), Box<dyn Error>> {
+fn load_texture(gfx: &mut gfx::ResourceContext<'_>, path: impl AsRef<Path>) -> Result<gfx::TextureKey, Box<dyn Error>> {
 	let image = image::open(path)?.flipv().into_rgba8().into_flat_samples();
 	let image_size = Vec2i::new(image.layout.width as i32, image.layout.height as i32);
-	let texture_format = gfx::TextureFormat::srgba();
 
+	assert!(image_size == Vec2i::splat(TEXTURE_SIZE as i32));
+
+	let texture_format = gfx::TextureFormat::srgba();
 	let texture = gfx.new_texture(image_size, texture_format);
 
 	{
@@ -324,7 +343,7 @@ fn load_texture(gfx: &mut gfx::ResourceContext<'_>, path: impl AsRef<Path>) -> R
 		texture.upload_rgba8_raw(&image.samples);
 	}
 
-	Ok((texture, image_size))
+	Ok(texture)
 }
 
 
