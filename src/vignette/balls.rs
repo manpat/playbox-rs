@@ -405,9 +405,7 @@ fn build_uniforms(camera: &Camera, aspect: f32) -> shaders::StdUniforms {
 
 	shaders::StdUniforms {
 		projection_view,
-		projection_view_inverse: projection_view.inverse(),
-
-		ui_projection_view: Mat4::identity()
+		projection_view_inverse: projection_view.inverse()
 	}
 }
 

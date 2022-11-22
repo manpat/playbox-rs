@@ -32,7 +32,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 
 
 	let mut view_resource_context = engine.gfx.resource_context(&resource_scope_token);
-	let mut uniform_buffer = view_resource_context.new_buffer(gfx::BufferUsage::Stream);
+	let mut std_uniform_buffer = view_resource_context.new_buffer(gfx::BufferUsage::Stream);
 
 	let mut player_view = views::PlayerView::new(&mut view_resource_context)?;
 	let mut debug_view = views::DebugView::new(&mut view_resource_context, &scene)?;
@@ -120,8 +120,17 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 			}
 		}
 
-		let uniforms = build_uniforms(&camera, engine.gfx.aspect());
-		uniform_buffer.upload_single(&uniforms);
+		let std_uniforms_camera = build_uniforms(&camera, engine.gfx.aspect());
+		let std_uniforms_ui = {
+			let projection_view = Mat4::scale(Vec3::new(1.0 / engine.gfx.aspect(), 1.0, 1.0));
+
+			shaders::StdUniforms {
+				projection_view,
+				projection_view_inverse: projection_view.inverse()
+			}
+		};
+
+		std_uniform_buffer.upload(&[std_uniforms_camera, std_uniforms_ui]);
 
 
 		let mut view_ctx = views::ViewContext::new(&mut engine);
@@ -129,7 +138,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 		view_ctx.gfx.set_clear_color(Color::grey_a(0.1, 0.0));
 		view_ctx.gfx.clear(gfx::ClearMode::ALL);
 
-		view_ctx.gfx.bind_uniform_buffer(0, uniform_buffer);
+		view_ctx.gfx.bind_uniform_buffer(0, std_uniform_buffer.element_view(0));
 
 		view_ctx.gfx.bind_framebuffer(test_fbo);
 		view_ctx.gfx.clear(gfx::ClearMode::ALL);
@@ -178,6 +187,7 @@ pub async fn load_and_play_scene(project_path: impl AsRef<std::path::Path>, scen
 		gbuffer_particles_view.draw(&mut view_ctx);
 
 		view_ctx.gfx.clear(gfx::ClearMode::DEPTH);
+		view_ctx.gfx.bind_uniform_buffer(0, std_uniform_buffer.element_view(1));
 
 		if debug_model.active {
 			debug_view.draw(&mut view_ctx, &debug_model);
@@ -207,9 +217,5 @@ fn build_uniforms(camera: &model::Camera, aspect: f32) -> shaders::StdUniforms {
 	shaders::StdUniforms {
 		projection_view,
 		projection_view_inverse: projection_view.inverse(),
-
-		ui_projection_view: {
-			Mat4::scale(Vec3::new(1.0 / aspect, 1.0, 1.0))
-		}
 	}
 }

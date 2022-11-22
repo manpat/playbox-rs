@@ -26,11 +26,12 @@ pub const GBUFFER_PARTICLE_UPDATE_COMPUTE: &'static str = include_str!("shaders/
 
 
 
+// NOTE: Aligned to 256 to satisfy UBO binding offset alignment requirements - see Capabilities::ubo_offset_alignment
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
+#[repr(align(256))]
 pub struct StdUniforms {
 	pub projection_view: Mat4,
 	pub projection_view_inverse: Mat4,
-	pub ui_projection_view: Mat4,
 	// NOTE: align to Vec4s
 }

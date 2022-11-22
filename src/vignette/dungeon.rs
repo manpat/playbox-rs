@@ -240,8 +240,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 		std_uniform_buffer.upload_single(&shaders::StdUniforms {
 			projection_view,
-			projection_view_inverse: projection_view.inverse(),
-			ui_projection_view: Mat4::identity(),
+			projection_view_inverse: projection_view.inverse()
 		});
 
 
@@ -249,8 +248,7 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 		std_uniform_buffer_ui.upload_single(&shaders::StdUniforms {
 			projection_view,
-			projection_view_inverse: projection_view.inverse(),
-			ui_projection_view: Mat4::identity(),
+			projection_view_inverse: projection_view.inverse()
 		});
 
 		let mut gfx = engine.gfx.draw_context();
