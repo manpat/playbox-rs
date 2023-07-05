@@ -102,6 +102,11 @@ async fn main_menu() -> Result<MainMenuCommand, Box<dyn Error>> {
 		gfx.set_clear_color(Color::grey(0.1));
 		gfx.clear(gfx::ClearMode::ALL);
 
+		// TODO(pat.m): this should be automatic - it shouldn't be so easy to accidentally rely on default pipeline states
+		// stops accidental sharing of pipeline state between vignettes.
+		gfx.set_depth_test(true);
+		gfx.set_backface_culling(true);
+
 
 		let ui = engine.imgui.frame();
 

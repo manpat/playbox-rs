@@ -41,8 +41,14 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		crate::shaders::TEXTURED_FRAG,
 	)?;
 
+	let composite_shader = resource_ctx.new_simple_shader(
+		crate::shaders::FULLSCREEN_QUAD_VERT,
+		include_str!("dungeon/composite.frag.glsl")
+	)?;
+
 	let mut std_uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
 	let mut std_uniform_buffer_ui = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
+	let mut posteffect_uniform_buffer = resource_ctx.new_buffer(gfx::BufferUsage::Stream);
 	let scene_mesh = gfx::Mesh::from_mesh_data(&mut resource_ctx, &build_map());
 
 	let mut dynamic_mesh = gfx::Mesh::new(&mut resource_ctx);
@@ -52,6 +58,11 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 	let texture = load_texture(&mut resource_ctx, "assets/dungeon.png")?;
 
+	let fbo_settings = gfx::FramebufferSettings::new(gfx::TextureSize::BackbufferDivisor(8))
+		.add_depth()
+		.add_color(0, gfx::TextureFormat::color());
+
+	let fbo = resource_ctx.new_framebuffer(fbo_settings);
 
 
 	let mut player_position = Vec2::zero();
@@ -64,6 +75,32 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 	let potion_pos = Vec2::new(2.0, -8.0);
 
 	let mut time = 0.0f32;
+
+	let mut posteffect_pulse_color = Color::white();
+	let mut posteffect_pulse_amt = 0.0f32;
+	let mut posteffect_pulse_dt = 0.0f32;
+
+	#[repr(C)]
+	#[derive(Copy, Clone)]
+	struct PostEffectUniforms {
+		perspective: Mat4,
+		perspective_inverse: Mat4,
+		pulse_color: Color,
+		fog_color: Color,
+		fog_power: f32,
+		fog_dist: f32,
+		fog_steps: f32,
+	}
+
+	let mut post_effect_uniforms = PostEffectUniforms {
+		perspective: Mat4::identity(),
+		perspective_inverse: Mat4::identity(),
+		pulse_color: Color::white(),
+		fog_color: Color::black(),
+		fog_power: 1.0/2.0,
+		fog_dist: 20.0,
+		fog_steps: 20.0,
+	};
 
 
 	let sword_sprite = Sprite::new(Vec2i::new(0, 15*16), Vec2i::new(15, 16)).with_anchor(Anchor::S);
@@ -91,6 +128,25 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 			if let Some(_window) = imgui::Window::new("Dungeon").begin(&ui) {
 				ui.checkbox("Sword", &mut player_has_sword);
 				ui.checkbox("Potion", &mut player_has_potion);
+
+
+				let mut color_raw: [_; 3] = post_effect_uniforms.fog_color.to_srgb().into();
+				if imgui::ColorEdit::new("Fog Color", &mut color_raw)
+					.build(engine.imgui.frame())
+				{
+					post_effect_uniforms.fog_color = Color::from(color_raw).to_linear();
+				}
+
+				imgui::Slider::new("Fog Power", 0.01, 4.0)
+					.flags(imgui::SliderFlags::LOGARITHMIC)
+					.build(ui, &mut post_effect_uniforms.fog_power);
+
+				imgui::Slider::new("Fog Dist", 0.01, 100.0)
+					.flags(imgui::SliderFlags::LOGARITHMIC)
+					.build(ui, &mut post_effect_uniforms.fog_dist);
+
+				imgui::Slider::new("Fog Steps", 1.0, 100.0)
+					.build(ui, &mut post_effect_uniforms.fog_steps);
 
 
 				let id = toybox::imgui_backend::texture_key_to_imgui_id(texture);
@@ -140,10 +196,46 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 
 			if !player_has_sword && (player_position - sword_pos).length() < pickup_distance {
 				player_has_sword = true;
+
+				posteffect_pulse_color = Color::grey(0.5);
+				posteffect_pulse_amt = 1.0;
+				posteffect_pulse_dt = 1.0 / 0.2;
+
+				engine.audio.queue_update(|graph| {
+					use audio::*;
+
+					let lpf_ramp = envelope::Ramp::new(0.2, 1000.0, 30.0).to_parameter();
+					let node = generator::GeneratorNode::new_triangle(50.0)
+						.effect(effect::ResonantLowPass::new(lpf_ramp, 0.2))
+						.envelope(envelope::Ramp::down(0.4))
+						.build();
+
+					graph.add_node(node, graph.output_node());
+				});
 			}
 
 			if !player_has_potion && (player_position - potion_pos).length() < pickup_distance {
 				player_has_potion = true;
+
+				posteffect_pulse_color = Color::rgb(0.1, 0.4, 0.1);
+				posteffect_pulse_amt = 1.0;
+				posteffect_pulse_dt = 1.0 / 0.2;
+
+				engine.audio.queue_update(|graph| {
+					use audio::*;
+
+					let lpf_ramp = envelope::Ramp::new(0.2, 1200.0, 30.0).to_parameter();
+					let lfo = generator::GeneratorNode::new_sine(12.0)
+						.gain_bias(10.0, 440.0)
+						.to_parameter();
+
+					let node = generator::GeneratorNode::new_triangle(lfo)
+						.effect(effect::ResonantLowPass::new(lpf_ramp, 0.2))
+						.envelope(envelope::Ramp::down(0.4))
+						.build();
+
+					graph.add_node(node, graph.output_node());
+				});
 			}
 		}
 
@@ -244,28 +336,52 @@ pub async fn play() -> Result<(), Box<dyn Error>> {
 		});
 
 
-		let projection_view = Mat4::ortho_aspect(1.0, engine.gfx.aspect(), -1.0, 1.0);
+		let projection_view_ui = Mat4::ortho_aspect(1.0, engine.gfx.aspect(), -1.0, 1.0);
 
 		std_uniform_buffer_ui.upload_single(&shaders::StdUniforms {
-			projection_view,
-			projection_view_inverse: projection_view.inverse()
+			projection_view: projection_view_ui,
+			projection_view_inverse: projection_view_ui.inverse()
 		});
 
+
+		posteffect_pulse_amt -= posteffect_pulse_dt / 60.0;
+
+		post_effect_uniforms.perspective = projection_view; //Mat4::perspective(PI/3.0, engine.gfx.aspect(), 0.1, 1000.0);
+		post_effect_uniforms.perspective_inverse = post_effect_uniforms.perspective.inverse();
+		post_effect_uniforms.pulse_color = posteffect_pulse_color
+			.with_alpha(posteffect_pulse_amt.clamp(0.0, 1.0));
+
+		posteffect_uniform_buffer.upload_single(&post_effect_uniforms);
+
 		let mut gfx = engine.gfx.draw_context();
-		gfx.set_clear_color(Color::grey(0.01));
-		gfx.clear(gfx::ClearMode::ALL);
+
+		gfx.set_depth_test(true);
 		gfx.set_backface_culling(false);
 
 		gfx.bind_texture(0, texture);
 		gfx.bind_uniform_buffer(0, std_uniform_buffer);
 		gfx.bind_shader(color_shader);
 
+		gfx.bind_framebuffer(fbo);
+		gfx.set_clear_color(Color::grey(0.01));
+		gfx.clear(gfx::ClearMode::ALL);
+
 		scene_mesh.draw(&mut gfx, gfx::DrawMode::Triangles);
 		dynamic_mesh.draw(&mut gfx, gfx::DrawMode::Triangles);
 
-		gfx.clear(gfx::ClearMode::DEPTH);
+		gfx.bind_framebuffer(None);
 
+		gfx.set_depth_test(false);
 		gfx.bind_uniform_buffer(0, std_uniform_buffer_ui);
+		gfx.bind_uniform_buffer(1, posteffect_uniform_buffer);
+
+		gfx.bind_shader(composite_shader);
+		gfx.bind_texture(0, fbo.color_attachment(0));
+		gfx.bind_texture(1, fbo.depth_stencil_attachment());
+		gfx.draw_arrays(gfx::DrawMode::Triangles, 6);
+
+		gfx.bind_shader(color_shader);
+		gfx.bind_texture(0, texture);
 		ui_mesh.draw(&mut gfx, gfx::DrawMode::Triangles);
 
 		engine = next_frame(engine).await;
