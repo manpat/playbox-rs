@@ -1,6 +1,6 @@
 [package]
 name = "playbox-rs"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 
 
@@ -11,16 +11,4 @@ edition = "2021"
 
 [dependencies.toybox]
 git = "https://github.com/manpat/toybox-rs.git"
-branch = "pre-1.0"
 features = ["tracy"]
-
-
-# [patch."https://github.com/manpat/common-rs.git"]
-# common = { path = "../common-rs" }
-
-# [patch."https://github.com/manpat/toybox-rs.git"]
-# toybox = { path = "../toybox-rs" }
-
-# [patch."https://github.com/manpat/toy-rs.git"]
-# toy = { path = "../toy-rs" }
-
