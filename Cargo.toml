@@ -11,15 +11,16 @@ edition = "2021"
 
 [dependencies.toybox]
 git = "https://github.com/manpat/toybox-rs.git"
+branch = "pre-1.0"
 features = ["tracy"]
 
 
-[patch."https://github.com/manpat/common-rs.git"]
-common = { path = "../common-rs" }
+# [patch."https://github.com/manpat/common-rs.git"]
+# common = { path = "../common-rs" }
 
-[patch."https://github.com/manpat/toybox-rs.git"]
-toybox = { path = "../toybox-rs" }
+# [patch."https://github.com/manpat/toybox-rs.git"]
+# toybox = { path = "../toybox-rs" }
 
-[patch."https://github.com/manpat/toy-rs.git"]
-toy = { path = "../toy-rs" }
+# [patch."https://github.com/manpat/toy-rs.git"]
+# toy = { path = "../toy-rs" }
 
