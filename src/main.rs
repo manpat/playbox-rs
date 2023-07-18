@@ -8,7 +8,10 @@ fn main() -> anyhow::Result<()> {
 
 
 
-struct App;
+struct App {
+	v_shader: gfx::resource_manager::shader::ShaderHandle,
+	f_shader: gfx::resource_manager::shader::ShaderHandle,
+}
 
 impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
@@ -17,7 +20,12 @@ impl App {
 		let mut group = ctx.gfx.frame_encoder.command_group("START");
 		group.debug_marker("FUCK");
 
-		Ok(App)
+		use gfx::resource_manager::shader::ShaderDef;
+
+		Ok(App {
+			v_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.vs.glsl")?),
+			f_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.fs.glsl")?),
+		})
 	}
 }
 
