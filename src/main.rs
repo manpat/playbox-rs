@@ -34,8 +34,20 @@ impl toybox::App for App {
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
 
+		group.upload_heap.stage_data(&[1.0f32, 2.0, 3.0]);
+		let upload_id = group.upload_heap.stage_data(&[1u32]);
+		group.upload_heap.stage_data(&[1.0f32, 2.0, 3.0]);
+		
+		group.upload_heap.update_staged_upload_alignment(upload_id, 128);
+
+		group.draw(self.v_shader, self.f_shader)
+			.primitive(gfx::command::draw::PrimitiveType::Triangles)
+			.elements(3)
+			.instances(8);
+
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Points)
 			.elements(10);
+
 	}
 }
