@@ -48,10 +48,7 @@ impl toybox::App for App {
 
 		group.execute(move |core, rm| {
 			let allocation = rm.upload_heap.resolve_allocation(upload_id);
-			unsafe {
-				core.gl.BindBufferRange(gl::UNIFORM_BUFFER, 0, rm.upload_heap.buffer_name().as_raw(),
-					allocation.offset as isize, allocation.size as isize);
-			}
+			core.bind_ubo(0, rm.upload_heap.buffer_name(), (allocation.offset, allocation.size));
 		});
 
 		group.draw(self.v_shader, self.f_shader)
