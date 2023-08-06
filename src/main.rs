@@ -44,21 +44,16 @@ impl toybox::App for App {
 		let upload_id = group.upload_stage.stage_data(&[self.time]);
 		group.upload_stage.stage_data(&[1.0f32, 2.0, 3.0]);
 		
-		group.upload_stage.update_staged_upload_alignment(upload_id, 128);
-
-		group.execute(move |core, rm| {
-			let allocation = rm.upload_heap.resolve_allocation(upload_id);
-			core.bind_ubo(0, rm.upload_heap.buffer_name(), (allocation.offset, allocation.size));
-		});
-
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
-			.instances(8);
+			.instances(8)
+			.ubo(0, upload_id);
 
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Points)
-			.elements(10);
+			.elements(10)
+			.ubo(0, upload_id);
 
 	}
 }
