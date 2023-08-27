@@ -19,7 +19,7 @@ impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
 		ctx.gfx.frame_encoder.backbuffer_color([1.0, 0.5, 1.0]);
 
-		ctx.audio.set_provider(MyAudioProvider::default())?;
+		// ctx.audio.set_provider(MyAudioProvider::default())?;
 
 		let mut group = ctx.gfx.frame_encoder.command_group("START");
 		group.debug_marker("FUCK");
@@ -77,27 +77,34 @@ impl toybox::App for App {
 
 #[derive(Default)]
 struct MyAudioProvider {
-	sample_dt: f32,
-	phase: f32,
+	sample_dt: f64,
+	phase: f64,
 }
 
 impl audio::Provider for MyAudioProvider {
 	fn on_configuration_changed(&mut self, config: audio::Configuration) {
-		self.sample_dt = 1.0/config.sample_rate;
+		self.sample_dt = 1.0/config.sample_rate as f64;
 		assert!(config.channels == 2);
 	}
 
 	fn fill_buffer(&mut self, buffer: &mut [f32]) {
+		let mut osc_phase = self.phase * 220.0 * std::f64::consts::TAU;
+		let osc_dt = self.sample_dt * 220.0 * std::f64::consts::TAU;
+
 		for frame in buffer.chunks_exact_mut(2) {
-			let osc = (self.phase * 110.0 * TAU).sin() * 0.1;
+			let osc = osc_phase.sin();
 			let amp = 0.5 - self.phase.cos() * 0.5;
 			let amp = amp * amp;
 
-			frame[0] = osc * amp;
-			frame[1] = -osc * amp;
+			let value = (amp * osc) as f32;
+
+			frame[0] = value;
+			frame[1] = -value;
+
 			self.phase += self.sample_dt;
+			osc_phase += osc_dt;
 		}
 
-		self.phase %= 2.0 * PI;
+		self.phase %= std::f64::consts::TAU;
 	}
 }
