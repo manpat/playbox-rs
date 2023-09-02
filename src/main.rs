@@ -11,6 +11,9 @@ fn main() -> anyhow::Result<()> {
 struct App {
 	v_shader: gfx::resource_manager::shader::ShaderHandle,
 	f_shader: gfx::resource_manager::shader::ShaderHandle,
+	c_shader: gfx::resource_manager::shader::ShaderHandle,
+
+	vertex_buffer: gfx::core::BufferName,
 
 	time: f32,
 }
@@ -29,6 +32,14 @@ impl App {
 		Ok(App {
 			v_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.vs.glsl")?),
 			f_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.fs.glsl")?),
+			c_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.cs.glsl")?),
+
+			vertex_buffer: {
+				let buffer = ctx.gfx.core.create_buffer();
+				let flags = 0; // not client visible
+				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[Vec2; 3]>(), flags);
+				buffer
+			},
 
 			time: 0.0,
 		})
@@ -45,6 +56,16 @@ impl toybox::App for App {
 
 		let projection_upload = ctx.gfx.frame_encoder.upload(&projection);
 
+		let mut group = ctx.gfx.frame_encoder.command_group("Compute time");
+		group.compute(self.c_shader)
+			.ssbo(0, self.vertex_buffer);
+
+		group.execute(move |core, _rm| {
+			unsafe {
+				core.gl.MemoryBarrier(gl::UNIFORM_BARRIER_BIT);
+			}
+		});
+
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
 
@@ -56,20 +77,23 @@ impl toybox::App for App {
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
 			.ubo(0, &0.0f32)
-			.ubo(1, projection_upload);
+			.ubo(1, projection_upload)
+			.ubo(2, self.vertex_buffer);
 		
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
 			.instances(8)
 			.ubo(0, upload_id)
-			.ubo(1, projection_upload);
+			.ubo(1, projection_upload)
+			.ubo(2, self.vertex_buffer);
 
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Points)
 			.elements(10)
 			.ubo(0, &(self.time*2.0))
-			.ubo(1, projection_upload);
+			.ubo(1, projection_upload)
+			.ubo(2, self.vertex_buffer);
 
 	}
 }
