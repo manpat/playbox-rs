@@ -24,6 +24,8 @@ impl App {
 
 		// ctx.audio.set_provider(MyAudioProvider::default())?;
 
+		dbg!(&ctx.gfx.core.capabilities());
+
 		let mut group = ctx.gfx.frame_encoder.command_group("START");
 		group.debug_marker("FUCK");
 
@@ -37,7 +39,9 @@ impl App {
 			vertex_buffer: {
 				let buffer = ctx.gfx.core.create_buffer();
 				let flags = 0; // not client visible
-				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[Vec2; 3]>(), flags);
+				// TODO(pat.m): using Vec4 here to cope with std140 layout. this is an easy mistake to make
+				// how to make this better?
+				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[Vec4; 3]>(), flags);
 				buffer
 			},
 
@@ -56,6 +60,9 @@ impl toybox::App for App {
 
 		let projection_upload = ctx.gfx.frame_encoder.upload(&projection);
 
+		use gfx::bindings::BufferBindTargetDesc;
+		ctx.gfx.frame_encoder.global_bindings.bind_buffer(BufferBindTargetDesc::UboIndex(1), projection_upload);
+
 		let mut group = ctx.gfx.frame_encoder.command_group("Compute time");
 		group.compute(self.c_shader)
 			.ssbo(0, self.vertex_buffer);
@@ -68,7 +75,7 @@ impl toybox::App for App {
 
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
-		group.ubo(1, projection_upload);
+		// group.ubo(1, projection_upload);
 		group.ubo(2, self.vertex_buffer);
 
 		self.time += 1.0/60.0;
@@ -90,6 +97,12 @@ impl toybox::App for App {
 			.primitive(gfx::command::draw::PrimitiveType::Points)
 			.elements(10)
 			.ubo(0, &(self.time*2.0));
+
+		group.draw(self.v_shader, self.f_shader)
+			.primitive(gfx::command::draw::PrimitiveType::Lines)
+			.indexed(&[0u32, 1, 1, 2, 2, 3])
+			.elements(6)
+			.ubo(0, &1.0f32);
 
 	}
 }

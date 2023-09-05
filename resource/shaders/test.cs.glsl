@@ -1,7 +1,8 @@
 layout(local_size_x=1) in;
 
 
-layout(binding=0) writeonly buffer Output {
+// must be std140 so it can be bound as UBO
+layout(binding=0, std140) writeonly buffer Output {
 	vec2 s_points[3];
 };
 
