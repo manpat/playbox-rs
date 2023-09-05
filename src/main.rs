@@ -68,6 +68,8 @@ impl toybox::App for App {
 
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
+		group.ubo(1, projection_upload);
+		group.ubo(2, self.vertex_buffer);
 
 		self.time += 1.0/60.0;
 
@@ -76,24 +78,18 @@ impl toybox::App for App {
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
-			.ubo(0, &0.0f32)
-			.ubo(1, projection_upload)
-			.ubo(2, self.vertex_buffer);
+			.ubo(0, &0.0f32);
 		
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
 			.instances(8)
-			.ubo(0, upload_id)
-			.ubo(1, projection_upload)
-			.ubo(2, self.vertex_buffer);
+			.ubo(0, upload_id);
 
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Points)
 			.elements(10)
-			.ubo(0, &(self.time*2.0))
-			.ubo(1, projection_upload)
-			.ubo(2, self.vertex_buffer);
+			.ubo(0, &(self.time*2.0));
 
 	}
 }
