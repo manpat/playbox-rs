@@ -75,7 +75,6 @@ impl toybox::App for App {
 
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
-		// group.ubo(1, projection_upload);
 		group.ubo(2, self.vertex_buffer);
 
 		self.time += 1.0/60.0;
