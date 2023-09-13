@@ -1,8 +1,13 @@
 
-in float v_instance;
+in Vertex {
+	vec2 v_uv;
+	float v_instance;
+};
 
 out vec4 o_color;
 
+layout(binding=0) uniform sampler2D u_texture; 
+
 void main() {
-	o_color = vec4(0.5, v_instance, 0.5, 1.0);
+	o_color = texture(u_texture, v_uv);
 }

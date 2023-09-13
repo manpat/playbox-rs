@@ -16,6 +16,9 @@ struct App {
 	vertex_buffer: gfx::core::BufferName,
 	line_index_buffer: gfx::core::BufferName,
 
+	image: gfx::core::ImageName,
+	sampler: gfx::core::SamplerName,
+
 	time: f32,
 }
 
@@ -30,7 +33,7 @@ impl App {
 		let mut group = ctx.gfx.frame_encoder.command_group("START");
 		group.debug_marker("FUCK");
 
-		use gfx::resource_manager::shader::ShaderDef;
+		use gfx::resource_manager::ShaderDef;
 
 		Ok(App {
 			v_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.vs.glsl")?),
@@ -51,6 +54,37 @@ impl App {
 				let flags = 0; // not client visible
 				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[u32; 6]>(), flags);
 				buffer
+			},
+
+			image: {
+				let image = ctx.gfx.core.create_image(gfx::core::ImageType::Image2D);
+				ctx.gfx.core.allocate_and_upload_srgba8_image(image, Vec2i::new(3, 3), &[
+					100, 255, 255, 255,
+					255, 100, 255, 255,
+					255, 255, 100, 255,
+
+					255, 100, 100, 255,
+					100, 255, 100, 255,
+					100, 100, 255, 255,
+
+					255, 255, 255, 255,
+					180, 180, 180, 255,
+					100, 100, 100, 255,
+				]);
+				ctx.gfx.core.set_debug_label(image, "Test image");
+				image
+			},
+
+			sampler: {
+				use gfx::core::{FilterMode, AddressingMode};
+
+				let sampler = ctx.gfx.core.create_sampler();
+				ctx.gfx.core.set_sampler_minify_filter(sampler, FilterMode::Nearest, None);
+				ctx.gfx.core.set_sampler_magnify_filter(sampler, FilterMode::Nearest);
+				ctx.gfx.core.set_sampler_addressing_mode(sampler, AddressingMode::Clamp);
+				ctx.gfx.core.set_sampler_axis_addressing_mode(sampler, gfx::Axis::X, AddressingMode::Repeat);
+				ctx.gfx.core.set_debug_label(sampler, "Test sampler");
+				sampler
 			},
 
 			time: 0.0,
@@ -84,6 +118,13 @@ impl toybox::App for App {
 		self.time += 1.0/60.0;
 
 		let upload_id = group.upload(&self.time);
+
+		let App{sampler, image, ..} = *self;
+
+		group.execute(move |core, _| {
+			core.bind_sampler(0, sampler);
+			core.bind_image(0, image);
+		});
 		
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
