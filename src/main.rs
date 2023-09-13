@@ -12,6 +12,7 @@ struct App {
 	v_shader: gfx::resource_manager::shader::ShaderHandle,
 	f_shader: gfx::resource_manager::shader::ShaderHandle,
 	c_shader: gfx::resource_manager::shader::ShaderHandle,
+	image_shader: gfx::resource_manager::shader::ShaderHandle,
 
 	vertex_buffer: gfx::core::BufferName,
 	line_index_buffer: gfx::core::BufferName,
@@ -39,6 +40,7 @@ impl App {
 			v_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.vs.glsl")?),
 			f_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.fs.glsl")?),
 			c_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.cs.glsl")?),
+			image_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/image.cs.glsl")?),
 
 			vertex_buffer: {
 				let buffer = ctx.gfx.core.create_buffer();
@@ -46,6 +48,7 @@ impl App {
 				// TODO(pat.m): using Vec4 here to cope with std140 layout. this is an easy mistake to make
 				// how to make this better?
 				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[Vec4; 3]>(), flags);
+				ctx.gfx.core.set_debug_label(buffer, "compute vertex buffer");
 				buffer
 			},
 
@@ -53,23 +56,24 @@ impl App {
 				let buffer = ctx.gfx.core.create_buffer();
 				let flags = 0; // not client visible
 				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[u32; 6]>(), flags);
+				ctx.gfx.core.set_debug_label(buffer, "compute index buffer");
 				buffer
 			},
 
 			image: {
 				let image = ctx.gfx.core.create_image(gfx::core::ImageType::Image2D);
-				ctx.gfx.core.allocate_and_upload_srgba8_image(image, Vec2i::new(3, 3), &[
-					100, 255, 255, 255,
-					255, 100, 255, 255,
-					255, 255, 100, 255,
+				ctx.gfx.core.allocate_and_upload_rgba8_image(image, Vec2i::new(3, 3), &[
+					 20, 255, 255, 255,
+					255,  20, 255, 255,
+					255, 255,  20, 255,
 
-					255, 100, 100, 255,
-					100, 255, 100, 255,
-					100, 100, 255, 255,
+					255,  20,  20, 255,
+					 20, 255,  20, 255,
+					 20,  20, 255, 255,
 
 					255, 255, 255, 255,
-					180, 180, 180, 255,
 					100, 100, 100, 255,
+					 20,  20,  20, 255,
 				]);
 				ctx.gfx.core.set_debug_label(image, "Test image");
 				image
@@ -100,10 +104,7 @@ impl toybox::App for App {
 			* Mat4::rotate_x(PI/16.0)
 			* Mat4::rotate_y(PI/6.0 + self.time/3.0);
 
-		let projection_upload = ctx.gfx.frame_encoder.upload(&projection);
-
-		use gfx::bindings::BufferBindTargetDesc;
-		ctx.gfx.frame_encoder.global_bindings.bind_buffer(BufferBindTargetDesc::UboIndex(1), projection_upload);
+		ctx.gfx.frame_encoder.bind_global_ubo(1, &projection);
 
 		let mut group = ctx.gfx.frame_encoder.command_group("Compute time");
 		group.compute(self.c_shader)
@@ -111,20 +112,18 @@ impl toybox::App for App {
 			.ssbo(1, self.line_index_buffer)
 			.indirect(&[1u32, 1, 1]);
 
+		group.compute(self.image_shader)
+			.groups([3, 3, 1])
+			.image_rw(0, self.image);
+
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
-		group.ubo(2, self.vertex_buffer);
+		group.bind_shared_ubo(2, self.vertex_buffer);
+		group.bind_shared_sampled_image(0, self.image, self.sampler);
 
 		self.time += 1.0/60.0;
 
 		let upload_id = group.upload(&self.time);
-
-		let App{sampler, image, ..} = *self;
-
-		group.execute(move |core, _| {
-			core.bind_sampler(0, sampler);
-			core.bind_image(0, image);
-		});
 		
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
