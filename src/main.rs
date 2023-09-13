@@ -14,6 +14,7 @@ struct App {
 	c_shader: gfx::resource_manager::shader::ShaderHandle,
 
 	vertex_buffer: gfx::core::BufferName,
+	line_index_buffer: gfx::core::BufferName,
 
 	time: f32,
 }
@@ -45,6 +46,13 @@ impl App {
 				buffer
 			},
 
+			line_index_buffer: {
+				let buffer = ctx.gfx.core.create_buffer();
+				let flags = 0; // not client visible
+				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[u32; 6]>(), flags);
+				buffer
+			},
+
 			time: 0.0,
 		})
 	}
@@ -65,13 +73,9 @@ impl toybox::App for App {
 
 		let mut group = ctx.gfx.frame_encoder.command_group("Compute time");
 		group.compute(self.c_shader)
-			.ssbo(0, self.vertex_buffer);
-
-		group.execute(move |core, _rm| {
-			unsafe {
-				core.gl.MemoryBarrier(gl::UNIFORM_BARRIER_BIT);
-			}
-		});
+			.ssbo(0, self.vertex_buffer)
+			.ssbo(1, self.line_index_buffer)
+			.indirect(&[1u32, 1, 1]);
 
 		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
 		group.debug_marker("Group Time");
@@ -99,9 +103,9 @@ impl toybox::App for App {
 
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Lines)
-			.indexed(&[0u32, 1, 1, 2, 2, 3])
+			.indexed(self.line_index_buffer)
 			.elements(6)
-			.ubo(0, &1.0f32);
+			.ubo(0, &(self.time/2.0));
 
 	}
 }
