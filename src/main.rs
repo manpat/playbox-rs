@@ -34,13 +34,13 @@ impl App {
 		let mut group = ctx.gfx.frame_encoder.command_group("START");
 		group.debug_marker("FUCK");
 
-		use gfx::resource_manager::ShaderDef;
+		use gfx::resource_manager::LoadShaderRequest;
 
 		Ok(App {
-			v_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.vs.glsl")?),
-			f_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.fs.glsl")?),
-			c_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/test.cs.glsl")?),
-			image_shader: ctx.gfx.resource_manager.create_shader(ShaderDef::from("shaders/image.cs.glsl")?),
+			v_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.vs.glsl")?),
+			f_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.fs.glsl")?),
+			c_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.cs.glsl")?),
+			image_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/image.cs.glsl")?),
 
 			vertex_buffer: {
 				let buffer = ctx.gfx.core.create_buffer();
@@ -104,31 +104,39 @@ impl toybox::App for App {
 			* Mat4::rotate_x(PI/16.0)
 			* Mat4::rotate_y(PI/6.0 + self.time/3.0);
 
-		ctx.gfx.frame_encoder.bind_global_ubo(1, &projection);
+		ctx.gfx.frame_encoder.bind_global_ubo(1, &[projection]);
 
-		let mut group = ctx.gfx.frame_encoder.command_group("Compute time");
-		group.compute(self.c_shader)
+		egui::Window::new("Wahoo")
+			.resizable(true)
+			.show(&ctx.egui, |ui| {
+				ui.label("Hello egui!");
+				ui.label("Text text text!");
+				if ui.button("Huh??").clicked() {}
+			});
+
+		ctx.gfx.frame_encoder.command_group("Generate Geo")
+			.compute(self.c_shader)
 			.ssbo(0, self.vertex_buffer)
 			.ssbo(1, self.line_index_buffer)
 			.indirect(&[1u32, 1, 1]);
 
-		group.compute(self.image_shader)
+		ctx.gfx.frame_encoder.command_group("Rotate image colours")
+			.compute(self.image_shader)
 			.groups([3, 3, 1])
 			.image_rw(0, self.image);
 
-		let mut group = ctx.gfx.frame_encoder.command_group("MY Group");
-		group.debug_marker("Group Time");
+		let mut group = ctx.gfx.frame_encoder.command_group("Draw everything");
 		group.bind_shared_ubo(2, self.vertex_buffer);
 		group.bind_shared_sampled_image(0, self.image, self.sampler);
 
 		self.time += 1.0/60.0;
 
-		let upload_id = group.upload(&self.time);
+		let upload_id = group.upload(&[self.time]);
 		
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
-			.ubo(0, &0.0f32);
+			.ubo(0, &[0.0f32]);
 		
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
@@ -139,13 +147,13 @@ impl toybox::App for App {
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Points)
 			.elements(10)
-			.ubo(0, &(self.time*2.0));
+			.ubo(0, &[self.time*2.0]);
 
 		group.draw(self.v_shader, self.f_shader)
 			.primitive(gfx::command::draw::PrimitiveType::Lines)
 			.indexed(self.line_index_buffer)
 			.elements(6)
-			.ubo(0, &(self.time/2.0));
+			.ubo(0, &[self.time/2.0]);
 
 	}
 }
