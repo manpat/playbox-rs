@@ -111,7 +111,11 @@ impl toybox::App for App {
 			.show(&ctx.egui, |ui| {
 				ui.label("Hello egui!");
 				ui.label("Text text text!");
-				if ui.button("Huh??").clicked() {}
+				if ui.button("Huh??").clicked() {
+					ctx.show_debug_menu = true;
+				}
+
+				ui.checkbox(&mut ctx.show_debug_menu, "Show debug menu");
 
 				let (response, painter) = ui.allocate_painter(egui::Vec2::splat(100.0), egui::Sense::hover());
 
@@ -129,13 +133,6 @@ impl toybox::App for App {
 					r *= 0.9;
 				}
 			});
-
-		egui::Window::new("Settings")
-			.resizable(false)
-			.show(&ctx.egui, |ui| {
-				ctx.egui.settings_ui(ui);
-			});
-
 
 		ctx.gfx.frame_encoder.command_group("Generate Geo")
 			.compute(self.c_shader)
@@ -178,6 +175,12 @@ impl toybox::App for App {
 			.elements(6)
 			.ubo(0, &[self.time/2.0]);
 
+	}
+
+	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
+		ui.menu_button("Playbox", |ui| {
+			let _ = ui.button("???");
+		});
 	}
 }
 
