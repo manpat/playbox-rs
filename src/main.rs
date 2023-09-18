@@ -107,12 +107,35 @@ impl toybox::App for App {
 		ctx.gfx.frame_encoder.bind_global_ubo(1, &[projection]);
 
 		egui::Window::new("Wahoo")
-			.resizable(true)
+			.resizable(false)
 			.show(&ctx.egui, |ui| {
 				ui.label("Hello egui!");
 				ui.label("Text text text!");
 				if ui.button("Huh??").clicked() {}
+
+				let (response, painter) = ui.allocate_painter(egui::Vec2::splat(100.0), egui::Sense::hover());
+
+				let rect = response.rect;
+				let c = rect.center();
+				let mut r = rect.width() / 2.0 - 1.0;
+				let color = egui::Color32::from_gray(128);
+				let stroke = egui::Stroke::new(1.0, color);
+
+				painter.with_clip_rect(egui::Rect::from_min_size(c, rect.size() / 2.0))
+					.circle_filled(c, r, egui::Color32::RED);
+
+				for _ in 0..20 {
+					painter.circle_stroke(c, r, stroke);
+					r *= 0.9;
+				}
 			});
+
+		egui::Window::new("Settings")
+			.resizable(false)
+			.show(&ctx.egui, |ui| {
+				ctx.egui.settings_ui(ui);
+			});
+
 
 		ctx.gfx.frame_encoder.command_group("Generate Geo")
 			.compute(self.c_shader)
