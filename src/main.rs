@@ -21,10 +21,13 @@ struct App {
 	sampler: gfx::core::SamplerName,
 
 	time: f32,
+	yaw: f32,
 }
 
 impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
+		ctx.show_debug_menu = true;
+
 		ctx.gfx.frame_encoder.backbuffer_color([1.0, 0.5, 1.0]);
 
 		// ctx.audio.set_provider(MyAudioProvider::default())?;
@@ -61,9 +64,10 @@ impl App {
 			},
 
 			image: {
-				let image = ctx.gfx.core.create_image(gfx::core::ImageType::Image2D);
-				ctx.gfx.core.allocate_and_upload_rgba8_image(image, Vec2i::new(3, 3), &[
-					 20, 255, 255, 255,
+				let format = gfx::core::ImageFormat::Rgba(gfx::core::ComponentFormat::Unorm8);
+				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
+				ctx.gfx.core.upload_image(image, format, &[
+					 20u8, 255, 255, 255,
 					255,  20, 255, 255,
 					255, 255,  20, 255,
 
@@ -92,17 +96,33 @@ impl App {
 			},
 
 			time: 0.0,
+			yaw: 0.0,
 		})
 	}
 }
 
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
+		if ctx.input.button_just_down(input::MouseButton::Left) {
+			ctx.input.set_capture_mouse(true);
+		}
+
+		if ctx.input.button_just_up(input::MouseButton::Left) {
+			ctx.input.set_capture_mouse(false);
+		}
+
+		if ctx.input.button_down(input::MouseButton::Left) {
+			let dx = ctx.input.tracker.mouse_delta.map_or(0.0, |delta| delta.x);
+			self.yaw += dx * TAU / 400.0;
+			self.yaw %= TAU;
+		}
+
+
 		let aspect = ctx.gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(PI/3.0, aspect, 0.01, 100.0)
 			* Mat4::translate(Vec3::from_z(-3.0))
 			* Mat4::rotate_x(PI/16.0)
-			* Mat4::rotate_y(PI/6.0 + self.time/3.0);
+			* Mat4::rotate_y(self.yaw);
 
 		ctx.gfx.frame_encoder.bind_global_ubo(1, &[projection]);
 
