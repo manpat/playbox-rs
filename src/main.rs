@@ -67,7 +67,7 @@ impl App {
 			image: {
 				let format = gfx::core::ImageFormat::Rgba(gfx::core::ComponentFormat::Unorm8);
 				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
-				// ctx.gfx.core.upload_image(image, format, &[
+				// ctx.gfx.core.upload_image(image, None, format, &[
 				// 	 20u8, 255, 255, 255,
 				// 	255,  20, 255, 255,
 				// 	255, 255,  20, 255,
@@ -98,9 +98,8 @@ impl App {
 
 				group.execute(move |core, rm| {
 					let buffer_range = rm.upload_heap.resolve_allocation(staged_color_data);
-					core.copy_subimage_from_buffer(image,
-						Vec3i::zero(), Vec3i::splat(3),
-						format, buffer_range, rm.upload_heap.buffer_name());
+					core.copy_image_from_buffer(image, None,
+						format, rm.upload_heap.buffer_name(), buffer_range);
 				});
 
 				image
