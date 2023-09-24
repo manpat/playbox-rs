@@ -45,6 +45,7 @@ impl App {
 			c_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.cs.glsl")?),
 			image_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/image.cs.glsl")?),
 
+			// TODO(pat.m): these will go away with the temporary storage heap
 			vertex_buffer: {
 				let buffer = ctx.gfx.core.create_buffer();
 				let flags = 0; // not client visible
@@ -66,7 +67,22 @@ impl App {
 			image: {
 				let format = gfx::core::ImageFormat::Rgba(gfx::core::ComponentFormat::Unorm8);
 				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
-				ctx.gfx.core.upload_image(image, format, &[
+				// ctx.gfx.core.upload_image(image, format, &[
+				// 	 20u8, 255, 255, 255,
+				// 	255,  20, 255, 255,
+				// 	255, 255,  20, 255,
+
+				// 	255,  20,  20, 255,
+				// 	 20, 255,  20, 255,
+				// 	 20,  20, 255, 255,
+
+				// 	255, 255, 255, 255,
+				// 	100, 100, 100, 255,
+				// 	 20,  20,  20, 255,
+				// ]);
+				ctx.gfx.core.set_debug_label(image, "Test image");
+
+				let staged_color_data = group.upload(&[
 					 20u8, 255, 255, 255,
 					255,  20, 255, 255,
 					255, 255,  20, 255,
@@ -79,7 +95,14 @@ impl App {
 					100, 100, 100, 255,
 					 20,  20,  20, 255,
 				]);
-				ctx.gfx.core.set_debug_label(image, "Test image");
+
+				group.execute(move |core, rm| {
+					let buffer_range = rm.upload_heap.resolve_allocation(staged_color_data);
+					core.copy_subimage_from_buffer(image,
+						Vec3i::zero(), Vec3i::splat(3),
+						format, buffer_range, rm.upload_heap.buffer_name());
+				});
+
 				image
 			},
 
