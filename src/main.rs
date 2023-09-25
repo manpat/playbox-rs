@@ -9,16 +9,17 @@ fn main() -> anyhow::Result<()> {
 
 
 struct App {
-	v_shader: gfx::resource_manager::shader::ShaderHandle,
-	f_shader: gfx::resource_manager::shader::ShaderHandle,
-	c_shader: gfx::resource_manager::shader::ShaderHandle,
-	image_shader: gfx::resource_manager::shader::ShaderHandle,
+	v_shader: gfx::ShaderHandle,
+	f_shader: gfx::ShaderHandle,
+	c_shader: gfx::ShaderHandle,
+	image_shader: gfx::ShaderHandle,
 
-	vertex_buffer: gfx::core::BufferName,
-	line_index_buffer: gfx::core::BufferName,
+	vertex_buffer: gfx::BufferName,
+	line_index_buffer: gfx::BufferName,
 
-	image: gfx::core::ImageName,
-	sampler: gfx::core::SamplerName,
+	image: gfx::ImageName,
+	cool_image: gfx::ImageHandle,
+	sampler: gfx::SamplerName,
 
 	time: f32,
 	yaw: f32,
@@ -40,10 +41,10 @@ impl App {
 		use gfx::resource_manager::LoadShaderRequest;
 
 		Ok(App {
-			v_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.vs.glsl")?),
-			f_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.fs.glsl")?),
-			c_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/test.cs.glsl")?),
-			image_shader: ctx.gfx.resource_manager.create_shader(LoadShaderRequest::from("shaders/image.cs.glsl")?),
+			v_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.vs.glsl")?),
+			f_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.fs.glsl")?),
+			c_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.cs.glsl")?),
+			image_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/image.cs.glsl")?),
 
 			// TODO(pat.m): these will go away with the temporary storage heap
 			vertex_buffer: {
@@ -84,6 +85,8 @@ impl App {
 
 				image
 			},
+
+			cool_image: ctx.gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
 			sampler: {
 				use gfx::core::{FilterMode, AddressingMode};
@@ -184,6 +187,7 @@ impl toybox::App for App {
 			.primitive(gfx::command::draw::PrimitiveType::Triangles)
 			.elements(3)
 			.instances(8)
+			.sampled_image(0, self.cool_image, self.sampler)
 			.ubo(0, upload_id);
 
 		group.draw(self.v_shader, self.f_shader)
