@@ -67,22 +67,7 @@ impl App {
 			image: {
 				let format = gfx::core::ImageFormat::Rgba(gfx::core::ComponentFormat::Unorm8);
 				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
-				// ctx.gfx.core.upload_image(image, None, format, &[
-				// 	 20u8, 255, 255, 255,
-				// 	255,  20, 255, 255,
-				// 	255, 255,  20, 255,
-
-				// 	255,  20,  20, 255,
-				// 	 20, 255,  20, 255,
-				// 	 20,  20, 255, 255,
-
-				// 	255, 255, 255, 255,
-				// 	100, 100, 100, 255,
-				// 	 20,  20,  20, 255,
-				// ]);
-				ctx.gfx.core.set_debug_label(image, "Test image");
-
-				let staged_color_data = group.upload(&[
+				ctx.gfx.core.upload_image(image, None, format, &[
 					 20u8, 255, 255, 255,
 					255,  20, 255, 255,
 					255, 255,  20, 255,
@@ -95,12 +80,7 @@ impl App {
 					100, 100, 100, 255,
 					 20,  20,  20, 255,
 				]);
-
-				group.execute(move |core, rm| {
-					let buffer_range = rm.upload_heap.resolve_allocation(staged_color_data);
-					core.copy_image_from_buffer(image, None,
-						format, rm.upload_heap.buffer_name(), buffer_range);
-				});
+				ctx.gfx.core.set_debug_label(image, "Test image");
 
 				image
 			},
