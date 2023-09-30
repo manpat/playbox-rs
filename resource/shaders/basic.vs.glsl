@@ -1,6 +1,7 @@
 
 
 out OutVertex {
+	vec4 v_color;
 	vec2 v_uv;
 };
 
@@ -11,6 +12,7 @@ layout(binding=1) uniform P {
 
 struct Vertex {
 	vec4 pos;
+	vec4 color;
 	vec2 uv;
 };
 
@@ -24,5 +26,6 @@ void main() {
 	gl_Position = u_projection_view * vec4(vertex.pos.xyz, 1.0);
 	gl_PointSize = 10.0;
 
+	v_color = vertex.color;
 	v_uv = vertex.uv;
 }

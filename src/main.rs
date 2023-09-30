@@ -22,6 +22,8 @@ struct App {
 	cool_image: gfx::ImageHandle,
 	sampler: gfx::SamplerName,
 
+	sprites: Sprites,
+
 	time: f32,
 	yaw: f32,
 }
@@ -101,6 +103,8 @@ impl App {
 				ctx.gfx.core.set_debug_label(sampler, "Test sampler");
 				sampler
 			},
+
+			sprites: Sprites::new(&mut ctx.gfx)?,
 
 			time: 0.0,
 			yaw: 0.0,
@@ -204,13 +208,6 @@ impl toybox::App for App {
 			.ubo(0, &[self.time/2.0]);
 
 		if let Some(pos) = ctx.input.pointer_position() {
-			#[derive(Copy, Clone, Debug, Default)]
-			#[repr(C)]
-			struct BasicVertex {
-				pos: Vec3, _pad: f32,
-				uv: Vec2, _pad2: [f32; 2],
-			}
-
 			let pos = (pos * Vec2::new(aspect, 1.0)).extend(-0.5);
 
 			let projection = Mat4::ortho_aspect(1.0, aspect, 0.01, 100.0);
@@ -220,21 +217,25 @@ impl toybox::App for App {
 				BasicVertex {
 					pos: pos + rot * Vec3::new(0.0, 0.1, 0.0),
 					uv: Vec2::new(1.0, 1.0),
+					color: Color::white(), 
 					.. BasicVertex::default()
 				},
 				BasicVertex {
 					pos: pos + rot * Vec3::new(0.0,-0.1, 0.0),
 					uv: Vec2::new(0.0, 0.0),
+					color: Color::white(),
 					.. BasicVertex::default()
 				},
 				BasicVertex {
 					pos: pos + rot * Vec3::new(0.1, 0.0, 0.0),
 					uv: Vec2::new(1.0, 0.0),
+					color: Color::white(),
 					.. BasicVertex::default()
 				},
 				BasicVertex {
 					pos: pos + rot * Vec3::new(-0.1, 0.0, 0.0),
 					uv: Vec2::new(0.0, 1.0),
+					color: Color::white(),
 					.. BasicVertex::default()
 				},
 			];
@@ -246,6 +247,20 @@ impl toybox::App for App {
 				.indexed(&[0u32, 2, 3, 2, 1, 3])
 				.sampled_image(0, self.cool_image, self.sampler);
 		}
+
+
+		let up = Vec3::from_y(1.0);
+		let right = Vec3::from_y_angle(self.yaw);
+
+		self.sprites.basic(Vec3::from_z(-1.0), up, Vec3::zero(), Color::rgb(1.0, 0.0, 1.0));
+
+		self.sprites.basic(right * 0.5, up * 0.5, Vec3::from_y(1.0), Color::rgb(1.0, 0.5, 0.5));
+
+		self.sprites.basic(right * 0.5, up, Vec3::new(1.5, 0.0, 1.0), Color::rgb(0.5, 1.0, 0.5));
+		self.sprites.basic(right * 0.5, up, Vec3::new(-1.0, 0.0, 2.5), Color::rgb(0.5, 1.0, 0.5));
+		self.sprites.basic(right * 0.5, up * 0.7, Vec3::new(3.0, 0.0, -1.5), Color::rgb(0.5, 1.0, 0.5));
+
+		self.sprites.draw(&mut ctx.gfx);
 
 	}
 
@@ -288,5 +303,104 @@ impl audio::Provider for MyAudioProvider {
 		}
 
 		self.phase %= std::f64::consts::TAU;
+	}
+}
+
+
+#[derive(Copy, Clone, Debug, Default)]
+#[repr(C)]
+struct BasicVertex {
+	pos: Vec3, _pad: f32,
+	color: Color,
+	uv: Vec2, _pad2: [f32; 2],
+}
+
+#[derive(Debug)]
+struct Sprites {
+	vertices: Vec<BasicVertex>,
+	indices: Vec<u32>,
+
+	v_shader: gfx::ShaderHandle,
+	f_shader: gfx::ShaderHandle,
+
+	atlas: gfx::ImageHandle,
+	sampler: gfx::SamplerName,
+}
+
+impl Sprites {
+	fn new(gfx: &mut gfx::System) -> anyhow::Result<Sprites> {
+		Ok(Sprites {
+			vertices: Vec::new(),
+			indices: Vec::new(),
+
+			v_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
+			f_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
+
+			atlas: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+
+			sampler: {
+				let sampler = gfx.core.create_sampler();
+				gfx.core.set_sampler_minify_filter(sampler, gfx::FilterMode::Nearest, None);
+				gfx.core.set_sampler_magnify_filter(sampler, gfx::FilterMode::Nearest);
+				gfx.core.set_sampler_addressing_mode(sampler, gfx::AddressingMode::Clamp);
+				gfx.core.set_debug_label(sampler, "Sprite sampler");
+				sampler
+			},
+		})
+	}
+
+	fn draw(&mut self, gfx: &mut gfx::System) {
+		if self.vertices.is_empty() {
+			return
+		}
+
+		gfx.frame_encoder.command_group("Sprites")
+			.draw(self.v_shader, self.f_shader)
+			.elements(self.indices.len() as u32)
+			.indexed(&self.indices)
+			.ssbo(0, &self.vertices)
+			.sampled_image(0, self.atlas, self.sampler);
+
+		self.vertices.clear();
+		self.indices.clear();
+	}
+}
+
+impl Sprites {
+	fn basic(&mut self, right: Vec3, up: Vec3, pos: Vec3, color: Color) {
+		let start_index = self.vertices.len() as u32;
+		let indices = [0, 1, 2, 0, 2, 3].into_iter().map(|i| i + start_index);
+
+		let right = right/2.0;
+
+		let vertices = [
+			BasicVertex {
+				pos: pos - right,
+				uv: Vec2::new(0.0, 0.0),
+				color,
+				.. BasicVertex::default()
+			},
+			BasicVertex {
+				pos: pos - right + up,
+				uv: Vec2::new(0.0, 1.0),
+				color,
+				.. BasicVertex::default()
+			},
+			BasicVertex {
+				pos: pos + right + up,
+				uv: Vec2::new(1.0, 1.0),
+				color, 
+				.. BasicVertex::default()
+			},
+			BasicVertex {
+				pos: pos + right,
+				uv: Vec2::new(1.0, 0.0),
+				color,
+				.. BasicVertex::default()
+			},
+		];
+
+		self.vertices.extend_from_slice(&vertices);
+		self.indices.extend(indices);
 	}
 }

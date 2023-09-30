@@ -1,6 +1,7 @@
 
 
 out Vertex {
+	vec4 v_color;
 	vec2 v_uv;
 };
 
@@ -33,4 +34,6 @@ void main() {
 	gl_ClipDistance[1] = -world_pos.x + clip_dist;
 	gl_ClipDistance[2] = world_pos.y + clip_dist2;
 	gl_ClipDistance[3] = -world_pos.y + clip_dist2;
+
+	v_color = vec4(1.0);
 }
