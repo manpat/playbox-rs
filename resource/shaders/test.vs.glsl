@@ -2,7 +2,6 @@
 
 out Vertex {
 	vec2 v_uv;
-	float v_instance;
 };
 
 layout(binding=0) uniform U {
@@ -34,6 +33,4 @@ void main() {
 	gl_ClipDistance[1] = -world_pos.x + clip_dist;
 	gl_ClipDistance[2] = world_pos.y + clip_dist2;
 	gl_ClipDistance[3] = -world_pos.y + clip_dist2;
-
-	v_instance = float(gl_InstanceID) / 10.0;
 }

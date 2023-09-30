@@ -10,6 +10,7 @@ fn main() -> anyhow::Result<()> {
 
 struct App {
 	v_shader: gfx::ShaderHandle,
+	v_basic_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
 	c_shader: gfx::ShaderHandle,
 	image_shader: gfx::ShaderHandle,
@@ -42,6 +43,7 @@ impl App {
 
 		Ok(App {
 			v_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.vs.glsl")?),
+			v_basic_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/basic.vs.glsl")?),
 			f_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.fs.glsl")?),
 			c_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.cs.glsl")?),
 			image_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/image.cs.glsl")?),
@@ -66,7 +68,7 @@ impl App {
 			},
 
 			image: {
-				let format = gfx::core::ImageFormat::Rgba(gfx::core::ComponentFormat::Unorm8);
+				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
 				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
 				ctx.gfx.core.upload_image(image, None, format, &[
 					 20u8, 255, 255, 255,
@@ -89,7 +91,7 @@ impl App {
 			cool_image: ctx.gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
 			sampler: {
-				use gfx::core::{FilterMode, AddressingMode};
+				use gfx::{FilterMode, AddressingMode};
 
 				let sampler = ctx.gfx.core.create_sampler();
 				ctx.gfx.core.set_sampler_minify_filter(sampler, FilterMode::Nearest, None);
@@ -117,8 +119,8 @@ impl toybox::App for App {
 		}
 
 		if ctx.input.button_down(input::MouseButton::Left) {
-			let dx = ctx.input.tracker.mouse_delta.map_or(0.0, |delta| delta.x);
-			self.yaw += dx * TAU / 400.0;
+			let dx = ctx.input.mouse_delta().map_or(0.0, |delta| delta.x);
+			self.yaw += dx * TAU;
 			self.yaw %= TAU;
 		}
 
@@ -179,27 +181,71 @@ impl toybox::App for App {
 		let upload_id = group.upload(&[self.time]);
 		
 		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::command::draw::PrimitiveType::Triangles)
+			.primitive(gfx::PrimitiveType::Triangles)
 			.elements(3)
 			.ubo(0, &[0.0f32]);
 		
 		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::command::draw::PrimitiveType::Triangles)
+			.primitive(gfx::PrimitiveType::Triangles)
 			.elements(3)
 			.instances(8)
 			.sampled_image(0, self.cool_image, self.sampler)
 			.ubo(0, upload_id);
 
 		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::command::draw::PrimitiveType::Points)
+			.primitive(gfx::PrimitiveType::Points)
 			.elements(10)
 			.ubo(0, &[self.time*2.0]);
 
 		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::command::draw::PrimitiveType::Lines)
+			.primitive(gfx::PrimitiveType::Lines)
 			.indexed(self.line_index_buffer)
 			.elements(6)
 			.ubo(0, &[self.time/2.0]);
+
+		if let Some(pos) = ctx.input.pointer_position() {
+			#[derive(Copy, Clone, Debug, Default)]
+			#[repr(C)]
+			struct BasicVertex {
+				pos: Vec3, _pad: f32,
+				uv: Vec2, _pad2: [f32; 2],
+			}
+
+			let pos = (pos * Vec2::new(aspect, 1.0)).extend(-0.5);
+
+			let projection = Mat4::ortho_aspect(1.0, aspect, 0.01, 100.0);
+			let rot = Mat3x4::rotate_z(self.time);
+
+			let vertices = [
+				BasicVertex {
+					pos: pos + rot * Vec3::new(0.0, 0.1, 0.0),
+					uv: Vec2::new(1.0, 1.0),
+					.. BasicVertex::default()
+				},
+				BasicVertex {
+					pos: pos + rot * Vec3::new(0.0,-0.1, 0.0),
+					uv: Vec2::new(0.0, 0.0),
+					.. BasicVertex::default()
+				},
+				BasicVertex {
+					pos: pos + rot * Vec3::new(0.1, 0.0, 0.0),
+					uv: Vec2::new(1.0, 0.0),
+					.. BasicVertex::default()
+				},
+				BasicVertex {
+					pos: pos + rot * Vec3::new(-0.1, 0.0, 0.0),
+					uv: Vec2::new(0.0, 1.0),
+					.. BasicVertex::default()
+				},
+			];
+
+			group.draw(self.v_basic_shader, self.f_shader)
+				.elements(6)
+				.ubo(1, &[projection])
+				.ssbo(0, &vertices)
+				.indexed(&[0u32, 2, 3, 2, 1, 3])
+				.sampled_image(0, self.cool_image, self.sampler);
+		}
 
 	}
 

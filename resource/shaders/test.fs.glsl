@@ -1,7 +1,6 @@
 
 in Vertex {
 	vec2 v_uv;
-	float v_instance;
 };
 
 out vec4 o_color;
