@@ -23,7 +23,7 @@ void main() {
 	vec2 base_pos = u_points[gl_VertexID % u_points.length()];
 	v_uv = base_pos * 3.0 + 0.5 + vec2(u_time/2.0, sin(u_time + 3.0 * offset));
 
-	vec3 world_pos = vec3(base_pos + vec2(sin(u_time - offset*2.0), offset-0.2), offset);
+	vec3 world_pos = vec3(base_pos + vec2(sin(u_time - offset*2.0), offset+0.5), offset);
 	gl_Position = u_projection_view * vec4(world_pos, 1.0);
 	gl_PointSize = 10.0;
 

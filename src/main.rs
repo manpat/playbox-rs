@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use toybox::*;
 
 fn main() -> anyhow::Result<()> {
@@ -26,6 +28,8 @@ struct App {
 
 	time: f32,
 	yaw: f32,
+	pitch: f32,
+	pos: Vec2,
 }
 
 impl App {
@@ -108,6 +112,9 @@ impl App {
 
 			time: 0.0,
 			yaw: 0.0,
+			pitch: 0.0,
+
+			pos: Vec2::zero(),
 		})
 	}
 }
@@ -123,17 +130,44 @@ impl toybox::App for App {
 		}
 
 		if ctx.input.button_down(input::MouseButton::Left) {
-			let dx = ctx.input.mouse_delta().map_or(0.0, |delta| delta.x);
+			let (dx, dy) = ctx.input.mouse_delta().map_or((0.0, 0.0), Vec2::to_tuple);
 			self.yaw += dx * TAU;
 			self.yaw %= TAU;
+
+			let pitch_limit = PI/2.0;
+			self.pitch = (self.pitch - 3.0*dy).clamp(-pitch_limit, pitch_limit);
+		}
+
+		let right = Vec2::from_angle(self.yaw);
+		let forward = -right.perp();
+		let speed = match ctx.input.button_down(input::Key::LShift) {
+			true => 4.0 / 60.0,
+			false => 2.0 / 60.0,
+		};
+
+		if ctx.input.button_down(input::Key::W) {
+			self.pos += forward * speed;
+		}
+
+		if ctx.input.button_down(input::Key::S) {
+			self.pos -= forward * speed;
+		}
+
+		if ctx.input.button_down(input::Key::D) {
+			self.pos += right * speed;
+		}
+
+		if ctx.input.button_down(input::Key::A) {
+			self.pos -= right * speed;
 		}
 
 
 		let aspect = ctx.gfx.backbuffer_aspect();
-		let projection = Mat4::perspective(PI/3.0, aspect, 0.01, 100.0)
-			* Mat4::translate(Vec3::from_z(-3.0))
-			* Mat4::rotate_x(PI/16.0)
-			* Mat4::rotate_y(self.yaw);
+		let projection = Mat4::perspective(PI/2.0, aspect, 0.01, 100.0)
+			* Mat4::translate(Vec3::from_z(-0.0))
+			* Mat4::rotate_x(self.pitch)
+			* Mat4::rotate_y(self.yaw)
+			* Mat4::translate(-Vec3::from_y(0.5) - self.pos.to_x0y());
 
 		ctx.gfx.frame_encoder.bind_global_ubo(1, &[projection]);
 
@@ -207,7 +241,9 @@ impl toybox::App for App {
 			.elements(6)
 			.ubo(0, &[self.time/2.0]);
 
-		if let Some(pos) = ctx.input.pointer_position() {
+		if let Some(pos) = ctx.input.pointer_position()
+			&& !ctx.input.button_down(input::MouseButton::Left)
+		{
 			let pos = (pos * Vec2::new(aspect, 1.0)).extend(-0.5);
 
 			let projection = Mat4::ortho_aspect(1.0, aspect, 0.01, 100.0);
@@ -251,6 +287,8 @@ impl toybox::App for App {
 
 		let up = Vec3::from_y(1.0);
 		let right = Vec3::from_y_angle(self.yaw);
+
+		self.sprites.basic(Vec3::from_x(10.0), Vec3::from_z(-10.0), Vec3::from_z(5.0), Color::rgb(0.5, 0.5, 0.5));
 
 		self.sprites.basic(Vec3::from_z(-1.0), up, Vec3::zero(), Color::rgb(1.0, 0.0, 1.0));
 
