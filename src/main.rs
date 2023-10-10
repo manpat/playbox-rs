@@ -20,7 +20,12 @@ struct App {
 	vertex_buffer: gfx::BufferName,
 	line_index_buffer: gfx::BufferName,
 
+	toy_vertex_buffer: gfx::BufferName,
+	toy_index_buffer: gfx::BufferName,
+	toy_element_count: u32,
+
 	image: gfx::ImageName,
+	blank_image: gfx::ImageName,
 	cool_image: gfx::ImageHandle,
 	sampler: gfx::SamplerName,
 
@@ -30,6 +35,8 @@ struct App {
 	yaw: f32,
 	pitch: f32,
 	pos: Vec2,
+
+	// show_sprites: bool,
 }
 
 impl App {
@@ -39,6 +46,44 @@ impl App {
 		ctx.gfx.frame_encoder.backbuffer_color([1.0, 0.5, 1.0]);
 
 		// ctx.audio.set_provider(MyAudioProvider::default())?;
+
+		let toy_vertex_buffer;
+		let toy_index_buffer;
+		let toy_element_count;
+
+		{
+			let project_path = ctx.gfx.resource_manager.resource_path().join("toys/basic.toy");
+			let project_data = std::fs::read(&project_path)?;
+			let project = toy::load(&project_data)?;
+
+			let mut vertex_data = Vec::new();
+			let mut index_data = Vec::new();
+
+			for entity in project.entities() {
+				let Some(mesh) = entity.mesh() else { continue };
+				let transform = Mat3x4::scale_translate(Vec3::splat(0.05), Vec3::from_y(0.3)) * entity.transform();
+
+				let vertices = std::iter::zip(&mesh.positions, &mesh.color_layers[0].data)
+					.map(|(&pos, &color)| {
+						let pos = transform * pos;
+						BasicVertex { pos, color: Color::from(color), .. Default::default() }
+					});
+
+				let index_start = vertex_data.len() as u32;
+				let indices = mesh.indices.iter().map(|idx| *idx as u32 + index_start);
+
+				vertex_data.extend(vertices);
+				index_data.extend(indices);
+			}
+
+			toy_vertex_buffer = ctx.gfx.core.create_buffer();
+			toy_index_buffer = ctx.gfx.core.create_buffer();
+			toy_element_count = index_data.len() as u32;
+
+			ctx.gfx.core.upload_immutable_buffer_immediate(toy_vertex_buffer, &vertex_data);
+			ctx.gfx.core.upload_immutable_buffer_immediate(toy_index_buffer, &index_data);
+		}
+
 
 		dbg!(&ctx.gfx.core.capabilities());
 
@@ -73,6 +118,10 @@ impl App {
 				buffer
 			},
 
+			toy_vertex_buffer,
+			toy_index_buffer,
+			toy_element_count,
+
 			image: {
 				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
 				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
@@ -91,6 +140,14 @@ impl App {
 				]);
 				ctx.gfx.core.set_debug_label(image, "Test image");
 
+				image
+			},
+
+			blank_image: {
+				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
+				let image = ctx.gfx.core.create_image_2d(format, Vec2i::splat(1));
+				ctx.gfx.core.upload_image(image, None, format, &[255u8, 255, 255, 255]);
+				ctx.gfx.core.set_debug_label(image, "Blank white image");
 				image
 			},
 
@@ -114,7 +171,7 @@ impl App {
 			yaw: 0.0,
 			pitch: 0.0,
 
-			pos: Vec2::zero(),
+			pos: Vec2::from_y(3.0),
 		})
 	}
 }
@@ -163,7 +220,7 @@ impl toybox::App for App {
 
 
 		let aspect = ctx.gfx.backbuffer_aspect();
-		let projection = Mat4::perspective(PI/2.0, aspect, 0.01, 100.0)
+		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0)
 			* Mat4::translate(Vec3::from_z(-0.0))
 			* Mat4::rotate_x(self.pitch)
 			* Mat4::rotate_y(self.yaw)
@@ -218,28 +275,34 @@ impl toybox::App for App {
 
 		let upload_id = group.upload(&[self.time]);
 		
-		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::PrimitiveType::Triangles)
-			.elements(3)
-			.ubo(0, &[0.0f32]);
+		// group.draw(self.v_shader, self.f_shader)
+		// 	.primitive(gfx::PrimitiveType::Triangles)
+		// 	.elements(3)
+		// 	.ubo(0, &[0.0f32]);
 		
-		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::PrimitiveType::Triangles)
-			.elements(3)
-			.instances(8)
-			.sampled_image(0, self.cool_image, self.sampler)
-			.ubo(0, upload_id);
+		// group.draw(self.v_shader, self.f_shader)
+		// 	.primitive(gfx::PrimitiveType::Triangles)
+		// 	.elements(3)
+		// 	.instances(8)
+		// 	.sampled_image(0, self.cool_image, self.sampler)
+		// 	.ubo(0, upload_id);
 
-		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::PrimitiveType::Points)
-			.elements(10)
-			.ubo(0, &[self.time*2.0]);
+		// group.draw(self.v_shader, self.f_shader)
+		// 	.primitive(gfx::PrimitiveType::Points)
+		// 	.elements(10)
+		// 	.ubo(0, &[self.time*2.0]);
 
-		group.draw(self.v_shader, self.f_shader)
-			.primitive(gfx::PrimitiveType::Lines)
-			.indexed(self.line_index_buffer)
-			.elements(6)
-			.ubo(0, &[self.time/2.0]);
+		// group.draw(self.v_shader, self.f_shader)
+		// 	.primitive(gfx::PrimitiveType::Lines)
+		// 	.indexed(self.line_index_buffer)
+		// 	.elements(6)
+		// 	.ubo(0, &[self.time/2.0]);
+
+		group.draw(self.v_basic_shader, self.f_shader)
+			.indexed(self.toy_index_buffer)
+			.ssbo(0, self.toy_vertex_buffer)
+			.sampled_image(0, self.blank_image, self.sampler)
+			.elements(self.toy_element_count);
 
 		if let Some(pos) = ctx.input.pointer_position()
 			&& !ctx.input.button_down(input::MouseButton::Left)
@@ -290,16 +353,15 @@ impl toybox::App for App {
 
 		self.sprites.basic(Vec3::from_x(10.0), Vec3::from_z(-10.0), Vec3::from_z(5.0), Color::rgb(0.5, 0.5, 0.5));
 
-		self.sprites.basic(Vec3::from_z(-1.0), up, Vec3::zero(), Color::rgb(1.0, 0.0, 1.0));
+		// self.sprites.basic(Vec3::from_z(-1.0), up, Vec3::zero(), Color::rgb(1.0, 0.0, 1.0));
 
-		self.sprites.basic(right * 0.5, up * 0.5, Vec3::from_y(1.0), Color::rgb(1.0, 0.5, 0.5));
+		// self.sprites.basic(right * 0.5, up * 0.5, Vec3::from_y(1.0), Color::rgb(1.0, 0.5, 0.5));
 
-		self.sprites.basic(right * 0.5, up, Vec3::new(1.5, 0.0, 1.0), Color::rgb(0.5, 1.0, 0.5));
-		self.sprites.basic(right * 0.5, up, Vec3::new(-1.0, 0.0, 2.5), Color::rgb(0.5, 1.0, 0.5));
-		self.sprites.basic(right * 0.5, up * 0.7, Vec3::new(3.0, 0.0, -1.5), Color::rgb(0.5, 1.0, 0.5));
+		// self.sprites.basic(right * 0.5, up, Vec3::new(1.5, 0.0, 1.0), Color::rgb(0.5, 1.0, 0.5));
+		// self.sprites.basic(right * 0.5, up, Vec3::new(-1.0, 0.0, 2.5), Color::rgb(0.5, 1.0, 0.5));
+		// self.sprites.basic(right * 0.5, up * 0.7, Vec3::new(3.0, 0.0, -1.5), Color::rgb(0.5, 1.0, 0.5));
 
 		self.sprites.draw(&mut ctx.gfx);
-
 	}
 
 	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
