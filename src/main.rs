@@ -2,6 +2,8 @@
 
 use toybox::*;
 
+mod world;
+
 fn main() -> anyhow::Result<()> {
 	// std::env::set_var("RUST_BACKTRACE", "1");
 
@@ -30,6 +32,8 @@ struct App {
 	sampler: gfx::SamplerName,
 
 	sprites: Sprites,
+
+	world: world::World,
 
 	time: f32,
 	yaw: f32,
@@ -61,7 +65,7 @@ impl App {
 
 			for entity in project.entities() {
 				let Some(mesh) = entity.mesh() else { continue };
-				let transform = Mat3x4::scale_translate(Vec3::splat(0.05), Vec3::from_y(0.3)) * entity.transform();
+				let transform = Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)) * entity.transform();
 
 				let vertices = std::iter::zip(&mesh.positions, &mesh.color_layers[0].data)
 					.map(|(&pos, &color)| {
@@ -167,6 +171,68 @@ impl App {
 
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
+			world: {
+				let mut world = world::World::new();
+
+				world.new_object(Vec3::new(-1.0, 0.0, -1.0), Vec2::splat(1.0), Color::white());
+				world.new_object(Vec3::new( 2.0, 0.0, -2.0), Vec2::new(1.0, 2.0), (0.2, 0.5, 0.8));
+
+				let obj_0 = world.new_object(Vec3::new( 0.0, 0.0, -3.0), Vec2::new(1.0, 0.8), (0.8, 0.2, 0.8));
+				let target_obj = world.new_object(Vec3::new( -3.0, 0.0, 2.0), Vec2::new(0.2, 0.5), (0.8, 0.9, 0.4));
+
+				world.attach_actor(obj_0, |ctx| async move {
+					loop {
+						ctx.frame().await;
+
+						let pos = ctx.get_pos(ctx.key()).await;
+						let target = ctx.get_pos(target_obj).await;
+
+						let diff = target - pos;
+						if diff.length() > 0.5 {
+							ctx.set_pos(pos + diff * 1.0/60.0).await;
+						}
+					}
+				});
+
+				world.attach_actor(target_obj, |ctx| async move {
+					use std::time::Duration;
+
+					async fn move_to(ctx: &world::ActorContext, target: Vec3) {
+						let mut pos = ctx.get_pos(ctx.key()).await;
+
+						loop {
+							let diff = target - pos;
+							if diff.length() < 0.1 {
+								break
+							}
+
+							pos += diff.normalize() * 2.0/60.0;
+							ctx.set_pos(pos).await;
+							ctx.frame().await;
+						}
+					}
+
+					tokio::select! {
+						_ = ctx.interact() => {}
+						_ = tokio::time::sleep(Duration::from_secs(3)) => {}
+					}
+
+					loop {
+						move_to(&ctx, Vec3::new(3.0, 0.0, 1.0)).await;
+						ctx.interact().await;
+
+						move_to(&ctx, Vec3::new(-1.0, 0.0, 2.0)).await;
+						ctx.interact().await;
+
+						move_to(&ctx, Vec3::new(-3.0, 0.0, 0.0)).await;
+						ctx.interact().await;
+					}
+
+				});
+
+				world
+			},
+
 			time: 0.0,
 			yaw: 0.0,
 			pitch: 0.0,
@@ -178,6 +244,8 @@ impl App {
 
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
+		self.world.update();
+
 		if ctx.input.button_just_down(input::MouseButton::Left) {
 			ctx.input.set_capture_mouse(true);
 		}
@@ -221,7 +289,6 @@ impl toybox::App for App {
 
 		let aspect = ctx.gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0)
-			* Mat4::translate(Vec3::from_z(-0.0))
 			* Mat4::rotate_x(self.pitch)
 			* Mat4::rotate_y(self.yaw)
 			* Mat4::translate(-Vec3::from_y(0.5) - self.pos.to_x0y());
@@ -272,32 +339,7 @@ impl toybox::App for App {
 		group.bind_shared_sampled_image(0, self.image, self.sampler);
 
 		self.time += 1.0/60.0;
-
-		let upload_id = group.upload(&[self.time]);
 		
-		// group.draw(self.v_shader, self.f_shader)
-		// 	.primitive(gfx::PrimitiveType::Triangles)
-		// 	.elements(3)
-		// 	.ubo(0, &[0.0f32]);
-		
-		// group.draw(self.v_shader, self.f_shader)
-		// 	.primitive(gfx::PrimitiveType::Triangles)
-		// 	.elements(3)
-		// 	.instances(8)
-		// 	.sampled_image(0, self.cool_image, self.sampler)
-		// 	.ubo(0, upload_id);
-
-		// group.draw(self.v_shader, self.f_shader)
-		// 	.primitive(gfx::PrimitiveType::Points)
-		// 	.elements(10)
-		// 	.ubo(0, &[self.time*2.0]);
-
-		// group.draw(self.v_shader, self.f_shader)
-		// 	.primitive(gfx::PrimitiveType::Lines)
-		// 	.indexed(self.line_index_buffer)
-		// 	.elements(6)
-		// 	.ubo(0, &[self.time/2.0]);
-
 		group.draw(self.v_basic_shader, self.f_shader)
 			.indexed(self.toy_index_buffer)
 			.ssbo(0, self.toy_vertex_buffer)
@@ -351,15 +393,25 @@ impl toybox::App for App {
 		let up = Vec3::from_y(1.0);
 		let right = Vec3::from_y_angle(self.yaw);
 
+		// Ground
 		self.sprites.basic(Vec3::from_x(10.0), Vec3::from_z(-10.0), Vec3::from_z(5.0), Color::rgb(0.5, 0.5, 0.5));
 
-		// self.sprites.basic(Vec3::from_z(-1.0), up, Vec3::zero(), Color::rgb(1.0, 0.0, 1.0));
+		for (key, &world::Object{pos, size, color, ..}) in self.world.objects.iter() {
+			self.sprites.basic(right * size.x, up * size.y, pos, color);
+		}
 
-		// self.sprites.basic(right * 0.5, up * 0.5, Vec3::from_y(1.0), Color::rgb(1.0, 0.5, 0.5));
 
-		// self.sprites.basic(right * 0.5, up, Vec3::new(1.5, 0.0, 1.0), Color::rgb(0.5, 1.0, 0.5));
-		// self.sprites.basic(right * 0.5, up, Vec3::new(-1.0, 0.0, 2.5), Color::rgb(0.5, 1.0, 0.5));
-		// self.sprites.basic(right * 0.5, up * 0.7, Vec3::new(3.0, 0.0, -1.5), Color::rgb(0.5, 1.0, 0.5));
+		let eye = Vec3::from_y(0.5) + self.pos.to_x0y();
+		let dir = Vec3::from_y_angle(self.yaw - PI/2.0);
+
+		if let Some(key) = self.world.nearest_interactive(eye, dir) {
+			let &world::Object{pos, size, ..} = &self.world.objects[key];
+			self.sprites.basic(right * 0.1, up * 0.1, pos + up * (size.y + 0.05), Color::white());
+
+			if ctx.input.button_just_down(input::Key::Space) || ctx.input.button_just_down(input::MouseButton::Right) {
+				self.world.interact(key);
+			}
+		}
 
 		self.sprites.draw(&mut ctx.gfx);
 	}

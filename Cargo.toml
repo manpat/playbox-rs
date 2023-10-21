@@ -5,7 +5,12 @@ edition = "2021"
 
 
 [dependencies]
-# smol = "1.2.*"
+slotmap = "1.0.6"
+
+
+[dependencies.tokio]
+version = "1.33.0"
+features = ["sync", "time", "rt", "rt-multi-thread", "macros"]
 
 
 
