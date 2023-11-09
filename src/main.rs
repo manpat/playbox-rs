@@ -16,11 +16,7 @@ struct App {
 	v_shader: gfx::ShaderHandle,
 	v_basic_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
-	c_shader: gfx::ShaderHandle,
 	image_shader: gfx::ShaderHandle,
-
-	vertex_buffer: gfx::BufferName,
-	line_index_buffer: gfx::BufferName,
 
 	toy_vertex_buffer: gfx::BufferName,
 	toy_index_buffer: gfx::BufferName,
@@ -123,27 +119,7 @@ impl App {
 			v_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.vs.glsl")?),
 			v_basic_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/basic.vs.glsl")?),
 			f_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.fs.glsl")?),
-			c_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.cs.glsl")?),
 			image_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/image.cs.glsl")?),
-
-			// TODO(pat.m): these will go away with the temporary storage heap
-			vertex_buffer: {
-				let buffer = ctx.gfx.core.create_buffer();
-				let flags = 0; // not client visible
-				// TODO(pat.m): using Vec4 here to cope with std140 layout. this is an easy mistake to make
-				// how to make this better?
-				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[Vec4; 3]>(), flags);
-				ctx.gfx.core.set_debug_label(buffer, "compute vertex buffer");
-				buffer
-			},
-
-			line_index_buffer: {
-				let buffer = ctx.gfx.core.create_buffer();
-				let flags = 0; // not client visible
-				ctx.gfx.core.allocate_buffer_storage(buffer, std::mem::size_of::<[u32; 6]>(), flags);
-				ctx.gfx.core.set_debug_label(buffer, "compute index buffer");
-				buffer
-			},
 
 			toy_vertex_buffer,
 			toy_index_buffer,
@@ -286,19 +262,12 @@ impl toybox::App for App {
 				}
 			});
 
-		ctx.gfx.frame_encoder.command_group("Generate Geo")
-			.compute(self.c_shader)
-			.ssbo(0, self.vertex_buffer)
-			.ssbo(1, self.line_index_buffer)
-			.indirect(&[1u32, 1, 1]);
-
 		ctx.gfx.frame_encoder.command_group("Rotate image colours")
 			.compute(self.image_shader)
 			.groups([3, 3, 1])
 			.image_rw(0, self.image);
 
 		let mut group = ctx.gfx.frame_encoder.command_group("Draw everything");
-		group.bind_shared_ubo(2, self.vertex_buffer);
 		group.bind_shared_sampled_image(0, self.image, self.sampler);
 
 		self.time += 1.0/60.0;
@@ -348,8 +317,7 @@ impl toybox::App for App {
 				.elements(6)
 				.ubo(1, &[projection])
 				.ssbo(0, &vertices)
-				.indexed(&[0u32, 2, 3, 2, 1, 3])
-				.sampled_image(0, self.cool_image, self.sampler);
+				.indexed(&[0u32, 2, 3, 2, 1, 3]);
 		}
 
 
