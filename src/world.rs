@@ -210,3 +210,71 @@ impl ActorContext {
 		rx.await.unwrap()
 	}
 }
+
+
+
+
+
+pub fn make_test_world() -> World {
+	let mut world = World::new();
+
+	world.new_object(Vec3::new(-1.0, 0.0, -1.0), Vec2::splat(1.0), Color::white());
+	world.new_object(Vec3::new( 2.0, 0.0, -2.0), Vec2::new(1.0, 2.0), (0.2, 0.5, 0.8));
+
+	let obj_0 = world.new_object(Vec3::new( 0.0, 0.0, -3.0), Vec2::new(1.0, 0.8), (0.8, 0.2, 0.8));
+	let target_obj = world.new_object(Vec3::new( -3.0, 0.0, 2.0), Vec2::new(0.2, 0.5), (0.8, 0.9, 0.4));
+
+	world.attach_actor(obj_0, |ctx| async move {
+		let mut pos = ctx.get_pos(ctx.key()).await;
+
+		loop {
+			ctx.frame().await;
+
+			let target = ctx.get_pos(target_obj).await;
+
+			let diff = target - pos;
+			if diff.length() > 0.5 {
+				pos += diff * 1.0/60.0;
+				ctx.set_pos(pos).await;
+			}
+		}
+	});
+
+	world.attach_actor(target_obj, |ctx| async move {
+		use std::time::Duration;
+
+		async fn move_to(ctx: &ActorContext, target: Vec3) {
+			let mut pos = ctx.get_pos(ctx.key()).await;
+
+			loop {
+				let diff = target - pos;
+				if diff.length() < 0.1 {
+					break
+				}
+
+				pos += diff.normalize() * 2.0/60.0;
+				ctx.set_pos(pos).await;
+				ctx.frame().await;
+			}
+		}
+
+		tokio::select! {
+			_ = ctx.interact() => {}
+			_ = tokio::time::sleep(Duration::from_secs(3)) => {}
+		}
+
+		loop {
+			move_to(&ctx, Vec3::new(3.0, 0.0, 1.0)).await;
+			ctx.interact().await;
+
+			move_to(&ctx, Vec3::new(-1.0, 0.0, 2.0)).await;
+			ctx.interact().await;
+
+			move_to(&ctx, Vec3::new(-3.0, 0.0, 0.0)).await;
+			ctx.interact().await;
+		}
+
+	});
+
+	world
+}
