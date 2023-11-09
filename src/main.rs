@@ -27,6 +27,8 @@ struct App {
 	cool_image: gfx::ImageHandle,
 	sampler: gfx::SamplerName,
 
+	test_resize_image: gfx::ImageHandle,
+
 	sprites: Sprites,
 
 	world: world::World,
@@ -47,12 +49,14 @@ impl App {
 
 		// ctx.audio.set_provider(MyAudioProvider::default())?;
 
+		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
+
 		let toy_vertex_buffer;
 		let toy_index_buffer;
 		let toy_element_count;
 
 		{
-			let project_path = ctx.gfx.resource_manager.resource_path().join("toys/basic.toy");
+			let project_path = resource_manager.resource_path().join("toys/basic.toy");
 			let project_data = std::fs::read(&project_path)?;
 			let project = toy::load(&project_data)?;
 
@@ -98,28 +102,23 @@ impl App {
 				index_data.extend(indices);
 			}
 
-			toy_vertex_buffer = ctx.gfx.core.create_buffer();
-			toy_index_buffer = ctx.gfx.core.create_buffer();
+			toy_vertex_buffer = core.create_buffer();
+			toy_index_buffer = core.create_buffer();
 			toy_element_count = index_data.len() as u32;
 
-			ctx.gfx.core.upload_immutable_buffer_immediate(toy_vertex_buffer, &vertex_data);
-			ctx.gfx.core.upload_immutable_buffer_immediate(toy_index_buffer, &index_data);
+			core.upload_immutable_buffer_immediate(toy_vertex_buffer, &vertex_data);
+			core.upload_immutable_buffer_immediate(toy_index_buffer, &index_data);
 		}
 
 
-		dbg!(&ctx.gfx.core.capabilities());
-		dbg!(ctx.gfx.resource_manager.resource_path());
-
-		let mut group = ctx.gfx.frame_encoder.command_group("START");
-		group.debug_marker("FUCK");
-
-		use gfx::resource_manager::LoadShaderRequest;
+		dbg!(&core.capabilities());
+		dbg!(resource_manager.resource_path());
 
 		Ok(App {
-			v_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.vs.glsl")?),
-			v_basic_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/basic.vs.glsl")?),
-			f_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/test.fs.glsl")?),
-			image_shader: ctx.gfx.resource_manager.request(LoadShaderRequest::from("shaders/image.cs.glsl")?),
+			v_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.vs.glsl")?),
+			v_basic_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
+			f_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
+			image_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/image.cs.glsl")?),
 
 			toy_vertex_buffer,
 			toy_index_buffer,
@@ -127,8 +126,8 @@ impl App {
 
 			image: {
 				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
-				let image = ctx.gfx.core.create_image_2d(format, Vec2i::new(3, 3));
-				ctx.gfx.core.upload_image(image, None, format, &[
+				let image = core.create_image_2d(format, Vec2i::new(3, 3));
+				core.upload_image(image, None, format, &[
 					 20u8, 255, 255, 255,
 					255,  20, 255, 255,
 					255, 255,  20, 255,
@@ -141,30 +140,31 @@ impl App {
 					100, 100, 100, 255,
 					 20,  20,  20, 255,
 				]);
-				ctx.gfx.core.set_debug_label(image, "Test image");
+				core.set_debug_label(image, "Test image");
 
 				image
 			},
 
 			blank_image: {
 				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
-				let image = ctx.gfx.core.create_image_2d(format, Vec2i::splat(1));
-				ctx.gfx.core.upload_image(image, None, format, &[255u8, 255, 255, 255]);
-				ctx.gfx.core.set_debug_label(image, "Blank white image");
+				let image = core.create_image_2d(format, Vec2i::splat(1));
+				core.upload_image(image, None, format, &[255u8, 255, 255, 255]);
+				core.set_debug_label(image, "Blank white image");
 				image
 			},
 
-			cool_image: ctx.gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+			cool_image: resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+			test_resize_image: resource_manager.request(gfx::CreateImageRequest::rendertarget("test resize", gfx::ImageFormat::Srgba8)),
 
 			sampler: {
 				use gfx::{FilterMode, AddressingMode};
 
-				let sampler = ctx.gfx.core.create_sampler();
-				ctx.gfx.core.set_sampler_minify_filter(sampler, FilterMode::Nearest, None);
-				ctx.gfx.core.set_sampler_magnify_filter(sampler, FilterMode::Nearest);
-				ctx.gfx.core.set_sampler_addressing_mode(sampler, AddressingMode::Clamp);
-				ctx.gfx.core.set_sampler_axis_addressing_mode(sampler, gfx::Axis::X, AddressingMode::Repeat);
-				ctx.gfx.core.set_debug_label(sampler, "Test sampler");
+				let sampler = core.create_sampler();
+				core.set_sampler_minify_filter(sampler, FilterMode::Nearest, None);
+				core.set_sampler_magnify_filter(sampler, FilterMode::Nearest);
+				core.set_sampler_addressing_mode(sampler, AddressingMode::Clamp);
+				core.set_sampler_axis_addressing_mode(sampler, gfx::Axis::X, AddressingMode::Repeat);
+				core.set_debug_label(sampler, "Test sampler");
 				sampler
 			},
 
