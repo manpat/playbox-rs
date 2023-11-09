@@ -27,7 +27,8 @@ struct App {
 	cool_image: gfx::ImageHandle,
 	sampler: gfx::SamplerName,
 
-	test_resize_image: gfx::ImageHandle,
+	fbo: gfx::FramebufferName,
+	test_rt: gfx::ImageHandle,
 
 	sprites: Sprites,
 
@@ -154,7 +155,14 @@ impl App {
 			},
 
 			cool_image: resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
-			test_resize_image: resource_manager.request(gfx::CreateImageRequest::rendertarget("test resize", gfx::ImageFormat::Srgba8)),
+
+			fbo: {
+				let name = core.create_framebuffer();
+				core.set_debug_label(name, "test fbo");
+				name
+			},
+
+			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Srgba8)),
 
 			sampler: {
 				use gfx::{FilterMode, AddressingMode};
@@ -245,6 +253,10 @@ impl toybox::App for App {
 
 				ui.checkbox(&mut ctx.show_debug_menu, "Show debug menu");
 
+				if let Some(name) = ctx.gfx.resource_manager.images.get_name(self.test_rt) {
+					egui_backend::show_image_name(ui, name);
+				}
+
 				let (response, painter) = ui.allocate_painter(egui::Vec2::splat(100.0), egui::Sense::hover());
 
 				let rect = response.rect;
@@ -272,11 +284,26 @@ impl toybox::App for App {
 
 		self.time += 1.0/60.0;
 		
+		let fbo = self.fbo;
+		let test_rt = self.test_rt;
+		group.execute(move |core, rm| {
+			let test_rt_name = rm.images.get_name(test_rt).unwrap();
+
+			core.set_framebuffer_attachment(fbo, gfx::FramebufferAttachment::Color(0), test_rt_name);
+
+			core.clear_framebuffer_color_buffer(fbo, 0, [0.0; 4]);
+			core.bind_framebuffer(fbo);
+		});
+
 		group.draw(self.v_basic_shader, self.f_shader)
 			.indexed(self.toy_index_buffer)
 			.ssbo(0, self.toy_vertex_buffer)
 			.sampled_image(0, self.blank_image, self.sampler)
 			.elements(self.toy_element_count);
+
+		group.execute(move |core, _| {
+			core.bind_framebuffer(None);
+		});
 
 		if let Some(pos) = ctx.input.pointer_position()
 			&& !ctx.input.button_down(input::MouseButton::Left)
