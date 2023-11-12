@@ -274,22 +274,21 @@ impl toybox::App for App {
 		let test_rt = self.test_rt;
 		let depth_rt = self.depth_rt;
 		group.execute(move |core, rm| {
-			let fbo = rm.resolve_framebuffer(core, &[test_rt, depth_rt]);
+			if let Some(name) = rm.images.get_name(test_rt) {
+				core.clear_image_to_default(name);
+			}
 
-			core.clear_framebuffer_color_buffer(fbo, 0, [0.3, 0.6, 0.6, 1.0]);
-			core.clear_framebuffer_depth_stencil(fbo, 1.0, 0);
-			core.bind_framebuffer(fbo);
+			if let Some(name) = rm.images.get_name(depth_rt) {
+				core.clear_image_to_default(name);
+			}
 		});
 
 		group.draw(self.v_basic_shader, self.f_shader)
 			.indexed(self.toy_index_buffer)
 			.ssbo(0, self.toy_vertex_buffer)
 			.sampled_image(0, self.blank_image, self.sampler)
-			.elements(self.toy_element_count);
-
-		group.execute(move |core, _| {
-			core.bind_framebuffer(None);
-		});
+			.elements(self.toy_element_count)
+			.rendertargets(&[self.test_rt, self.depth_rt]);
 
 		if let Some(pos) = ctx.input.pointer_position()
 			&& !ctx.input.button_down(input::MouseButton::Left)
