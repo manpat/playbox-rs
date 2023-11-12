@@ -13,7 +13,6 @@ fn main() -> anyhow::Result<()> {
 
 
 struct App {
-	v_shader: gfx::ShaderHandle,
 	v_basic_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
 	image_shader: gfx::ShaderHandle,
@@ -24,11 +23,10 @@ struct App {
 
 	image: gfx::ImageName,
 	blank_image: gfx::ImageName,
-	cool_image: gfx::ImageHandle,
 	sampler: gfx::SamplerName,
 
-	fbo: gfx::FramebufferName,
 	test_rt: gfx::ImageHandle,
+	depth_rt: gfx::ImageHandle,
 
 	sprites: Sprites,
 
@@ -115,7 +113,6 @@ impl App {
 		}
 
 		Ok(App {
-			v_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.vs.glsl")?),
 			v_basic_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
 			f_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
 			image_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/image.cs.glsl")?),
@@ -153,15 +150,8 @@ impl App {
 				image
 			},
 
-			cool_image: resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
-
-			fbo: {
-				let name = core.create_framebuffer();
-				core.set_debug_label(name, "test fbo");
-				name
-			},
-
 			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Srgba8)),
+			depth_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth)),
 
 			sampler: {
 				use gfx::{FilterMode, AddressingMode};
@@ -281,14 +271,13 @@ impl toybox::App for App {
 
 		self.time += 1.0/60.0;
 		
-		let fbo = self.fbo;
 		let test_rt = self.test_rt;
+		let depth_rt = self.depth_rt;
 		group.execute(move |core, rm| {
-			let test_rt_name = rm.images.get_name(test_rt).unwrap();
+			let fbo = rm.resolve_framebuffer(core, &[test_rt, depth_rt]);
 
-			core.set_framebuffer_attachment(fbo, gfx::FramebufferAttachment::Color(0), test_rt_name);
-
-			core.clear_framebuffer_color_buffer(fbo, 0, [0.0; 4]);
+			core.clear_framebuffer_color_buffer(fbo, 0, [0.3, 0.6, 0.6, 1.0]);
+			core.clear_framebuffer_depth_stencil(fbo, 1.0, 0);
 			core.bind_framebuffer(fbo);
 		});
 
