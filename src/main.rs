@@ -48,6 +48,9 @@ impl App {
 
 		ctx.gfx.frame_encoder.backbuffer_color([1.0, 0.5, 1.0]);
 
+		dbg!(&ctx.gfx.core.capabilities());
+		dbg!(ctx.resource_root_path());
+
 		// ctx.audio.set_provider(MyAudioProvider::default())?;
 
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
@@ -110,10 +113,6 @@ impl App {
 			core.upload_immutable_buffer_immediate(toy_vertex_buffer, &vertex_data);
 			core.upload_immutable_buffer_immediate(toy_index_buffer, &index_data);
 		}
-
-
-		dbg!(&core.capabilities());
-		dbg!(resource_manager.resource_path());
 
 		Ok(App {
 			v_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.vs.glsl")?),
@@ -253,9 +252,7 @@ impl toybox::App for App {
 
 				ui.checkbox(&mut ctx.show_debug_menu, "Show debug menu");
 
-				if let Some(name) = ctx.gfx.resource_manager.images.get_name(self.test_rt) {
-					egui_backend::show_image_name(ui, name);
-				}
+				egui_backend::show_image_handle(ui, self.test_rt);
 
 				let (response, painter) = ui.allocate_painter(egui::Vec2::splat(100.0), egui::Sense::hover());
 
