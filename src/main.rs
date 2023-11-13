@@ -365,25 +365,17 @@ impl toybox::App for App {
 			.image_rw(0, self.test2_rt)
 			.groups_from_image_size(self.test2_rt);
 
-		
-		postprocess_group.execute(|core, _| unsafe {
-			core.gl.Disable(gl::DEPTH_TEST);
-			core.gl.Enable(gl::BLEND);
-			core.gl.BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-		});
-
 		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
 			.sampled_image(0, self.test2_rt, self.sampler)
-			.elements(6);
+			.elements(6)
+			.blend_mode(gfx::BlendMode::ALPHA)
+			.depth_test(false);
 
 		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
 			.sampled_image(0, self.test_rt, self.sampler)
-			.elements(6);
-
-		postprocess_group.execute(|core, _| unsafe {
-			core.gl.Disable(gl::BLEND);
-			core.gl.Enable(gl::DEPTH_TEST);
-		});
+			.elements(6)
+			.blend_mode(gfx::BlendMode::ALPHA)
+			.depth_test(false);
 	}
 
 	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
