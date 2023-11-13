@@ -13,6 +13,7 @@ fn main() -> anyhow::Result<()> {
 
 
 struct App {
+	fullscreen_shader: gfx::ShaderHandle,
 	v_basic_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
 	image_shader: gfx::ShaderHandle,
@@ -114,6 +115,7 @@ impl App {
 		}
 
 		Ok(App {
+			fullscreen_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fullscreen.vs.glsl")?),
 			v_basic_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
 			f_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
 			image_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/image.cs.glsl")?),
@@ -324,10 +326,6 @@ impl toybox::App for App {
 				.indexed(&[0u32, 2, 3, 2, 1, 3]);
 		}
 
-		ctx.gfx.frame_encoder.command_group("Postprocess")
-			.compute(self.posteffect_shader)
-			.image_rw(0, self.test_rt)
-			.groups_from_image_size(self.test_rt);
 
 		let up = Vec3::from_y(1.0);
 		let right = Vec3::from_y_angle(self.yaw);
@@ -353,6 +351,29 @@ impl toybox::App for App {
 		}
 
 		self.sprites.draw(&mut ctx.gfx);
+
+
+		let mut postprocess_group = ctx.gfx.frame_encoder.command_group("Postprocess");
+
+		postprocess_group.compute(self.posteffect_shader)
+			.image_rw(0, self.test_rt)
+			.groups_from_image_size(self.test_rt);
+
+		
+		postprocess_group.execute(|core, _| unsafe {
+			core.gl.Disable(gl::DEPTH_TEST);
+			core.gl.Enable(gl::BLEND);
+			core.gl.BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+		});
+
+		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
+			.sampled_image(0, self.test_rt, self.sampler)
+			.elements(6);
+
+		postprocess_group.execute(|core, _| unsafe {
+			core.gl.Disable(gl::BLEND);
+			core.gl.Enable(gl::DEPTH_TEST);
+		});
 	}
 
 	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
