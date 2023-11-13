@@ -13,7 +13,7 @@ void main() {
 
 	vec4 texel = imageLoad(u_image, texel_uv);
 
-	if ((texel_uv.x + texel_uv.y) % 128 > 32) {
+	if ((texel_uv.x/16 + texel_uv.y/16) % 2 > 0) {
 		texel.rgb = vec3(1.0) - texel.gbr;
 	}
 

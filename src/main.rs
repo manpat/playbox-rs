@@ -28,6 +28,7 @@ struct App {
 	sampler: gfx::SamplerName,
 
 	test_rt: gfx::ImageHandle,
+	test2_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
 
 	sprites: Sprites,
@@ -155,6 +156,7 @@ impl App {
 			},
 
 			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2)),
+			test2_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2)),
 			depth_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth)),
 
 			sampler: {
@@ -247,6 +249,7 @@ impl toybox::App for App {
 				ui.checkbox(&mut ctx.show_debug_menu, "Show debug menu");
 
 				egui_backend::show_image_handle(ui, self.test_rt);
+				egui_backend::show_image_handle(ui, self.test2_rt);
 
 				let (response, painter) = ui.allocate_painter(egui::Vec2::splat(100.0), egui::Sense::hover());
 
@@ -274,7 +277,10 @@ impl toybox::App for App {
 
 		let mut group = ctx.gfx.frame_encoder.command_group("Draw everything");
 		group.bind_shared_sampled_image(0, self.image, self.sampler);
+		group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
+
 		group.clear_image_to_default(self.test_rt);
+		group.clear_image_to_default(self.test2_rt);
 		group.clear_image_to_default(self.depth_rt);
 
 		group.draw(self.v_basic_shader, self.f_shader)
@@ -282,7 +288,7 @@ impl toybox::App for App {
 			.ssbo(0, self.toy_vertex_buffer)
 			.sampled_image(0, self.blank_image, self.sampler)
 			.elements(self.toy_element_count)
-			.rendertargets(&[self.test_rt, self.depth_rt]);
+			.rendertargets(&[self.test2_rt, self.depth_rt]);
 
 		if let Some(pos) = ctx.input.pointer_position()
 			&& !ctx.input.button_down(input::MouseButton::Left)
@@ -356,8 +362,8 @@ impl toybox::App for App {
 		let mut postprocess_group = ctx.gfx.frame_encoder.command_group("Postprocess");
 
 		postprocess_group.compute(self.posteffect_shader)
-			.image_rw(0, self.test_rt)
-			.groups_from_image_size(self.test_rt);
+			.image_rw(0, self.test2_rt)
+			.groups_from_image_size(self.test2_rt);
 
 		
 		postprocess_group.execute(|core, _| unsafe {
@@ -365,6 +371,10 @@ impl toybox::App for App {
 			core.gl.Enable(gl::BLEND);
 			core.gl.BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
 		});
+
+		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
+			.sampled_image(0, self.test2_rt, self.sampler)
+			.elements(6);
 
 		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
 			.sampled_image(0, self.test_rt, self.sampler)
@@ -466,7 +476,7 @@ impl Sprites {
 			return
 		}
 
-		gfx.frame_encoder.command_group("Sprites")
+		gfx.frame_encoder.command_group("Draw everything")
 			.draw(self.v_shader, self.f_shader)
 			.elements(self.indices.len() as u32)
 			.indexed(&self.indices)
