@@ -16,6 +16,7 @@ struct App {
 	v_basic_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
 	image_shader: gfx::ShaderHandle,
+	posteffect_shader: gfx::ShaderHandle,
 
 	toy_vertex_buffer: gfx::BufferName,
 	toy_index_buffer: gfx::BufferName,
@@ -49,7 +50,7 @@ impl App {
 		dbg!(&ctx.gfx.core.capabilities());
 		dbg!(ctx.resource_root_path());
 
-		ctx.audio.set_provider(MyAudioProvider::default())?;
+		// ctx.audio.set_provider(MyAudioProvider::default())?;
 
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
@@ -116,6 +117,7 @@ impl App {
 			v_basic_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
 			f_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
 			image_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/image.cs.glsl")?),
+			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
 
 			toy_vertex_buffer,
 			toy_index_buffer,
@@ -150,7 +152,7 @@ impl App {
 				image
 			},
 
-			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Srgba8)),
+			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2)),
 			depth_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth)),
 
 			sampler: {
@@ -322,6 +324,10 @@ impl toybox::App for App {
 				.indexed(&[0u32, 2, 3, 2, 1, 3]);
 		}
 
+		ctx.gfx.frame_encoder.command_group("Postprocess")
+			.compute(self.posteffect_shader)
+			.image_rw(0, self.test_rt)
+			.groups_from_image_size(self.test_rt);
 
 		let up = Vec3::from_y(1.0);
 		let right = Vec3::from_y_angle(self.yaw);
