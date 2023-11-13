@@ -49,7 +49,7 @@ impl App {
 		dbg!(&ctx.gfx.core.capabilities());
 		dbg!(ctx.resource_root_path());
 
-		// ctx.audio.set_provider(MyAudioProvider::default())?;
+		ctx.audio.set_provider(MyAudioProvider::default())?;
 
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
@@ -266,22 +266,12 @@ impl toybox::App for App {
 			.groups([3, 3, 1])
 			.image_rw(0, self.image);
 
+		self.time += 1.0/60.0;
+
 		let mut group = ctx.gfx.frame_encoder.command_group("Draw everything");
 		group.bind_shared_sampled_image(0, self.image, self.sampler);
-
-		self.time += 1.0/60.0;
-		
-		let test_rt = self.test_rt;
-		let depth_rt = self.depth_rt;
-		group.execute(move |core, rm| {
-			if let Some(name) = rm.images.get_name(test_rt) {
-				core.clear_image_to_default(name);
-			}
-
-			if let Some(name) = rm.images.get_name(depth_rt) {
-				core.clear_image_to_default(name);
-			}
-		});
+		group.clear_image_to_default(self.test_rt);
+		group.clear_image_to_default(self.depth_rt);
 
 		group.draw(self.v_basic_shader, self.f_shader)
 			.indexed(self.toy_index_buffer)
