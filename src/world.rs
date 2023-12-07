@@ -3,7 +3,7 @@ use toybox::common::*;
 use slotmap::SlotMap;
 
 use tokio::runtime::Runtime;
-use tokio::sync::{oneshot, mpsc, watch};
+use tokio::sync::{oneshot, mpsc};
 
 use std::future::Future;
 
@@ -264,14 +264,10 @@ pub fn make_test_world() -> World {
 		}
 
 		loop {
-			move_to(&ctx, Vec3::new(3.0, 0.0, 1.0)).await;
-			ctx.interact().await;
-
-			move_to(&ctx, Vec3::new(-1.0, 0.0, 2.0)).await;
-			ctx.interact().await;
-
-			move_to(&ctx, Vec3::new(-3.0, 0.0, 0.0)).await;
-			ctx.interact().await;
+			for pos in [(3.0, 1.0), (-1.0, 2.0), (-3.0, 0.0)] {
+				move_to(&ctx, Vec2::from(pos).to_x0y()).await;
+				ctx.interact().await;
+			}
 		}
 
 	});

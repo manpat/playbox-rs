@@ -47,7 +47,7 @@ impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
 		ctx.show_debug_menu = true;
 
-		ctx.gfx.frame_encoder.backbuffer_color([1.0, 0.5, 1.0]);
+		ctx.gfx.frame_encoder.backbuffer_color(Color::light_magenta());
 
 		dbg!(&ctx.gfx.core.capabilities());
 		dbg!(ctx.resource_root_path());
@@ -268,14 +268,15 @@ impl toybox::App for App {
 				}
 			});
 
-		ctx.gfx.frame_encoder.command_group("Rotate image colours")
+		ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Start)
+			.annotate("Rotate image colours")
 			.compute(self.image_shader)
 			.groups([3, 3, 1])
 			.image_rw(0, self.image);
 
 		self.time += 1.0/60.0;
 
-		let mut group = ctx.gfx.frame_encoder.command_group("Draw everything");
+		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 		group.bind_shared_sampled_image(0, self.image, self.sampler);
 		group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
 
@@ -339,7 +340,7 @@ impl toybox::App for App {
 		// Ground
 		self.sprites.basic(Vec3::from_x(10.0), Vec3::from_z(-10.0), Vec3::from_z(5.0), Color::rgb(0.5, 0.5, 0.5));
 
-		for (key, &world::Object{pos, size, color, ..}) in self.world.objects.iter() {
+		for (_, &world::Object{pos, size, color, ..}) in self.world.objects.iter() {
 			self.sprites.basic(right * size.x, up * size.y, pos, color);
 		}
 
@@ -359,7 +360,7 @@ impl toybox::App for App {
 		self.sprites.draw(&mut ctx.gfx);
 
 
-		let mut postprocess_group = ctx.gfx.frame_encoder.command_group("Postprocess");
+		let mut postprocess_group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
 		postprocess_group.compute(self.posteffect_shader)
 			.image_rw(0, self.test2_rt)
@@ -468,7 +469,8 @@ impl Sprites {
 			return
 		}
 
-		gfx.frame_encoder.command_group("Draw everything")
+		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
+			.annotate("Sprites")
 			.draw(self.v_shader, self.f_shader)
 			.elements(self.indices.len() as u32)
 			.indexed(&self.indices)
