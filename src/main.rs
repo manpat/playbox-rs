@@ -291,7 +291,7 @@ impl toybox::App for App {
 			.elements(self.toy_element_count)
 			.rendertargets(&[self.test2_rt, self.depth_rt]);
 
-		if let Some(pos) = ctx.input.pointer_position()
+		if let Some(pos) = ctx.input.mouse_position_ndc()
 			&& !ctx.input.button_down(input::MouseButton::Left)
 		{
 			let pos = (pos * Vec2::new(aspect, 1.0)).extend(-0.5);
@@ -455,7 +455,7 @@ impl Sprites {
 
 			sampler: {
 				let sampler = gfx.core.create_sampler();
-				gfx.core.set_sampler_minify_filter(sampler, gfx::FilterMode::Nearest, None);
+				gfx.core.set_sampler_minify_filter(sampler, gfx::FilterMode::Nearest, gfx::FilterMode::Linear);
 				gfx.core.set_sampler_magnify_filter(sampler, gfx::FilterMode::Nearest);
 				gfx.core.set_sampler_addressing_mode(sampler, gfx::AddressingMode::Clamp);
 				gfx.core.set_debug_label(sampler, "Sprite sampler");
