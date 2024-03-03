@@ -20,8 +20,6 @@ struct App {
 	toy_element_count: u32,
 
 	image: gfx::ImageName,
-	blank_image: gfx::ImageName,
-	sampler: gfx::SamplerName,
 
 	test_rt: gfx::ImageHandle,
 	test2_rt: gfx::ImageHandle,
@@ -139,29 +137,9 @@ impl App {
 				image
 			},
 
-			blank_image: {
-				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
-				let image = core.create_image_2d(format, Vec2i::splat(1));
-				core.upload_image(image, None, format, &[255u8, 255, 255, 255]);
-				core.set_debug_label(image, "Blank white image");
-				image
-			},
-
 			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2)),
 			test2_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2)),
 			depth_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth)),
-
-			sampler: {
-				use gfx::{FilterMode, AddressingMode};
-
-				let sampler = core.create_sampler();
-				core.set_sampler_minify_filter(sampler, FilterMode::Nearest, None);
-				core.set_sampler_magnify_filter(sampler, FilterMode::Nearest);
-				core.set_sampler_addressing_mode(sampler, AddressingMode::Clamp);
-				core.set_sampler_axis_addressing_mode(sampler, gfx::Axis::X, AddressingMode::Repeat);
-				core.set_debug_label(sampler, "Test sampler");
-				sampler
-			},
 
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
@@ -231,22 +209,20 @@ impl toybox::App for App {
 
 		self.time += 1.0/60.0;
 
+		let rm = &mut ctx.gfx.resource_manager;
+
 		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Main);
-		group.bind_shared_sampled_image(0, self.image, self.sampler);
+		group.bind_shared_sampled_image(0, self.image, rm.nearest_sampler);
 		group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
 
 		group.clear_image_to_default(self.test_rt);
 		group.clear_image_to_default(self.test2_rt);
 		group.clear_image_to_default(self.depth_rt);
 
-		let vs_shader = ctx.gfx.resource_manager.standard_vs_shader;
-		let fullscreen_vs_shader = ctx.gfx.resource_manager.fullscreen_vs_shader;
-		let fs_shader = ctx.gfx.resource_manager.flat_fs_shader;
-
-		group.draw(vs_shader, fs_shader)
+		group.draw(rm.standard_vs_shader, rm.flat_fs_shader)
 			.indexed(self.toy_index_buffer)
 			.ssbo(0, self.toy_vertex_buffer)
-			.sampled_image(0, self.blank_image, self.sampler)
+			.sampled_image(0, rm.blank_white_image, rm.nearest_sampler)
 			.elements(self.toy_element_count)
 			.rendertargets(&[self.test2_rt, self.depth_rt]);
 
@@ -265,7 +241,7 @@ impl toybox::App for App {
 				gfx::StandardVertex::with_uv(pos + rot * Vec3::new(-0.1, 0.0, 0.0), Vec2::new(0.0, 1.0)),
 			];
 
-			group.draw(vs_shader, fs_shader)
+			group.draw(rm.standard_vs_shader, rm.flat_fs_shader)
 				.elements(6)
 				.ubo(0, &[projection])
 				.ssbo(0, &vertices)
@@ -298,21 +274,21 @@ impl toybox::App for App {
 
 		self.sprites.draw(&mut ctx.gfx);
 
-
+		let rm = &mut ctx.gfx.resource_manager;
 		let mut postprocess_group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
 		postprocess_group.compute(self.posteffect_shader)
 			.image_rw(0, self.test2_rt)
 			.groups_from_image_size(self.test2_rt);
 
-		postprocess_group.draw(fullscreen_vs_shader, fs_shader)
-			.sampled_image(0, self.test2_rt, self.sampler)
+		postprocess_group.draw(rm.fullscreen_vs_shader, rm.flat_fs_shader)
+			.sampled_image(0, self.test2_rt, rm.nearest_sampler)
 			.elements(6)
 			.blend_mode(gfx::BlendMode::ALPHA)
 			.depth_test(false);
 
-		postprocess_group.draw(fullscreen_vs_shader, fs_shader)
-			.sampled_image(0, self.test_rt, self.sampler)
+		postprocess_group.draw(rm.fullscreen_vs_shader, rm.flat_fs_shader)
+			.sampled_image(0, self.test_rt, rm.nearest_sampler)
 			.elements(6)
 			.blend_mode(gfx::BlendMode::ALPHA)
 			.depth_test(false);
@@ -370,7 +346,6 @@ struct Sprites {
 	f_shader: gfx::ShaderHandle,
 
 	atlas: gfx::ImageHandle,
-	sampler: gfx::SamplerName,
 }
 
 impl Sprites {
@@ -383,15 +358,6 @@ impl Sprites {
 			f_shader: gfx.resource_manager.flat_fs_shader,
 
 			atlas: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
-
-			sampler: {
-				let sampler = gfx.core.create_sampler();
-				gfx.core.set_sampler_minify_filter(sampler, gfx::FilterMode::Nearest, gfx::FilterMode::Linear);
-				gfx.core.set_sampler_magnify_filter(sampler, gfx::FilterMode::Nearest);
-				gfx.core.set_sampler_addressing_mode(sampler, gfx::AddressingMode::Clamp);
-				gfx.core.set_debug_label(sampler, "Sprite sampler");
-				sampler
-			},
 		})
 	}
 
@@ -406,7 +372,7 @@ impl Sprites {
 			.elements(self.indices.len() as u32)
 			.indexed(&self.indices)
 			.ssbo(0, &self.vertices)
-			.sampled_image(0, self.atlas, self.sampler);
+			.sampled_image(0, self.atlas, gfx.resource_manager.nearest_sampler);
 
 		self.vertices.clear();
 		self.indices.clear();
@@ -429,5 +395,30 @@ impl Sprites {
 
 		self.vertices.extend_from_slice(&vertices);
 		self.indices.extend(indices);
+	}
+}
+
+
+
+#[derive(Debug)]
+pub struct ToyRenderer {
+	texture: gfx::ImageNameOrHandle,
+	rendertarget: Option<gfx::ImageNameOrHandle>,
+	framestage: gfx::FrameStage,
+
+	v_shader: gfx::ShaderHandle,
+	f_shader: gfx::ShaderHandle,
+}
+
+impl ToyRenderer {
+	pub fn new(rm: &mut gfx::ResourceManager) -> ToyRenderer {
+		ToyRenderer {
+			texture: rm.blank_white_image.into(),
+			rendertarget: None,
+			framestage: gfx::FrameStage::Main,
+
+			v_shader: rm.standard_vs_shader,
+			f_shader: rm.flat_fs_shader,
+		}
 	}
 }
