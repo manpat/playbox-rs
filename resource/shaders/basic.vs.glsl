@@ -5,7 +5,7 @@ out OutVertex {
 	vec2 v_uv;
 };
 
-layout(binding=1) uniform P {
+layout(binding=0) uniform P {
 	mat4 u_projection_view;
 };
 

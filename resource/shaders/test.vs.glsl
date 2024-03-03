@@ -5,11 +5,11 @@ out Vertex {
 	vec2 v_uv;
 };
 
-layout(binding=0) uniform U {
+layout(binding=1) uniform U {
 	float u_time;
 };
 
-layout(binding=1) uniform P {
+layout(binding=0) uniform P {
 	mat4 u_projection_view;
 };
 

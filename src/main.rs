@@ -14,10 +14,10 @@ fn main() -> anyhow::Result<()> {
 
 struct App {
 	fullscreen_shader: gfx::ShaderHandle,
-	v_basic_shader: gfx::ShaderHandle,
-	f_shader: gfx::ShaderHandle,
-	image_shader: gfx::ShaderHandle,
 	posteffect_shader: gfx::ShaderHandle,
+
+	standard_vs_shader: gfx::ShaderHandle,
+	flat_fs_shader: gfx::ShaderHandle,
 
 	toy_vertex_buffer: gfx::BufferName,
 	toy_index_buffer: gfx::BufferName,
@@ -82,7 +82,7 @@ impl App {
 					let vertices = mesh.positions.iter()
 						.map(|&pos| {
 							let pos = transform * pos;
-							BasicVertex { pos, color: Color::white(), .. Default::default() }
+							gfx::StandardVertex::from_pos(pos)
 						});
 
 					let index_start = vertex_data.len() as u32;
@@ -97,7 +97,7 @@ impl App {
 				let vertices = std::iter::zip(&mesh.positions, &mesh.color_layers[0].data)
 					.map(|(&pos, &color)| {
 						let pos = transform * pos;
-						BasicVertex { pos, color: Color::from(color), .. Default::default() }
+						gfx::StandardVertex::with_color(pos, color)
 					});
 
 				let index_start = vertex_data.len() as u32;
@@ -116,11 +116,11 @@ impl App {
 		}
 
 		Ok(App {
-			fullscreen_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fullscreen.vs.glsl")?),
-			v_basic_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
-			f_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
-			image_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/image.cs.glsl")?),
 			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
+
+			fullscreen_shader: resource_manager.request(gfx::CompileShaderRequest::vertex("fullscreen vs", gfx::FULLSCREEN_VS_SHADER_SOURCE)),
+			standard_vs_shader: resource_manager.request(gfx::CompileShaderRequest::vertex("standard vs", gfx::STANDARD_VS_SHADER_SOURCE)),
+			flat_fs_shader: resource_manager.request(gfx::CompileShaderRequest::fragment("standard fs", gfx::FLAT_FS_SHADER_SOURCE)),
 
 			toy_vertex_buffer,
 			toy_index_buffer,
@@ -235,44 +235,7 @@ impl toybox::App for App {
 			* Mat4::rotate_y(self.yaw)
 			* Mat4::translate(-Vec3::from_y(0.5) - self.pos.to_x0y());
 
-		ctx.gfx.frame_encoder.bind_global_ubo(1, &[projection]);
-
-		egui::Window::new("Wahoo")
-			.resizable(false)
-			.show(&ctx.egui, |ui| {
-				ui.label("Hello egui!");
-				ui.label("Text text text!");
-				if ui.button("Huh??").clicked() {
-					ctx.show_debug_menu = true;
-				}
-
-				ui.checkbox(&mut ctx.show_debug_menu, "Show debug menu");
-
-				egui_backend::show_image_handle(ui, self.test_rt);
-				egui_backend::show_image_handle(ui, self.test2_rt);
-
-				let (response, painter) = ui.allocate_painter(egui::Vec2::splat(100.0), egui::Sense::hover());
-
-				let rect = response.rect;
-				let c = rect.center();
-				let mut r = rect.width() / 2.0 - 1.0;
-				let color = egui::Color32::from_gray(128);
-				let stroke = egui::Stroke::new(1.0, color);
-
-				painter.with_clip_rect(egui::Rect::from_min_size(c, rect.size() / 2.0))
-					.circle_filled(c, r, egui::Color32::RED);
-
-				for _ in 0..20 {
-					painter.circle_stroke(c, r, stroke);
-					r *= 0.9;
-				}
-			});
-
-		ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Start)
-			.annotate("Rotate image colours")
-			.compute(self.image_shader)
-			.groups([3, 3, 1])
-			.image_rw(0, self.image);
+		ctx.gfx.frame_encoder.bind_global_ubo(0, &[projection]);
 
 		self.time += 1.0/60.0;
 
@@ -284,7 +247,7 @@ impl toybox::App for App {
 		group.clear_image_to_default(self.test2_rt);
 		group.clear_image_to_default(self.depth_rt);
 
-		group.draw(self.v_basic_shader, self.f_shader)
+		group.draw(self.standard_vs_shader, self.flat_fs_shader)
 			.indexed(self.toy_index_buffer)
 			.ssbo(0, self.toy_vertex_buffer)
 			.sampled_image(0, self.blank_image, self.sampler)
@@ -300,35 +263,15 @@ impl toybox::App for App {
 			let rot = Mat3x4::rotate_z(self.time);
 
 			let vertices = [
-				BasicVertex {
-					pos: pos + rot * Vec3::new(0.0, 0.1, 0.0),
-					uv: Vec2::new(1.0, 1.0),
-					color: Color::white(), 
-					.. BasicVertex::default()
-				},
-				BasicVertex {
-					pos: pos + rot * Vec3::new(0.0,-0.1, 0.0),
-					uv: Vec2::new(0.0, 0.0),
-					color: Color::white(),
-					.. BasicVertex::default()
-				},
-				BasicVertex {
-					pos: pos + rot * Vec3::new(0.1, 0.0, 0.0),
-					uv: Vec2::new(1.0, 0.0),
-					color: Color::white(),
-					.. BasicVertex::default()
-				},
-				BasicVertex {
-					pos: pos + rot * Vec3::new(-0.1, 0.0, 0.0),
-					uv: Vec2::new(0.0, 1.0),
-					color: Color::white(),
-					.. BasicVertex::default()
-				},
+				gfx::StandardVertex::with_uv(pos + rot * Vec3::new(0.0, 0.1, 0.0), Vec2::new(1.0, 1.0)),
+				gfx::StandardVertex::with_uv(pos + rot * Vec3::new(0.0,-0.1, 0.0), Vec2::new(0.0, 0.0)),
+				gfx::StandardVertex::with_uv(pos + rot * Vec3::new(0.1, 0.0, 0.0), Vec2::new(1.0, 0.0)),
+				gfx::StandardVertex::with_uv(pos + rot * Vec3::new(-0.1, 0.0, 0.0), Vec2::new(0.0, 1.0)),
 			];
 
-			group.draw(self.v_basic_shader, self.f_shader)
+			group.draw(self.standard_vs_shader, self.flat_fs_shader)
 				.elements(6)
-				.ubo(1, &[projection])
+				.ubo(0, &[projection])
 				.ssbo(0, &vertices)
 				.indexed(&[0u32, 2, 3, 2, 1, 3]);
 		}
@@ -366,13 +309,13 @@ impl toybox::App for App {
 			.image_rw(0, self.test2_rt)
 			.groups_from_image_size(self.test2_rt);
 
-		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
+		postprocess_group.draw(self.fullscreen_shader, self.flat_fs_shader)
 			.sampled_image(0, self.test2_rt, self.sampler)
 			.elements(6)
 			.blend_mode(gfx::BlendMode::ALPHA)
 			.depth_test(false);
 
-		postprocess_group.draw(self.fullscreen_shader, self.f_shader)
+		postprocess_group.draw(self.fullscreen_shader, self.flat_fs_shader)
 			.sampled_image(0, self.test_rt, self.sampler)
 			.elements(6)
 			.blend_mode(gfx::BlendMode::ALPHA)
@@ -432,7 +375,7 @@ struct BasicVertex {
 
 #[derive(Debug)]
 struct Sprites {
-	vertices: Vec<BasicVertex>,
+	vertices: Vec<gfx::StandardVertex>,
 	indices: Vec<u32>,
 
 	v_shader: gfx::ShaderHandle,
@@ -448,8 +391,8 @@ impl Sprites {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 
-			v_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/basic.vs.glsl")?),
-			f_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/test.fs.glsl")?),
+			v_shader: gfx.resource_manager.request(gfx::CompileShaderRequest::vertex("standard vs", gfx::STANDARD_VS_SHADER_SOURCE)),
+			f_shader: gfx.resource_manager.request(gfx::CompileShaderRequest::fragment("standard fs", gfx::FLAT_FS_SHADER_SOURCE)),
 
 			atlas: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
@@ -490,30 +433,10 @@ impl Sprites {
 		let right = right/2.0;
 
 		let vertices = [
-			BasicVertex {
-				pos: pos - right,
-				uv: Vec2::new(0.0, 0.0),
-				color,
-				.. BasicVertex::default()
-			},
-			BasicVertex {
-				pos: pos - right + up,
-				uv: Vec2::new(0.0, 1.0),
-				color,
-				.. BasicVertex::default()
-			},
-			BasicVertex {
-				pos: pos + right + up,
-				uv: Vec2::new(1.0, 1.0),
-				color, 
-				.. BasicVertex::default()
-			},
-			BasicVertex {
-				pos: pos + right,
-				uv: Vec2::new(1.0, 0.0),
-				color,
-				.. BasicVertex::default()
-			},
+			gfx::StandardVertex::new(pos - right, Vec2::new(0.0, 0.0), color),
+			gfx::StandardVertex::new(pos - right + up, Vec2::new(0.0, 1.0), color),
+			gfx::StandardVertex::new(pos + right + up, Vec2::new(1.0, 1.0), color),
+			gfx::StandardVertex::new(pos + right, Vec2::new(1.0, 0.0), color),
 		];
 
 		self.vertices.extend_from_slice(&vertices);
