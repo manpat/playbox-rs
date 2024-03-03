@@ -13,11 +13,7 @@ fn main() -> anyhow::Result<()> {
 
 
 struct App {
-	fullscreen_shader: gfx::ShaderHandle,
 	posteffect_shader: gfx::ShaderHandle,
-
-	standard_vs_shader: gfx::ShaderHandle,
-	flat_fs_shader: gfx::ShaderHandle,
 
 	toy_vertex_buffer: gfx::BufferName,
 	toy_index_buffer: gfx::BufferName,
@@ -117,10 +113,6 @@ impl App {
 
 		Ok(App {
 			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
-
-			fullscreen_shader: resource_manager.request(gfx::CompileShaderRequest::vertex("fullscreen vs", gfx::FULLSCREEN_VS_SHADER_SOURCE)),
-			standard_vs_shader: resource_manager.request(gfx::CompileShaderRequest::vertex("standard vs", gfx::STANDARD_VS_SHADER_SOURCE)),
-			flat_fs_shader: resource_manager.request(gfx::CompileShaderRequest::fragment("standard fs", gfx::FLAT_FS_SHADER_SOURCE)),
 
 			toy_vertex_buffer,
 			toy_index_buffer,
@@ -247,7 +239,11 @@ impl toybox::App for App {
 		group.clear_image_to_default(self.test2_rt);
 		group.clear_image_to_default(self.depth_rt);
 
-		group.draw(self.standard_vs_shader, self.flat_fs_shader)
+		let vs_shader = ctx.gfx.resource_manager.standard_vs_shader;
+		let fullscreen_vs_shader = ctx.gfx.resource_manager.fullscreen_vs_shader;
+		let fs_shader = ctx.gfx.resource_manager.flat_fs_shader;
+
+		group.draw(vs_shader, fs_shader)
 			.indexed(self.toy_index_buffer)
 			.ssbo(0, self.toy_vertex_buffer)
 			.sampled_image(0, self.blank_image, self.sampler)
@@ -269,7 +265,7 @@ impl toybox::App for App {
 				gfx::StandardVertex::with_uv(pos + rot * Vec3::new(-0.1, 0.0, 0.0), Vec2::new(0.0, 1.0)),
 			];
 
-			group.draw(self.standard_vs_shader, self.flat_fs_shader)
+			group.draw(vs_shader, fs_shader)
 				.elements(6)
 				.ubo(0, &[projection])
 				.ssbo(0, &vertices)
@@ -309,13 +305,13 @@ impl toybox::App for App {
 			.image_rw(0, self.test2_rt)
 			.groups_from_image_size(self.test2_rt);
 
-		postprocess_group.draw(self.fullscreen_shader, self.flat_fs_shader)
+		postprocess_group.draw(fullscreen_vs_shader, fs_shader)
 			.sampled_image(0, self.test2_rt, self.sampler)
 			.elements(6)
 			.blend_mode(gfx::BlendMode::ALPHA)
 			.depth_test(false);
 
-		postprocess_group.draw(self.fullscreen_shader, self.flat_fs_shader)
+		postprocess_group.draw(fullscreen_vs_shader, fs_shader)
 			.sampled_image(0, self.test_rt, self.sampler)
 			.elements(6)
 			.blend_mode(gfx::BlendMode::ALPHA)
@@ -365,14 +361,6 @@ impl audio::Provider for MyAudioProvider {
 }
 
 
-#[derive(Copy, Clone, Debug, Default)]
-#[repr(C)]
-struct BasicVertex {
-	pos: Vec3, _pad: f32,
-	color: Color,
-	uv: Vec2, _pad2: [f32; 2],
-}
-
 #[derive(Debug)]
 struct Sprites {
 	vertices: Vec<gfx::StandardVertex>,
@@ -391,8 +379,8 @@ impl Sprites {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 
-			v_shader: gfx.resource_manager.request(gfx::CompileShaderRequest::vertex("standard vs", gfx::STANDARD_VS_SHADER_SOURCE)),
-			f_shader: gfx.resource_manager.request(gfx::CompileShaderRequest::fragment("standard fs", gfx::FLAT_FS_SHADER_SOURCE)),
+			v_shader: gfx.resource_manager.standard_vs_shader,
+			f_shader: gfx.resource_manager.flat_fs_shader,
 
 			atlas: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
