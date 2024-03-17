@@ -65,54 +65,16 @@ impl App {
 			let project_data = std::fs::read(&project_path)?;
 			let project = toy::load(&project_data)?;
 
-			let mut vertex_data = Vec::new();
-			let mut index_data = Vec::new();
-
-			for entity in project.entities() {
-				let Some(mesh) = entity.mesh() else {
-					println!("Entity {} had no mesh - skipping", entity.name);
-					continue
-				};
-
-				let transform = Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)) * entity.transform();
-
-				if mesh.color_layers.is_empty() {
-					println!("Entity {} had no color data - setting to white", entity.name);
-
-					let vertices = mesh.positions.iter()
-						.map(|&pos| {
-							let pos = transform * pos;
-							gfx::StandardVertex::from_pos(pos)
-						});
-
-					let index_start = vertex_data.len() as u32;
-					let indices = mesh.indices.iter().map(|idx| *idx as u32 + index_start);
-
-					vertex_data.extend(vertices);
-					index_data.extend(indices);
-
-					continue;
-				}
-
-				let vertices = std::iter::zip(&mesh.positions, &mesh.color_layers[0].data)
-					.map(|(&pos, &color)| {
-						let pos = transform * pos;
-						gfx::StandardVertex::with_color(pos, color)
-					});
-
-				let index_start = vertex_data.len() as u32;
-				let indices = mesh.indices.iter().map(|idx| *idx as u32 + index_start);
-
-				vertex_data.extend(vertices);
-				index_data.extend(indices);
-			}
+			let mut builder = ToyMeshBuilder::new();
+			builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
+			builder.add_entities_with_prefix(project.find_scene("main").unwrap(), "FOO");
 
 			toy_vertex_buffer = core.create_buffer();
 			toy_index_buffer = core.create_buffer();
-			toy_element_count = index_data.len() as u32;
+			toy_element_count = builder.indices.len() as u32;
 
-			core.upload_immutable_buffer_immediate(toy_vertex_buffer, &vertex_data);
-			core.upload_immutable_buffer_immediate(toy_index_buffer, &index_data);
+			core.upload_immutable_buffer_immediate(toy_vertex_buffer, &builder.vertices);
+			core.upload_immutable_buffer_immediate(toy_index_buffer, &builder.indices);
 		}
 
 		Ok(App {
@@ -334,5 +296,105 @@ impl ToyRenderer {
 			v_shader: rm.standard_vs_shader,
 			f_shader: rm.flat_fs_shader,
 		}
+	}
+}
+
+
+#[derive(Debug, Default)]
+pub struct ToyMeshBuilder {
+	vertices: Vec<gfx::StandardVertex>,
+	indices: Vec<u32>,
+
+	root_transform: Mat3x4,
+}
+
+impl ToyMeshBuilder {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	pub fn clear(&mut self) {
+		self.vertices.clear();
+		self.indices.clear();
+	}
+
+	pub fn set_root_transform(&mut self, transform: Mat3x4) {
+		self.root_transform = transform;
+	}
+
+	pub fn add_mesh(&mut self, mesh: &toy::Mesh, transform: Mat3x4) {
+		let transform = self.root_transform * transform;
+
+		let index_start = self.vertices.len() as u32;
+		let indices = mesh.indices.iter().map(|idx| *idx as u32 + index_start);
+
+		let vertices = ToyMeshStandardVertexIterator::new(mesh)
+			.map(|(pos, color, uv)| gfx::StandardVertex::new(transform * pos, uv, color));
+
+		self.vertices.extend(vertices);
+		self.indices.extend(indices);
+	}
+
+	pub fn add_entity(&mut self, entity: toy::EntityRef<'_>) {
+		if let Some(mesh) = entity.mesh() {
+			self.add_mesh(mesh, entity.transform());
+		}
+	}
+
+	pub fn add_entities<'t>(&mut self, container: impl toy::EntityCollection<'t>) {
+		for entity in container.into_entities() {
+			if let Some(mesh) = entity.mesh() {
+				self.add_mesh(mesh, entity.transform());
+			}
+		}
+	}
+
+	pub fn add_entities_with_prefix<'t>(&mut self, container: impl toy::EntityCollection<'t>, prefix: &str) {
+		for entity in container.into_entities_with_prefix(prefix) {
+			if let Some(mesh) = entity.mesh() {
+				self.add_mesh(mesh, entity.transform());
+			}
+		}
+	}
+}
+
+struct ToyMeshStandardVertexIterator<'t> {
+	positions: &'t [Vec3],
+	colors: Option<&'t [Vec4]>,
+	uvs: Option<&'t [Vec2]>,
+}
+
+impl<'t> ToyMeshStandardVertexIterator<'t> {
+	pub fn new(mesh: &'t toy::Mesh) -> Self {
+		let positions = &mesh.positions;
+
+		ToyMeshStandardVertexIterator {
+			positions,
+			colors: mesh.color_layers.first()
+				.map(|layer| layer.data.as_slice())
+				.filter(|data| data.len() == positions.len()),
+
+			uvs: mesh.uv_layers.first()
+				.map(|layer| layer.data.as_slice())
+				.filter(|data| data.len() == positions.len()),
+		}
+	}
+}
+
+impl<'t> Iterator for ToyMeshStandardVertexIterator<'t> {
+	type Item = (Vec3, Vec4, Vec2);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		fn split_first<T: Copy>(s: &mut &[T]) -> Option<T> {
+			let value = *s.first()?;
+			*s = &s[1..];
+			Some(value)
+		}
+
+		let pos = split_first(&mut self.positions)?;
+		let color = self.colors.as_mut().and_then(split_first).unwrap_or_else(Vec4::one);
+		let uv = self.uvs.as_mut().and_then(split_first).unwrap_or_else(Vec2::zero);
+
+		Some((pos, color, uv))
 	}
 }
