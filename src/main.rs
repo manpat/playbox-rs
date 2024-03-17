@@ -2,11 +2,16 @@
 
 use toybox::*;
 
+mod audio;
+mod sprites;
 mod world;
+
+use audio::MyAudioSystem;
+use sprites::Sprites;
+
 
 fn main() -> anyhow::Result<()> {
 	std::env::set_var("RUST_BACKTRACE", "1");
-
 	toybox::run("playbox", App::new)
 }
 
@@ -27,6 +32,7 @@ struct App {
 
 	sprites: Sprites,
 
+	audio: MyAudioSystem,
 	world: world::World,
 
 	time: f32,
@@ -46,7 +52,7 @@ impl App {
 		dbg!(&ctx.gfx.core.capabilities());
 		dbg!(ctx.resource_root_path());
 
-		// ctx.audio.set_provider(MyAudioProvider::default())?;
+		let audio = MyAudioSystem::start(&mut ctx.audio)?;
 
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
@@ -143,6 +149,7 @@ impl App {
 
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
+			audio,
 			world: world::make_test_world(),
 
 			time: 0.0,
@@ -196,6 +203,10 @@ impl toybox::App for App {
 
 		if ctx.input.button_down(input::Key::A) {
 			self.pos -= right * speed;
+		}
+
+		if ctx.input.button_just_down(input::Key::F) {
+			self.audio.trigger();
 		}
 
 
@@ -298,103 +309,6 @@ impl toybox::App for App {
 		ui.menu_button("Playbox", |ui| {
 			let _ = ui.button("???");
 		});
-	}
-}
-
-
-#[derive(Default)]
-struct MyAudioProvider {
-	sample_dt: f64,
-	phase: f64,
-}
-
-impl audio::Provider for MyAudioProvider {
-	fn on_configuration_changed(&mut self, config: audio::Configuration) {
-		self.sample_dt = 1.0/config.sample_rate as f64;
-		assert!(config.channels == 2);
-	}
-
-	fn fill_buffer(&mut self, buffer: &mut [f32]) {
-		let mut osc_phase = self.phase * 220.0 * std::f64::consts::TAU;
-		let osc_dt = self.sample_dt * 220.0 * std::f64::consts::TAU;
-
-		for frame in buffer.chunks_exact_mut(2) {
-			let osc = osc_phase.sin();
-			let amp = 0.5 - self.phase.cos() * 0.5;
-			let amp = amp * amp;
-
-			let value = (amp * osc) as f32;
-
-			frame[0] = value;
-			frame[1] = -value;
-
-			self.phase += self.sample_dt;
-			osc_phase += osc_dt;
-		}
-
-		self.phase %= std::f64::consts::TAU;
-	}
-}
-
-
-#[derive(Debug)]
-struct Sprites {
-	vertices: Vec<gfx::StandardVertex>,
-	indices: Vec<u32>,
-
-	v_shader: gfx::ShaderHandle,
-	f_shader: gfx::ShaderHandle,
-
-	atlas: gfx::ImageHandle,
-}
-
-impl Sprites {
-	fn new(gfx: &mut gfx::System) -> anyhow::Result<Sprites> {
-		Ok(Sprites {
-			vertices: Vec::new(),
-			indices: Vec::new(),
-
-			v_shader: gfx.resource_manager.standard_vs_shader,
-			f_shader: gfx.resource_manager.flat_fs_shader,
-
-			atlas: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
-		})
-	}
-
-	fn draw(&mut self, gfx: &mut gfx::System) {
-		if self.vertices.is_empty() {
-			return
-		}
-
-		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
-			.annotate("Sprites")
-			.draw(self.v_shader, self.f_shader)
-			.elements(self.indices.len() as u32)
-			.indexed(&self.indices)
-			.ssbo(0, &self.vertices)
-			.sampled_image(0, self.atlas, gfx.resource_manager.nearest_sampler);
-
-		self.vertices.clear();
-		self.indices.clear();
-	}
-}
-
-impl Sprites {
-	fn basic(&mut self, right: Vec3, up: Vec3, pos: Vec3, color: Color) {
-		let start_index = self.vertices.len() as u32;
-		let indices = [0, 1, 2, 0, 2, 3].into_iter().map(|i| i + start_index);
-
-		let right = right/2.0;
-
-		let vertices = [
-			gfx::StandardVertex::new(pos - right, Vec2::new(0.0, 0.0), color),
-			gfx::StandardVertex::new(pos - right + up, Vec2::new(0.0, 1.0), color),
-			gfx::StandardVertex::new(pos + right + up, Vec2::new(1.0, 1.0), color),
-			gfx::StandardVertex::new(pos + right, Vec2::new(1.0, 0.0), color),
-		];
-
-		self.vertices.extend_from_slice(&vertices);
-		self.indices.extend(indices);
 	}
 }
 
