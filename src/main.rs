@@ -56,7 +56,7 @@ impl App {
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
 		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2));
-		let test2_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2));
+		let test2_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2).clear_policy(gfx::ImageClearPolicy::Never));
 		let depth_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth));
 
 		let toy_renderer = {
@@ -176,11 +176,6 @@ impl toybox::App for App {
 		self.time += 1.0/60.0;
 
 		let rm = &mut ctx.gfx.resource_manager;
-
-		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Start);
-		group.clear_image_to_default(self.test_rt);
-		group.clear_image_to_default(self.test2_rt);
-		group.clear_image_to_default(self.depth_rt);
 
 		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 		group.bind_shared_sampled_image(0, self.image, rm.nearest_sampler);
