@@ -10,6 +10,9 @@ pub struct Sprites {
 	f_shader: gfx::ShaderHandle,
 
 	atlas: gfx::ImageHandle,
+
+	up: Vec3,
+	right: Vec3,
 }
 
 impl Sprites {
@@ -22,6 +25,9 @@ impl Sprites {
 			f_shader: gfx.resource_manager.flat_fs_shader,
 
 			atlas: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+
+			up: Vec3::from_y(1.0),
+			right: Vec3::from_x(1.0),
 		})
 	}
 
@@ -41,6 +47,11 @@ impl Sprites {
 		self.vertices.clear();
 		self.indices.clear();
 	}
+
+	pub fn set_billboard_orientation(&mut self, up: Vec3, right: Vec3) {
+		self.up = up;
+		self.right = right;
+	}
 }
 
 impl Sprites {
@@ -59,5 +70,9 @@ impl Sprites {
 
 		self.vertices.extend_from_slice(&vertices);
 		self.indices.extend(indices);
+	}
+
+	pub fn billboard(&mut self, pos: Vec3, size: Vec2, color: Color) {
+		self.basic(size.x * self.right, size.y * self.up, pos, color);
 	}
 }
