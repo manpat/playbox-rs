@@ -20,16 +20,13 @@ fn main() -> anyhow::Result<()> {
 struct App {
 	posteffect_shader: gfx::ShaderHandle,
 
-	toy_vertex_buffer: gfx::BufferName,
-	toy_index_buffer: gfx::BufferName,
-	toy_element_count: u32,
-
 	image: gfx::ImageName,
 
 	test_rt: gfx::ImageHandle,
 	test2_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
 
+	toy_renderer: ToyRenderer,
 	sprites: Sprites,
 
 	audio: MyAudioSystem,
@@ -56,34 +53,27 @@ impl App {
 
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
-		let toy_vertex_buffer;
-		let toy_index_buffer;
-		let toy_element_count;
+		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2));
+		let test2_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2));
+		let depth_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth));
 
-		{
+		let toy_renderer = {
 			let project_path = resource_manager.resource_path().join("toys/basic.toy");
 			let project_data = std::fs::read(&project_path)?;
 			let project = toy::load(&project_data)?;
 
-			let mut builder = ToyMeshBuilder::new();
-			builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
-			builder.add_entities_with_prefix(project.find_scene("main").unwrap(), "FOO");
-
-			toy_vertex_buffer = core.create_buffer();
-			toy_index_buffer = core.create_buffer();
-			toy_element_count = builder.indices.len() as u32;
-
-			core.upload_immutable_buffer_immediate(toy_vertex_buffer, &builder.vertices);
-			core.upload_immutable_buffer_immediate(toy_index_buffer, &builder.indices);
-		}
+			let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
+			toy_renderer.set_color_target(test2_rt);
+			toy_renderer.set_depth_target(depth_rt);
+			toy_renderer.update(&core, |builder| {
+				builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
+				builder.add_entities(project.find_scene("main").unwrap());
+			});
+			toy_renderer
+		};
 
 		Ok(App {
 			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
-
-			toy_vertex_buffer,
-			toy_index_buffer,
-			toy_element_count,
-
 			image: {
 				let format = gfx::ImageFormat::Rgba(gfx::ComponentFormat::Unorm8);
 				let image = core.create_image_2d(format, Vec2i::new(3, 3));
@@ -105,10 +95,11 @@ impl App {
 				image
 			},
 
-			test_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2)),
-			test2_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2)),
-			depth_rt: resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth)),
+			test_rt,
+			test2_rt,
+			depth_rt,
 
+			toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
 			audio,
@@ -184,20 +175,14 @@ impl toybox::App for App {
 
 		let rm = &mut ctx.gfx.resource_manager;
 
-		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Main);
-		group.bind_shared_sampled_image(0, self.image, rm.nearest_sampler);
-		group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
-
+		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Start);
 		group.clear_image_to_default(self.test_rt);
 		group.clear_image_to_default(self.test2_rt);
 		group.clear_image_to_default(self.depth_rt);
 
-		group.draw(rm.standard_vs_shader, rm.flat_fs_shader)
-			.indexed(self.toy_index_buffer)
-			.ssbo(0, self.toy_vertex_buffer)
-			.sampled_image(0, rm.blank_white_image, rm.nearest_sampler)
-			.elements(self.toy_element_count)
-			.rendertargets(&[self.test2_rt, self.depth_rt]);
+		let mut group = ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Main);
+		group.bind_shared_sampled_image(0, self.image, rm.nearest_sampler);
+		group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
 
 		if let Some(pos) = ctx.input.mouse_position_ndc()
 			&& !ctx.input.button_down(input::MouseButton::Left)
@@ -220,6 +205,9 @@ impl toybox::App for App {
 				.ssbo(0, &vertices)
 				.indexed(&[0u32, 2, 3, 2, 1, 3]);
 		}
+
+
+		self.toy_renderer.draw(&mut ctx.gfx);
 
 
 		let up = Vec3::from_y(1.0);
@@ -279,22 +267,73 @@ impl toybox::App for App {
 #[derive(Debug)]
 pub struct ToyRenderer {
 	texture: gfx::ImageNameOrHandle,
-	rendertarget: Option<gfx::ImageNameOrHandle>,
+	color_target: Option<gfx::ImageHandle>,
+	depth_target: Option<gfx::ImageHandle>,
 	framestage: gfx::FrameStage,
 
 	v_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
+
+	vertex_buffer: gfx::BufferName,
+	index_buffer: gfx::BufferName,
+	element_count: u32,
+
+	builder: ToyMeshBuilder,
 }
 
 impl ToyRenderer {
-	pub fn new(rm: &mut gfx::ResourceManager) -> ToyRenderer {
+	pub fn new(core: &gfx::Core, rm: &mut gfx::ResourceManager) -> ToyRenderer {
 		ToyRenderer {
 			texture: rm.blank_white_image.into(),
-			rendertarget: None,
+			color_target: None,
+			depth_target: None,
 			framestage: gfx::FrameStage::Main,
 
 			v_shader: rm.standard_vs_shader,
 			f_shader: rm.flat_fs_shader,
+
+			vertex_buffer: core.create_buffer(),
+			index_buffer: core.create_buffer(),
+			element_count: 0,
+
+			builder: ToyMeshBuilder::new(),
+		}
+	}
+
+	pub fn set_color_target(&mut self, target: impl Into<Option<gfx::ImageHandle>>) {
+		self.color_target = target.into();
+	}
+
+	pub fn set_depth_target(&mut self, target: impl Into<Option<gfx::ImageHandle>>) {
+		self.depth_target = target.into();
+	}
+
+	pub fn update(&mut self, core: &gfx::Core, f: impl FnOnce(&mut ToyMeshBuilder)) {
+		self.builder.clear();
+		self.builder.set_root_transform(Mat3x4::identity());
+		f(&mut self.builder);
+
+		self.element_count = self.builder.indices.len() as u32;
+		core.upload_immutable_buffer_immediate(self.vertex_buffer, &self.builder.vertices);
+		core.upload_immutable_buffer_immediate(self.index_buffer, &self.builder.indices);
+	}
+
+	pub fn draw(&self, gfx: &mut gfx::System) {
+		if self.element_count > 0 {
+			let mut group = gfx.frame_encoder.command_group(self.framestage);
+			let mut command = group.draw(self.v_shader, self.f_shader);
+
+			command.indexed(self.index_buffer)
+				.ssbo(0, self.vertex_buffer)
+				.sampled_image(0, self.texture, gfx.resource_manager.nearest_sampler)
+				.elements(self.element_count);
+
+			match (self.color_target, self.depth_target) {
+				(Some(ct), Some(dt)) => { command.rendertargets(&[ct, dt]); }
+				(Some(ct), None) => { command.rendertargets(&[ct]); }
+				(None, Some(dt)) => { command.rendertargets(&[dt]); }
+				_ => {}
+			}
 		}
 	}
 }

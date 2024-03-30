@@ -56,7 +56,7 @@ impl audio::Provider for MyAudioProvider {
 
 		for frame in buffer.chunks_exact_mut(2) {
 			let osc = osc_phase.sin();
-			let amp = (1.0 - self.env_phase).max(0.0).powi(2) * 0.5;
+			let amp = (1.0 - self.env_phase).max(0.0).powi(2) * 0.3;
 
 			let value = (amp * osc) as f32;
 
