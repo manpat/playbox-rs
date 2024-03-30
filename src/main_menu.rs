@@ -1,8 +1,4 @@
-use toybox::*;
-use crate::audio::MyAudioSystem;
-use crate::sprites::Sprites;
-use crate::toy_draw::ToyRenderer;
-
+use crate::prelude::*;
 
 pub struct MainMenuScene {
 

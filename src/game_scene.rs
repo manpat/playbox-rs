@@ -1,10 +1,4 @@
-use toybox::*;
-
-use crate::world;
-use crate::audio::MyAudioSystem;
-use crate::sprites::Sprites;
-use crate::toy_draw::ToyRenderer;
-
+use crate::prelude::*;
 
 pub struct GameScene {
 	posteffect_shader: gfx::ShaderHandle,
@@ -74,15 +68,11 @@ impl GameScene {
 
 		self.world.update();
 
-		if ctx.input.button_just_down(input::MouseButton::Left) {
-			ctx.input.set_capture_mouse(true);
-		}
+		ctx.input.set_capture_mouse(true);
 
-		if ctx.input.button_just_up(input::MouseButton::Left) {
-			ctx.input.set_capture_mouse(false);
-		}
-
-		if ctx.input.button_down(input::MouseButton::Left) {
+		// TODO(pat.m): factor out camera/player controller stuff
+		// TODO(pat.m): Allow free cam
+		/*if ctx.input.button_down(input::MouseButton::Left)*/ {
 			let (dx, dy) = ctx.input.mouse_delta().map_or((0.0, 0.0), Vec2::to_tuple);
 			self.yaw += dx * TAU;
 			self.yaw %= TAU;
@@ -118,7 +108,8 @@ impl GameScene {
 			self.audio.trigger();
 		}
 
-		self.update_world(ctx);
+		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
+		self.update_interactive_objects(ctx);
 	}
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
@@ -134,15 +125,15 @@ impl GameScene {
 		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
 			.bind_rendertargets(&[self.test_rt, self.depth_rt]);
 
+		self.draw_world();
+
 		self.toy_renderer.draw(gfx);
 		self.sprites.draw(gfx);
 
 		self.dispatch_postprocess(gfx);
 	}
 
-	fn update_world(&mut self, ctx: &mut toybox::Context) {
-		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
-
+	fn draw_world(&mut self) {
 		// Ground
 		self.sprites.basic(Vec3::from_x(10.0), Vec3::from_z(-10.0), Vec3::from_z(5.0), Color::rgb(0.5, 0.5, 0.5));
 
@@ -150,8 +141,9 @@ impl GameScene {
 		for (_, &world::Object{pos, size, color, ..}) in self.world.objects.iter() {
 			self.sprites.billboard(pos, size, color);
 		}
+	}
 
-		// Interactive objects
+	fn update_interactive_objects(&mut self, ctx: &mut toybox::Context) {
 		let eye = Vec3::from_y(0.5) + self.pos.to_x0y();
 		let dir = Vec3::from_y_angle(self.yaw - PI/2.0);
 
@@ -168,22 +160,18 @@ impl GameScene {
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {
 		let gfx::System { resource_manager: rm, frame_encoder, .. } = gfx;
 
-		let mut postprocess_group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
+		let mut group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
-		postprocess_group.compute(self.posteffect_shader)
+		group.compute(self.posteffect_shader)
 			.image_rw(0, self.test2_rt)
 			.groups_from_image_size(self.test2_rt);
 
-		postprocess_group.draw(rm.fullscreen_vs_shader, rm.flat_fs_shader)
+		group.draw_fullscreen(None)
 			.sampled_image(0, self.test2_rt, rm.nearest_sampler)
-			.elements(6)
-			.blend_mode(gfx::BlendMode::ALPHA)
-			.depth_test(false);
+			.blend_mode(gfx::BlendMode::ALPHA);
 
-		postprocess_group.draw(rm.fullscreen_vs_shader, rm.flat_fs_shader)
+		group.draw_fullscreen(None)
 			.sampled_image(0, self.test_rt, rm.nearest_sampler)
-			.elements(6)
-			.blend_mode(gfx::BlendMode::ALPHA)
-			.depth_test(false);
+			.blend_mode(gfx::BlendMode::ALPHA);
 	}
 }
