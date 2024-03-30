@@ -96,6 +96,8 @@ impl toybox::App for App {
 
 				ctx.input.set_capture_mouse(false);
 
+				// TODO(pat.m): menu builder
+				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
 				ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0))
 					.draw_fullscreen(None)
 					.sampled_image(0, ctx.gfx.resource_manager.blank_black_image, ctx.gfx.resource_manager.nearest_sampler);
@@ -103,7 +105,6 @@ impl toybox::App for App {
 				self.game_scene.draw(&mut ctx.gfx);
 			}
 		}
-
 	}
 
 	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
