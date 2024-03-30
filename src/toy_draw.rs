@@ -57,7 +57,7 @@ impl ToyRenderer {
 
 	pub fn draw(&self, gfx: &mut gfx::System) {
 		if self.element_count > 0 {
-			let mut group = gfx.frame_encoder.command_group(self.framestage);
+			let mut group = gfx.frame_encoder.command_group(self.framestage).annotate("Toy");
 			let mut command = group.draw(self.v_shader, self.f_shader);
 
 			command.indexed(self.index_buffer)
