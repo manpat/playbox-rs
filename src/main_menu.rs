@@ -39,7 +39,7 @@ impl MainMenuScene {
 		// }
 
 
-		self.painter.draw(&mut ctx.gfx, screen_bounds);
+		self.painter.submit(&mut ctx.gfx, screen_bounds);
 	}
 }
 
@@ -66,7 +66,6 @@ impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
 	pub fn button(&mut self, pos: Vec2) -> bool {
 		let size = Vec2::new(256.0, 128.0) / 2.0 + Vec2::splat(8.0);
 		let bounds = Aabb2::around_point(pos, size);
-		let uvs = Aabb2::new(Vec2::zero(), Vec2::zero());
 
 		let is_hovered = self.input.mouse_position_pixels()
 			.map(|pos| bounds.contains_point(pos))
@@ -81,35 +80,11 @@ impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
 			(_, false) => Color::white(),
 		};
 
-		self.painter.shape_layer.draw_quad(bounds, uvs, Color::grey_a(0.1, 0.3));
+		self.painter.rect(bounds, Color::grey_a(0.1, 0.3));
 
-		fn floor_vec2(Vec2{x,y}: Vec2) -> Vec2 {
-			Vec2::new(x.floor(), y.floor())
-		}
-
-		self.painter.glyph_atlas.layout(&self.painter.font, 100, "Abcdef WAAAHhhhh", |info, cursor| {
-			let glyph_pos = floor_vec2(bounds.min + Vec2::new(8.0 + cursor, 8.0)) + info.offset_px.to_vec2();
-			let glyph_size = info.size_px.to_vec2();
-			let glyph_rect = Aabb2::new(glyph_pos, glyph_pos + glyph_size);
-
-			self.painter.text_layer.draw_quad(glyph_rect, info.uv_bounds, color);
-		});
-
-		self.painter.glyph_atlas.layout(&self.painter.font, 200, "WEH", |info, cursor| {
-			let glyph_pos = floor_vec2(bounds.min + Vec2::new(8.0 + cursor, 8.0 + 100.0)) + info.offset_px.to_vec2();
-			let glyph_size = info.size_px.to_vec2();
-			let glyph_rect = Aabb2::new(glyph_pos, glyph_pos + glyph_size);
-
-			self.painter.text_layer.draw_quad(glyph_rect, info.uv_bounds, color);
-		});
-
-		self.painter.glyph_atlas.layout(&self.painter.font, 24, "Text text text text text", |info, cursor| {
-			let glyph_pos = floor_vec2(bounds.min + Vec2::new(8.0 + cursor, 8.0 - 24.0)) + info.offset_px.to_vec2();
-			let glyph_size = info.size_px.to_vec2();
-			let glyph_rect = Aabb2::new(glyph_pos, glyph_pos + glyph_size);
-
-			self.painter.text_layer.draw_quad(glyph_rect, info.uv_bounds, color);
-		});
+		self.painter.text(bounds.min + Vec2::new(8.0, 8.0), 100, "Abcdef WAAAHhhhh", color);
+		self.painter.text(bounds.min + Vec2::new(8.0, 8.0 + 100.0), 200, "WEH", color);
+		self.painter.text(bounds.min + Vec2::new(8.0, 8.0 - 24.0), 24, "Text text text text text", color);
 
 		is_hovered && self.input.button_just_up(input::MouseButton::Left)
 	}
@@ -149,7 +124,7 @@ impl MenuPainter {
 		})
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System, bounds: Aabb2) {
+	pub fn submit(&mut self, gfx: &mut gfx::System, bounds: Aabb2) {
 		let aspect = gfx.backbuffer_aspect();
 		let projection = Mat4::ortho(bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, -1.0, 1.0);
 		let projection = gfx.frame_encoder.upload(&[projection]);
@@ -179,7 +154,7 @@ impl MenuPainter {
 				.indexed(&self.text_layer.indices)
 				.ssbo(0, &self.text_layer.vertices)
 				.ubo(0, projection)
-				.sampled_image(0, self.glyph_atlas.font_atlas, gfx.resource_manager.linear_sampler)
+				.sampled_image(0, self.glyph_atlas.font_atlas, gfx.resource_manager.nearest_sampler)
 				.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
 				.depth_test(false);
 
@@ -187,6 +162,24 @@ impl MenuPainter {
 		}
 	}
 }
+
+impl MenuPainter {
+	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
+		self.shape_layer.draw_quad(geom, Aabb2::point(Vec2::zero()), color);
+	}
+
+	pub fn text(&mut self, origin: Vec2, font_size: u32, s: &str, color: impl Into<Color>) {
+		let origin = origin.floor();
+		let color = color.into();
+
+		self.glyph_atlas.layout(&self.font, font_size, s, |geom_rect, uv_rect| {
+			self.text_layer.draw_quad(geom_rect.translate(origin), uv_rect, color);
+		});
+	}
+}
+
+
+
 
 
 pub struct MenuPainterLayer {
@@ -275,6 +268,8 @@ impl GlyphCache {
 	pub fn get(&mut self, font: &fontdue::Font, font_size: u32, ch: char) -> &GlyphInfo {
 		use std::collections::hash_map::Entry;
 
+		let glyph_margin = 1;
+
 		let key = (ch, font.file_hash(), font_size);
 		match self.glyphs.entry(key) {
 			Entry::Occupied(entry) => entry.into_mut(),
@@ -285,7 +280,7 @@ impl GlyphCache {
 				if metrics.width + self.cursor_x > self.atlas_size.x as usize {
 					assert!(self.cursor_y + self.current_row_height_px <= self.atlas_size.y as usize, "Font atlas ran out of space!");
 
-					self.cursor_y += self.current_row_height_px;
+					self.cursor_y += self.current_row_height_px + glyph_margin;
 					self.cursor_x = 0;
 					self.current_row_height_px = 0;
 				}
@@ -296,16 +291,16 @@ impl GlyphCache {
 				let size_px = Vec2i::new(metrics.width as i32, metrics.height as i32);
 				let offset_px = Vec2i::new(metrics.xmin, metrics.ymin);
 
-				self.cursor_x += metrics.width;
+				self.cursor_x += metrics.width + glyph_margin;
 
 				let uv_pos = pos_px.to_vec2() / self.atlas_size.to_vec2();
 				let uv_size = size_px.to_vec2() / self.atlas_size.to_vec2();
-				let uv_bounds = Aabb2::new(uv_pos, uv_pos + uv_size);
+				let uv_rect = Aabb2::new(uv_pos, uv_pos + uv_size);
 
-				self.to_insert.push(GlyphInsertion {key, pos_px, size_px, data});
+				self.to_insert.push(GlyphInsertion {pos_px, size_px, data});
 
 				slot.insert(GlyphInfo {
-					uv_bounds,
+					uv_rect,
 					offset_px,
 					size_px,
 					advance_px: metrics.advance_width,
@@ -314,7 +309,7 @@ impl GlyphCache {
 		}
 	}
 
-	pub fn layout(&mut self, font: &fontdue::Font, font_size: u32, s: &str, mut f: impl FnMut(&GlyphInfo, f32)) {
+	pub fn layout(&mut self, font: &fontdue::Font, font_size: u32, s: &str, mut f: impl FnMut(Aabb2, Aabb2)) {
 		let space_width = font.metrics(' ', font_size as f32).advance_width;
 
 		let mut cursor_x = 0.0;
@@ -331,21 +326,24 @@ impl GlyphCache {
 			}
 
 			let info = self.get(font, font_size, ch);
-			f(info, cursor_x);
+
+			let offset = info.offset_px.to_vec2() + Vec2::from_x(cursor_x);
+			let geom_rect = Aabb2::new(offset, offset + info.size_px.to_vec2());
+
+			f(geom_rect, info.uv_rect);
 			cursor_x += info.advance_px;
 		}
 	}
 }
 
 struct GlyphInsertion {
-	key: (char, usize, u32),
 	pos_px: Vec2i,
 	size_px: Vec2i,
 	data: Vec<u8>,
 }
 
 pub struct GlyphInfo {
-	pub uv_bounds: Aabb2,
+	pub uv_rect: Aabb2,
 	pub offset_px: Vec2i,
 	pub size_px: Vec2i,
 	pub advance_px: f32,
