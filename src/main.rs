@@ -16,7 +16,7 @@ pub mod prelude {
 
 	pub use crate::audio::MyAudioSystem;
 	pub use crate::game_scene::GameScene;
-	pub use crate::main_menu::{MainMenuScene, MainMenuCmd};
+	pub use crate::main_menu::{MainMenuScene, MenuCmd, PauseMenuScene};
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
 	pub use crate::world;
@@ -46,6 +46,7 @@ struct App {
 	active_scene: ActiveScene,
 
 	main_menu: MainMenuScene,
+	pause_menu: PauseMenuScene,
 	game_scene: GameScene,
 }
 
@@ -67,6 +68,7 @@ impl App {
 		Ok(App {
 			active_scene,
 			main_menu: MainMenuScene::new(ctx, audio.clone())?,
+			pause_menu: PauseMenuScene::new(ctx)?,
 			game_scene: GameScene::new(ctx, audio.clone())?,
 		})
 	}
@@ -76,22 +78,16 @@ impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
 		match self.active_scene {
 			ActiveScene::MainMenu => {
-				if ctx.input.button_just_down(input::Key::Space) {
-					self.active_scene = ActiveScene::Game;
-				}
-
-				ctx.input.set_capture_mouse(false);
-
 				match self.main_menu.update(ctx) {
-					Some(MainMenuCmd::Play) => {
+					Some(MenuCmd::Play) => {
 						self.active_scene = ActiveScene::Game;
 					}
 
-					Some(MainMenuCmd::Settings) => {
+					Some(MenuCmd::Settings) => {
 
 					}
 
-					Some(MainMenuCmd::Quit) => {
+					Some(MenuCmd::Quit) => {
 						ctx.wants_quit = true;
 					}
 
@@ -109,17 +105,23 @@ impl toybox::App for App {
 			}
 
 			ActiveScene::PauseMenu => {
-				if ctx.input.button_just_down(input::Key::Escape) {
-					self.active_scene = ActiveScene::Game;
-				}
-
-				ctx.input.set_capture_mouse(false);
-
-				// TODO(pat.m): menu builder
 				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
-				ctx.gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0))
-					.draw_fullscreen(None)
-					.sampled_image(0, ctx.gfx.resource_manager.blank_black_image, ctx.gfx.resource_manager.nearest_sampler);
+				
+				match self.pause_menu.update(ctx) {
+					Some(MenuCmd::Play) => {
+						self.active_scene = ActiveScene::Game;
+					}
+
+					Some(MenuCmd::ReturnToMain) => {
+						self.active_scene = ActiveScene::MainMenu;
+					}
+
+					Some(MenuCmd::Quit) => {
+						ctx.wants_quit = true;
+					}
+
+					_ => {}
+				}
 
 				self.game_scene.draw(&mut ctx.gfx);
 			}
