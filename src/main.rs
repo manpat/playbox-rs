@@ -3,21 +3,26 @@
 use toybox::*;
 
 pub mod audio;
+pub mod menu;
 pub mod sprites;
 pub mod world;
 pub mod toy_draw;
 pub mod game_scene;
 pub mod main_menu;
+pub mod glyph_cache;
 
 pub mod prelude {
 	pub use toybox::prelude::*;
 
 	pub use crate::audio::MyAudioSystem;
 	pub use crate::game_scene::GameScene;
-	pub use crate::main_menu::MainMenuScene;
+	pub use crate::main_menu::{MainMenuScene, MainMenuCmd};
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
 	pub use crate::world;
+	pub use crate::menu;
+
+	pub use crate::glyph_cache::GlyphCache;
 }
 
 use prelude::*;
@@ -77,7 +82,21 @@ impl toybox::App for App {
 
 				ctx.input.set_capture_mouse(false);
 
-				self.main_menu.update(ctx);
+				match self.main_menu.update(ctx) {
+					Some(MainMenuCmd::Play) => {
+						self.active_scene = ActiveScene::Game;
+					}
+
+					Some(MainMenuCmd::Settings) => {
+
+					}
+
+					Some(MainMenuCmd::Quit) => {
+						ctx.wants_quit = true;
+					}
+
+					_ => {}
+				}
 			}
 
 			ActiveScene::Game => {
