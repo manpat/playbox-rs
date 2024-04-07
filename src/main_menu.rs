@@ -6,14 +6,14 @@ pub struct MainMenuScene {
 }
 
 impl MainMenuScene {
-	pub fn new(ctx: &mut toybox::Context, audio: MyAudioSystem) -> anyhow::Result<MainMenuScene> {
+	pub fn new(ctx: &mut Context<'_>, audio: MyAudioSystem) -> anyhow::Result<MainMenuScene> {
 		Ok(MainMenuScene{
 			painter: menu::MenuPainter::new(&mut ctx.gfx)?,
 			audio,
 		})
 	}
 
-	pub fn update(&mut self, ctx: &mut toybox::Context) -> Option<MenuCmd> {
+	pub fn update(&mut self, ctx: &mut Context<'_>) -> Option<MenuCmd> {
 		ctx.gfx.frame_encoder.backbuffer_color(Color::light_cyan());
 
 		ctx.input.set_capture_mouse(false);
@@ -66,13 +66,13 @@ pub struct PauseMenuScene {
 }
 
 impl PauseMenuScene {
-	pub fn new(ctx: &mut toybox::Context) -> anyhow::Result<PauseMenuScene> {
+	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<PauseMenuScene> {
 		Ok(PauseMenuScene{
 			painter: menu::MenuPainter::new(&mut ctx.gfx)?,
 		})
 	}
 
-	pub fn update(&mut self, ctx: &mut toybox::Context) -> Option<MenuCmd> {
+	pub fn update(&mut self, ctx: &mut Context<'_>) -> Option<MenuCmd> {
 		ctx.input.set_capture_mouse(false);
 
 		let resume_shortcut_pressed = ctx.input.button_just_down(input::Key::Escape);

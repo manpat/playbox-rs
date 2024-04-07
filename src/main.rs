@@ -23,6 +23,8 @@ pub mod prelude {
 	pub use crate::menu;
 
 	pub use crate::glyph_cache::GlyphCache;
+
+	pub use crate::Context;
 }
 
 use prelude::*;
@@ -61,9 +63,11 @@ impl App {
 
 		let mut active_scene = ActiveScene::MainMenu;
 
-		if false /*cfg.read_bool("skip-main-menu")*/ {
+		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
 		}
+
+		let ctx = &mut Context::new(ctx);
 
 		Ok(App {
 			active_scene,
@@ -78,14 +82,12 @@ impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
 		match self.active_scene {
 			ActiveScene::MainMenu => {
-				match self.main_menu.update(ctx) {
+				match self.main_menu.update(&mut Context::new(ctx)) {
 					Some(MenuCmd::Play) => {
 						self.active_scene = ActiveScene::Game;
 					}
 
-					Some(MenuCmd::Settings) => {
-
-					}
+					Some(MenuCmd::Settings) => {}
 
 					Some(MenuCmd::Quit) => {
 						ctx.wants_quit = true;
@@ -100,14 +102,14 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				self.game_scene.update(ctx);
+				self.game_scene.update(&mut Context::new(ctx));
 				self.game_scene.draw(&mut ctx.gfx);
 			}
 
 			ActiveScene::PauseMenu => {
 				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
 				
-				match self.pause_menu.update(ctx) {
+				match self.pause_menu.update(&mut Context::new(ctx)) {
 					Some(MenuCmd::Play) => {
 						self.active_scene = ActiveScene::Game;
 					}
@@ -132,5 +134,22 @@ impl toybox::App for App {
 		ui.menu_button("Playbox", |ui| {
 			let _ = ui.button("???");
 		});
+	}
+}
+
+
+pub struct Context<'tb> {
+	pub gfx: &'tb mut toybox::gfx::System,
+	pub audio: &'tb mut toybox::audio::System,
+	pub input: &'tb mut toybox::input::System,
+	pub egui: &'tb mut toybox::egui::Context,
+	pub cfg: &'tb mut toybox::cfg::Config,
+}
+
+impl<'tb> Context<'tb> {
+	pub fn new(tb: &'tb mut toybox::Context) -> Self {
+		let toybox::Context { gfx, audio, input, egui, cfg, .. } = tb;
+
+		Self {gfx, audio, input, egui, cfg}
 	}
 }

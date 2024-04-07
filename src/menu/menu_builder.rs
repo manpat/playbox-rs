@@ -16,7 +16,7 @@ pub struct MenuBuilder<'mp, 'ctx> {
 }
 
 impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
-	pub fn new(painter: &'mp mut MenuPainter, ctx: &'ctx mut toybox::Context) -> Self {
+	pub fn new(painter: &'mp mut MenuPainter, ctx: &'ctx mut Context<'_>) -> Self {
 		let size = ctx.gfx.backbuffer_size();
 		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
 		let content_rect = screen_rect.shrink(Vec2::splat(8.0));

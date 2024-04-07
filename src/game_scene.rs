@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 pub struct GameScene {
 	posteffect_shader: gfx::ShaderHandle,
+	fog_shader: gfx::ShaderHandle,
 
 	test_rt: gfx::ImageHandle,
 	test2_rt: gfx::ImageHandle,
@@ -12,6 +13,9 @@ pub struct GameScene {
 	world: world::World,
 	audio: MyAudioSystem,
 
+	show_debug: bool,
+	fog_color: Color,
+
 	yaw: f32,
 	pitch: f32,
 	pos: Vec2,
@@ -20,11 +24,11 @@ pub struct GameScene {
 }
 
 impl GameScene {
-	pub fn new(ctx: &mut toybox::Context, audio: MyAudioSystem) -> anyhow::Result<GameScene> {
+	pub fn new(ctx: &mut Context<'_>, audio: MyAudioSystem) -> anyhow::Result<GameScene> {
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
-		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::Rgb10A2));
-		let test2_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::Rgb10A2));
+		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::hdr_color()));
+		let test2_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::hdr_color()));
 		let depth_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth));
 
 		let toy_renderer = {
@@ -44,6 +48,7 @@ impl GameScene {
 
 		Ok(GameScene {
 			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
+			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
 
 			test_rt,
 			test2_rt,
@@ -55,6 +60,9 @@ impl GameScene {
 			audio,
 			world: world::make_test_world(),
 
+			show_debug: false,
+			fog_color: Color::light_magenta(),
+
 			time: 0.0,
 			yaw: 0.0,
 			pitch: 0.0,
@@ -63,12 +71,31 @@ impl GameScene {
 		})
 	}
 
-	pub fn update(&mut self, ctx: &mut toybox::Context) {
+	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		self.time += 1.0/60.0;
 
 		self.world.update();
 
-		ctx.input.set_capture_mouse(true);
+		if ctx.input.button_just_down(input::Key::F2) {
+			self.show_debug = !self.show_debug;
+		}
+
+		ctx.input.set_capture_mouse(!self.show_debug);
+
+		if self.show_debug {
+			egui::Window::new("Bleh")
+				.show(&ctx.egui, |ui| {
+					use egui::{*, color_picker::*};
+
+					let [r, g, b, a] = self.fog_color.to_array();
+					let mut color = Rgba::from_rgb(r, g, b);
+					color_edit_button_rgba(ui, &mut color, Alpha::Opaque);
+
+					self.fog_color = Color::from([color.r(), color.g(), color.b(), a]);
+				});
+
+			return;
+		}
 
 		// TODO(pat.m): factor out camera/player controller stuff
 		// TODO(pat.m): Allow free cam
@@ -119,7 +146,7 @@ impl GameScene {
 			* Mat4::rotate_y(self.yaw)
 			* Mat4::translate(-Vec3::from_y(0.5) - self.pos.to_x0y());
 
-		gfx.frame_encoder.backbuffer_color(Color::light_magenta());
+		gfx.frame_encoder.backbuffer_color(self.fog_color);
 		gfx.frame_encoder.bind_global_ubo(0, &[projection]);
 
 		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
@@ -135,7 +162,20 @@ impl GameScene {
 
 	fn draw_world(&mut self) {
 		// Ground
-		self.sprites.basic(Vec3::from_x(10.0), Vec3::from_z(-10.0), Vec3::from_z(5.0), Color::rgb(0.5, 0.5, 0.5));
+		let scale = 3.0;
+		for y in -10..=10 {
+			for x in -10..=10 {
+				let offset = Vec3::new(x as f32, 0.0, y as f32);
+				let dist = 1.0 - (offset.length() / 10.0).clamp(0.0, 1.0).powi(2);
+
+				self.sprites.basic(
+					Vec3::from_x(scale),
+					Vec3::from_z(-scale),
+					offset * scale,
+					Color::grey_a(0.5, dist)
+				);
+			}
+		}
 
 		// Objects
 		for (_, &world::Object{pos, size, color, ..}) in self.world.objects.iter() {
@@ -143,7 +183,7 @@ impl GameScene {
 		}
 	}
 
-	fn update_interactive_objects(&mut self, ctx: &mut toybox::Context) {
+	fn update_interactive_objects(&mut self, ctx: &mut Context<'_>) {
 		let eye = Vec3::from_y(0.5) + self.pos.to_x0y();
 		let dir = Vec3::from_y_angle(self.yaw - PI/2.0);
 
@@ -165,6 +205,16 @@ impl GameScene {
 		group.compute(self.posteffect_shader)
 			.image_rw(0, self.test2_rt)
 			.groups_from_image_size(self.test2_rt);
+
+		group.compute(self.fog_shader)
+			.image_rw(0, self.test2_rt)
+			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
+			.groups_from_image_size(self.test2_rt);
+
+		group.compute(self.fog_shader)
+			.image_rw(0, self.test_rt)
+			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
+			.groups_from_image_size(self.test_rt);
 
 		group.draw_fullscreen(None)
 			.sampled_image(0, self.test2_rt, rm.nearest_sampler)

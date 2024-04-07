@@ -1,13 +1,17 @@
 use crate::prelude::*;
 use super::{MenuBuilder};
 
-const TUFFY_DATA: &[u8] = include_bytes!("../../resource/fonts/Tuffy.otf");
+// TODO(pat.m): try ab_glyph. variable fonts??
+
+// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Tuffy.otf");
+const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Quicksand-Light.ttf");
 
 
 pub struct MenuPainter {
 	pub shape_layer: MenuPainterLayer,
 	pub text_layer: MenuPainterLayer,
 
+	// TODO(pat.m): pull these out into a shared place so they can be reused for diff menus
 	pub font: fontdue::Font,
 	pub glyph_atlas: GlyphCache,
 
@@ -18,7 +22,7 @@ pub struct MenuPainter {
 
 impl MenuPainter {
 	pub fn new(gfx: &mut gfx::System) -> anyhow::Result<MenuPainter> {
-		let font = fontdue::Font::from_bytes(TUFFY_DATA, fontdue::FontSettings::default())
+		let font = fontdue::Font::from_bytes(FONT_DATA, fontdue::FontSettings::default())
 			.map_err(|err| anyhow::anyhow!("{}", err))?;
 
 		Ok(MenuPainter {
@@ -71,7 +75,7 @@ impl MenuPainter {
 		}
 	}
 
-	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx mut toybox::Context) -> MenuBuilder<'mp, 'ctx> {
+	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx mut Context<'_>) -> MenuBuilder<'mp, 'ctx> {
 		MenuBuilder::new(self, ctx)
 	}
 }
