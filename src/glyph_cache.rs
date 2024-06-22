@@ -86,7 +86,7 @@ impl GlyphCache {
 	}
 
 	pub fn layout(&mut self, font: &fontdue::Font, font_size: u32, s: &str, mut f: impl FnMut(Aabb2, Aabb2)) {
-		use fontdue::layout::{Layout, TextStyle, CoordinateSystem, LayoutSettings, VerticalAlign};
+		use fontdue::layout::{Layout, TextStyle, CoordinateSystem, LayoutSettings};
 		let mut layout = Layout::new(CoordinateSystem::PositiveYUp);
 
 		layout.reset(&LayoutSettings {

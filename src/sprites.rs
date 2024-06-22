@@ -55,7 +55,7 @@ impl Sprites {
 }
 
 impl Sprites {
-	pub fn basic(&mut self, right: Vec3, up: Vec3, pos: Vec3, color: impl Into<Color>) {
+	pub fn add(&mut self, right: Vec3, up: Vec3, pos: Vec3, color: impl Into<Color>) {
 		let start_index = self.vertices.len() as u32;
 		let indices = [0, 1, 2, 0, 2, 3].into_iter().map(|i| i + start_index);
 
@@ -74,6 +74,6 @@ impl Sprites {
 	}
 
 	pub fn billboard(&mut self, pos: Vec3, size: Vec2, color: impl Into<Color>) {
-		self.basic(size.x * self.right, size.y * self.up, pos, color);
+		self.add(size.x * self.right, size.y * self.up, pos, color);
 	}
 }

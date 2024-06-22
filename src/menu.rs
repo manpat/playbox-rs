@@ -1,5 +1,3 @@
-use crate::prelude::*;
-
 mod menu_builder;
 mod menu_painter;
 
