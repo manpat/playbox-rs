@@ -55,11 +55,12 @@ impl Sprites {
 }
 
 impl Sprites {
-	pub fn basic(&mut self, right: Vec3, up: Vec3, pos: Vec3, color: Color) {
+	pub fn basic(&mut self, right: Vec3, up: Vec3, pos: Vec3, color: impl Into<Color>) {
 		let start_index = self.vertices.len() as u32;
 		let indices = [0, 1, 2, 0, 2, 3].into_iter().map(|i| i + start_index);
 
 		let right = right/2.0;
+		let color = color.into();
 
 		let vertices = [
 			gfx::StandardVertex::new(pos - right, Vec2::new(0.0, 0.0), color),
@@ -72,7 +73,7 @@ impl Sprites {
 		self.indices.extend(indices);
 	}
 
-	pub fn billboard(&mut self, pos: Vec3, size: Vec2, color: Color) {
+	pub fn billboard(&mut self, pos: Vec3, size: Vec2, color: impl Into<Color>) {
 		self.basic(size.x * self.right, size.y * self.up, pos, color);
 	}
 }

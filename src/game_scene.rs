@@ -11,6 +11,7 @@ pub struct GameScene {
 	toy_renderer: ToyRenderer,
 	sprites: Sprites,
 	world: world::World,
+	world_view: world::WorldView,
 	audio: MyAudioSystem,
 
 	show_debug: bool,
@@ -58,7 +59,8 @@ impl GameScene {
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
 			audio,
-			world: world::make_test_world(),
+			world: world::World::new(),
+			world_view: world::WorldView::new(),
 
 			show_debug: false,
 			fog_color: Color::light_magenta(),
@@ -135,8 +137,8 @@ impl GameScene {
 			self.audio.trigger();
 		}
 
-		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
-		self.update_interactive_objects(ctx);
+		// self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
+		// self.update_interactive_objects(ctx);
 	}
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
@@ -161,40 +163,8 @@ impl GameScene {
 	}
 
 	fn draw_world(&mut self) {
-		// Ground
-		let scale = 3.0;
-		for y in -10..=10 {
-			for x in -10..=10 {
-				let offset = Vec3::new(x as f32, 0.0, y as f32);
-				let dist = 1.0 - (offset.length() / 10.0).clamp(0.0, 1.0).powi(2);
-
-				self.sprites.basic(
-					Vec3::from_x(scale),
-					Vec3::from_z(-scale),
-					offset * scale,
-					Color::grey_a(0.5, dist)
-				);
-			}
-		}
-
-		// Objects
-		for (_, &world::Object{pos, size, color, ..}) in self.world.objects.iter() {
-			self.sprites.billboard(pos, size, color);
-		}
-	}
-
-	fn update_interactive_objects(&mut self, ctx: &mut Context<'_>) {
-		let eye = Vec3::from_y(0.5) + self.pos.to_x0y();
-		let dir = Vec3::from_y_angle(self.yaw - PI/2.0);
-
-		if let Some(key) = self.world.nearest_interactive(eye, dir) {
-			let &world::Object{pos, size, ..} = &self.world.objects[key];
-			self.sprites.billboard(pos + Vec3::from_y(size.y + 0.05), Vec2::splat(0.1), Color::white());
-
-			if ctx.input.button_just_down(input::Key::Space) || ctx.input.button_just_down(input::MouseButton::Right) {
-				self.world.interact(key);
-			}
-		}
+		self.world_view.build(&self.world);
+		self.world_view.draw(&mut self.sprites);
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {
