@@ -163,8 +163,8 @@ impl GameScene {
 	}
 
 	fn draw_world(&mut self) {
-		self.world_view.build(&self.world);
-		self.world_view.draw(&mut self.sprites);
+		// self.world_view.build(&self.world);
+		self.world_view.draw(&mut self.sprites, &self.world);
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {

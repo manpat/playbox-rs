@@ -73,6 +73,21 @@ impl Sprites {
 		self.indices.extend(indices);
 	}
 
+	pub fn add_convex_poly<VS>(&mut self, vs: VS, color: impl Into<Color>)
+		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
+	{
+		let vs = vs.into_iter();
+		let start_index = self.vertices.len() as u32;
+		let indices = (1..vs.len() as u32 - 1)
+			.flat_map(|i| [start_index, start_index + i, start_index + i + 1]);
+
+		let color = color.into();
+		let vertices = vs.map(|pos| gfx::StandardVertex::new(pos, Vec2::zero(), color));
+
+		self.vertices.extend(vertices);
+		self.indices.extend(indices);
+	}
+
 	pub fn billboard(&mut self, pos: Vec3, size: Vec2, color: impl Into<Color>) {
 		self.add(size.x * self.right, size.y * self.up, pos, color);
 	}
