@@ -19,7 +19,8 @@ pub struct GameScene {
 
 	yaw: f32,
 	pitch: f32,
-	pos: Vec2,
+
+	world_pos: world::WorldPosition,
 
 	time: f32,
 }
@@ -69,14 +70,12 @@ impl GameScene {
 			yaw: 0.0,
 			pitch: 0.0,
 
-			pos: Vec2::from_y(3.0),
+			world_pos: world::WorldPosition::default(),
 		})
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		self.time += 1.0/60.0;
-
-		self.world.update();
 
 		if ctx.input.button_just_down(input::Key::F2) {
 			self.show_debug = !self.show_debug;
@@ -117,27 +116,32 @@ impl GameScene {
 			false => 2.0 / 60.0,
 		};
 
+		let mut delta = Vec2::zero();
+
 		if ctx.input.button_down(input::Key::W) {
-			self.pos += forward * speed;
+			delta += forward * speed;
 		}
 
 		if ctx.input.button_down(input::Key::S) {
-			self.pos -= forward * speed;
+			delta -= forward * speed;
 		}
 
 		if ctx.input.button_down(input::Key::D) {
-			self.pos += right * speed;
+			delta += right * speed;
 		}
 
 		if ctx.input.button_down(input::Key::A) {
-			self.pos -= right * speed;
+			delta -= right * speed;
 		}
+
+		self.world.try_move_by(&mut self.world_pos, Some(&mut self.yaw), delta);
+
 
 		if ctx.input.button_just_down(input::Key::F) {
 			self.audio.trigger();
 		}
 
-		// self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
+		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
 		// self.update_interactive_objects(ctx);
 	}
 
@@ -146,7 +150,7 @@ impl GameScene {
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0)
 			* Mat4::rotate_x(self.pitch)
 			* Mat4::rotate_y(self.yaw)
-			* Mat4::translate(-Vec3::from_y(0.5) - self.pos.to_x0y());
+			* Mat4::translate(-Vec3::from_y(0.5));
 
 		gfx.frame_encoder.backbuffer_color(self.fog_color);
 		gfx.frame_encoder.bind_global_ubo(0, &[projection]);
@@ -156,7 +160,7 @@ impl GameScene {
 
 		self.draw_world();
 
-		self.toy_renderer.draw(gfx);
+		// self.toy_renderer.draw(gfx);
 		self.sprites.draw(gfx);
 
 		self.dispatch_postprocess(gfx);
@@ -164,7 +168,7 @@ impl GameScene {
 
 	fn draw_world(&mut self) {
 		// self.world_view.build(&self.world);
-		self.world_view.draw(&mut self.sprites, &self.world);
+		self.world_view.draw(&mut self.sprites, &self.world, self.world_pos);
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {
