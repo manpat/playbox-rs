@@ -44,15 +44,21 @@ impl World {
 			],
 
 			connections: vec![
+				(GlobalWallId{room_index: 0, wall_index: 0}, GlobalWallId{room_index: 1, wall_index: 2}),
+
 				(GlobalWallId{room_index: 0, wall_index: 1}, GlobalWallId{room_index: 1, wall_index: 0}),
-				(GlobalWallId{room_index: 0, wall_index: 2}, GlobalWallId{room_index: 2, wall_index: 3}),
+				(GlobalWallId{room_index: 0, wall_index: 2}, GlobalWallId{room_index: 2, wall_index: 2}),
 
-				// (GlobalWallId{room_index: 0, wall_index: 3}, GlobalWallId{room_index: 2, wall_index: 2}),
-				(GlobalWallId{room_index: 0, wall_index: 3}, GlobalWallId{room_index: 2, wall_index: 0}),
-				(GlobalWallId{room_index: 2, wall_index: 2}, GlobalWallId{room_index: 1, wall_index: 0}),
+				// (GlobalWallId{room_index: 0, wall_index: 3}, GlobalWallId{room_index: 2, wall_index: 1}),
+				// (GlobalWallId{room_index: 2, wall_index: 2}, GlobalWallId{room_index: 1, wall_index: 0}),
 
-				(GlobalWallId{room_index: 1, wall_index: 2}, GlobalWallId{room_index: 0, wall_index: 0}),
+				(GlobalWallId{room_index: 2, wall_index: 1}, GlobalWallId{room_index: 2, wall_index: 3}),
 			],
+
+			// connections: vec![
+			// 	(GlobalWallId{room_index: 0, wall_index: 3}, GlobalWallId{room_index: 0, wall_index: 0}),
+			// 	// (GlobalWallId{room_index: 1, wall_index: 0}, GlobalWallId{room_index: 0, wall_index: 3}),
+			// ],
 		}
 	}
 
@@ -155,15 +161,13 @@ impl WorldView {
 		// 	calculate transform between connected walls, and build that room,
 		// 	using wall intersection to calculate a frustum to cull by
 
-		sprites.billboard(Vec3::zero(), Vec2::new(0.1, 2.0), Color::red());
-
 		let mut drawer = WorldDrawer{sprites, world, vertical_offset: 0.0};
-		let transform = Mat2x3::rotate_translate(0.0, -pov.local_position);
+		let initial_transform = Mat2x3::rotate_translate(0.0, -pov.local_position);
 
 
 		const MAX_DEPTH: i32 = 2;
 
-		let mut room_stack = vec![(pov.room_index, transform, 0)];
+		let mut room_stack = vec![(pov.room_index, initial_transform, 0)];
 
 		while let Some((room_index, transform, current_depth)) = room_stack.pop() {
 			drawer.vertical_offset = -((current_depth-1).max(0) as f32 / 10.0);
@@ -189,6 +193,14 @@ impl WorldView {
 				let total_transform = transform * portal_transform;
 
 				room_stack.push((target_wall_id.room_index, total_transform, current_depth+1));
+
+				// If we connect to the same room then we need to draw again with the inverse transform to make sure both walls get recursed through
+				if current_wall_id.room_index == target_wall_id.room_index {
+					let portal_transform = calculate_portal_transform(world, target_wall_id, current_wall_id);
+					let total_transform = transform * portal_transform;
+
+					room_stack.push((target_wall_id.room_index, total_transform, current_depth+1));
+				}
 			}
 		}
 
