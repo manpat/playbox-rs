@@ -21,6 +21,9 @@ pub struct GameScene {
 	pitch: f32,
 
 	world_pos: world::WorldPosition,
+	free_pos: Vec3,
+
+	free_cam: bool,
 
 	time: f32,
 }
@@ -71,6 +74,9 @@ impl GameScene {
 			pitch: 0.0,
 
 			world_pos: world::WorldPosition::default(),
+			free_pos: Vec3::zero(),
+
+			free_cam: false,
 		})
 	}
 
@@ -98,6 +104,14 @@ impl GameScene {
 			return;
 		}
 
+		if ctx.input.button_just_down(input::Key::V) {
+			self.free_cam = !self.free_cam;
+
+			if !self.free_cam {
+				self.free_pos = Vec3::zero();
+			}
+		}
+
 		// TODO(pat.m): factor out camera/player controller stuff
 		// TODO(pat.m): Allow free cam
 		/*if ctx.input.button_down(input::MouseButton::Left)*/ {
@@ -109,37 +123,61 @@ impl GameScene {
 			self.pitch = (self.pitch - 3.0*dy).clamp(-pitch_limit, pitch_limit);
 		}
 
-		let right = Vec2::from_angle(self.yaw);
-		let forward = -right.perp();
 		let speed = match ctx.input.button_down(input::Key::LShift) {
 			true => 4.0 / 60.0,
 			false => 2.0 / 60.0,
 		};
 
-		let mut delta = Vec2::zero();
+		if self.free_cam {
+			// TODO(pat.m): figure out why these need to be negated :(
+			// yaw at least I think is because I'm using Vec2::to_x0y, but pitch??
+			let yaw_orientation = Quat::from_yaw(-self.yaw);
+			let orientation = yaw_orientation * Quat::from_pitch(-self.pitch);
 
-		if ctx.input.button_down(input::Key::W) {
-			delta += forward * speed;
+			let right = yaw_orientation.right();
+			let forward = orientation.forward();
+
+			if ctx.input.button_down(input::Key::W) {
+				self.free_pos += forward * speed;
+			}
+
+			if ctx.input.button_down(input::Key::S) {
+				self.free_pos -= forward * speed;
+			}
+
+			if ctx.input.button_down(input::Key::D) {
+				self.free_pos += right * speed;
+			}
+
+			if ctx.input.button_down(input::Key::A) {
+				self.free_pos -= right * speed;
+			}
+
+		} else {
+			let right = Vec2::from_angle(self.yaw);
+			let forward = -right.perp();
+
+			let mut delta = Vec2::zero();
+
+			if ctx.input.button_down(input::Key::W) {
+				delta += forward * speed;
+			}
+
+			if ctx.input.button_down(input::Key::S) {
+				delta -= forward * speed;
+			}
+
+			if ctx.input.button_down(input::Key::D) {
+				delta += right * speed;
+			}
+
+			if ctx.input.button_down(input::Key::A) {
+				delta -= right * speed;
+			}
+
+			self.world.try_move_by(&mut self.world_pos, Some(&mut self.yaw), delta);
 		}
 
-		if ctx.input.button_down(input::Key::S) {
-			delta -= forward * speed;
-		}
-
-		if ctx.input.button_down(input::Key::D) {
-			delta += right * speed;
-		}
-
-		if ctx.input.button_down(input::Key::A) {
-			delta -= right * speed;
-		}
-
-		self.world.try_move_by(&mut self.world_pos, Some(&mut self.yaw), delta);
-
-
-		if ctx.input.button_just_down(input::Key::F) {
-			self.audio.trigger();
-		}
 
 		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.yaw));
 		// self.update_interactive_objects(ctx);
@@ -147,13 +185,13 @@ impl GameScene {
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
 		let aspect = gfx.backbuffer_aspect();
-		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0)
+		let projection_view = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0)
 			* Mat4::rotate_x(self.pitch)
 			* Mat4::rotate_y(self.yaw)
-			* Mat4::translate(-Vec3::from_y(0.5));
+			* Mat4::translate(-self.free_pos-Vec3::from_y(0.5));
 
 		gfx.frame_encoder.backbuffer_color(self.fog_color);
-		gfx.frame_encoder.bind_global_ubo(0, &[projection]);
+		gfx.frame_encoder.bind_global_ubo(0, &[projection_view]);
 
 		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
 			.bind_rendertargets(&[self.test_rt, self.depth_rt]);

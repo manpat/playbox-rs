@@ -95,7 +95,7 @@ impl World {
 					}
 				})
 			{
-				// Connected walls may be different lengths, so we need to calculate the apperture that we can actually
+				// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 				// pass through.
 				let opposing_wall_length = {
 					let opposing_room = &self.rooms[opposing_wall_id.room_index];
@@ -106,7 +106,7 @@ impl World {
 				let apperture_size = wall_length.min(opposing_wall_length);
 				let intersection_dist_from_center = (wall_length/2.0 - wall_direction.dot(desired_delta_wall_space)).abs();
 
-				// If we're transitioning through the apperture then we need to transition to the opposing room.
+				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
 				if intersection_dist_from_center < apperture_size/2.0 {
 					let transform = calculate_portal_transform(self, opposing_wall_id, wall_id);
@@ -306,7 +306,7 @@ impl WorldDrawer<'_> {
 		let up = Vec3::from_y(0.2);
 
 		if let Some(opposing_wall_id) = opposing_wall_id {
-			// Connected walls may be different lengths, so we need to calculate the apperture that we can actually
+			// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 			// pass through.
 			let opposing_wall_length = {
 				let opposing_room = &self.world.rooms[opposing_wall_id.room_index];
