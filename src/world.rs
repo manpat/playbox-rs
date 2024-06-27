@@ -13,7 +13,7 @@ impl World {
 		World {
 			rooms: vec![
 				Room {
-					walls: [const {Wall{color: Color::light_red()}}; 4].into(),
+					walls: [Wall{color: Color::light_red()}; 4].into(),
 					wall_vertices: vec![
 						Vec2::new(-1.0, -1.0),
 						Vec2::new(-1.0,  1.0),
@@ -23,7 +23,7 @@ impl World {
 				},
 
 				Room {
-					walls: [const {Wall{color: Color::light_cyan()}}; 4].into(),
+					walls: [Wall{color: Color::light_cyan()}; 4].into(),
 					wall_vertices: vec![
 						Vec2::new(-2.0, -1.5),
 						Vec2::new(-2.0,  1.0),
@@ -33,7 +33,7 @@ impl World {
 				},
 
 				Room {
-					walls: [const {Wall{color: Color::light_green()}}; 4].into(),
+					walls: [Wall{color: Color::light_green()}; 4].into(),
 					wall_vertices: vec![
 						Vec2::new(0.0, 0.0),
 						Vec2::new(0.0, 1.0),
@@ -54,11 +54,6 @@ impl World {
 
 				(GlobalWallId{room_index: 2, wall_index: 1}, GlobalWallId{room_index: 2, wall_index: 3}),
 			],
-
-			// connections: vec![
-			// 	(GlobalWallId{room_index: 0, wall_index: 3}, GlobalWallId{room_index: 0, wall_index: 0}),
-			// 	// (GlobalWallId{room_index: 1, wall_index: 0}, GlobalWallId{room_index: 0, wall_index: 3}),
-			// ],
 		}
 	}
 
@@ -74,6 +69,7 @@ impl World {
 			let (wall_start, wall_end) = current_room.wall_vertices(wall_index);
 
 			let wall_direction = (wall_end - wall_start).normalize();
+			let wall_length = (wall_end - wall_start).length();
 
 			let desired_delta_wall_space = desired_position - wall_start;
 			let penetration = wall_direction.wedge(desired_delta_wall_space);
@@ -89,7 +85,7 @@ impl World {
 			// or if we need to slide against the wall
 			let wall_id = GlobalWallId{room_index: position.room_index, wall_index};
 			if let Some(opposing_wall_id) = self.connections.iter()
-				.filter_map(|&(a, b)| {
+				.find_map(|&(a, b)| {
 					if a == wall_id {
 						Some(b)
 					} else if b == wall_id {
@@ -98,22 +94,35 @@ impl World {
 						None
 					}
 				})
-				.next()
 			{
-				let transform = calculate_portal_transform(self, opposing_wall_id, wall_id);
+				// Connected walls may be different lengths, so we need to calculate the apperture that we can actually
+				// pass through.
+				let opposing_wall_length = {
+					let opposing_room = &self.rooms[opposing_wall_id.room_index];
+					let (wall_start, wall_end) = opposing_room.wall_vertices(opposing_wall_id.wall_index);
+					(wall_end - wall_start).length()
+				};
 
-				// Need to transition
-				position.room_index = opposing_wall_id.room_index;
-				position.local_position = transform * desired_position;
+				let apperture_size = wall_length.min(opposing_wall_length);
+				let intersection_dist_from_center = (wall_length/2.0 - wall_direction.dot(desired_delta_wall_space)).abs();
 
-				// Apply yaw offset
-				if let Some(yaw) = yaw {
-					let row = transform.rows[0];
-					let angle_delta = row.y.atan2(row.x);
-					*yaw -= angle_delta;
+				// If we're transitioning through the apperture then we need to transition to the opposing room.
+				// Otherwise just slide as normal.
+				if intersection_dist_from_center < apperture_size/2.0 {
+					let transform = calculate_portal_transform(self, opposing_wall_id, wall_id);
+
+					position.room_index = opposing_wall_id.room_index;
+					position.local_position = transform * desired_position;
+
+					// Apply yaw offset
+					if let Some(yaw) = yaw {
+						let row = transform.rows[0];
+						let angle_delta = row.y.atan2(row.x);
+						*yaw -= angle_delta;
+					}
+
+					return;
 				}
-
-				return;
 			}
 
 			// Slide along wall
@@ -126,6 +135,7 @@ impl World {
 }
 
 
+#[derive(Debug)]
 pub struct Room {
 	pub walls: Vec<Wall>,
 	pub wall_vertices: Vec<Vec2>,
@@ -138,6 +148,7 @@ impl Room {
 	}
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Wall {
 	pub color: Color,
 }
@@ -268,30 +279,79 @@ impl WorldDrawer<'_> {
 		// Walls
 		for wall_index in 0..room.walls.len() {
 			let wall_id = GlobalWallId{room_index, wall_index};
-			let is_connection = self.world.connections.iter().any(|&(left, right)| left == wall_id || right == wall_id);
+			let connection = self.world.connections.iter()
+				.find_map(|&(a, b)|
+					if a == wall_id {
+						Some(b)
+					} else if b == wall_id {
+						Some(a)
+					} else {
+						None
+					}
+				);
 
-			if !is_connection {
-				self.draw_wall(room, wall_index, transform);
-			}
+			self.draw_wall(wall_id, transform, connection);
 		}
 	}
 
-	fn draw_wall(&mut self, room: &Room, wall_index: usize, transform: &Mat2x3) {
+	fn draw_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, transform: &Mat2x3, opposing_wall_id: Option<GlobalWallId>) {
+		let room = &self.world.rooms[room_index];
+
+		let wall_color = room.walls[wall_index].color;
+
 		let (start_vertex, end_vertex) = room.wall_vertices(wall_index);
-		let start_vertex = (*transform * start_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
-		let end_vertex = (*transform * end_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+		let start_vertex_3d = (*transform * start_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+		let end_vertex_3d = (*transform * end_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
 
 		let up = Vec3::from_y(0.2);
 
-		let verts = [
-			start_vertex,
-			start_vertex + up,
-			end_vertex + up,
-			end_vertex,
-		];
+		if let Some(opposing_wall_id) = opposing_wall_id {
+			// Connected walls may be different lengths, so we need to calculate the apperture that we can actually
+			// pass through.
+			let opposing_wall_length = {
+				let opposing_room = &self.world.rooms[opposing_wall_id.room_index];
+				let (wall_start, wall_end) = opposing_room.wall_vertices(opposing_wall_id.wall_index);
+				(wall_end - wall_start).length()
+			};
 
-		let wall = &room.walls[wall_index];
+			let wall_length = (end_vertex - start_vertex).length();
+			let wall_dir = (end_vertex - start_vertex) / wall_length;
 
-		self.sprites.add_convex_poly(verts, wall.color);
+			let apperture_half_size = wall_length.min(opposing_wall_length) / 2.0;
+			let left_vertex = start_vertex + wall_dir * (wall_length/2.0 - apperture_half_size);
+			let right_vertex = start_vertex + wall_dir * (wall_length/2.0 + apperture_half_size);
+
+			let left_vertex_3d = (*transform * left_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+			let right_vertex_3d = (*transform * right_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+
+			let verts = [
+				start_vertex_3d,
+				start_vertex_3d + up,
+				left_vertex_3d + up,
+				left_vertex_3d,
+			];
+
+			self.sprites.add_convex_poly(verts, wall_color);
+
+			let verts = [
+				right_vertex_3d,
+				right_vertex_3d + up,
+				end_vertex_3d + up,
+				end_vertex_3d,
+			];
+
+			self.sprites.add_convex_poly(verts, wall_color);
+
+		} else {
+			let verts = [
+				start_vertex_3d,
+				start_vertex_3d + up,
+				end_vertex_3d + up,
+				end_vertex_3d,
+			];
+
+			self.sprites.add_convex_poly(verts, wall_color);
+		}
+
 	}
 }
