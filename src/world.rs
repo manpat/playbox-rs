@@ -155,6 +155,16 @@ pub struct Wall {
 
 
 
+#[derive(Debug, Copy, Clone, Default)]
+struct ClipState {
+	depth: i32,
+
+	local_position: Vec2,
+	left_apperture: Vec2,
+	right_apperture: Vec2,
+}
+
+
 
 pub struct WorldView {
 
@@ -165,7 +175,7 @@ impl WorldView {
 		Self {}
 	}
 
-	pub fn draw(&self, sprites: &mut super::Sprites, world: &World, pov: WorldPosition) {
+	pub fn draw(&self, sprites: &mut super::Sprites, world: &World, world_position: WorldPosition) {
 		// Draw room you're in
 		// then for each wall,
 		// 	check if it has a neighbouring room, and if so
@@ -173,18 +183,31 @@ impl WorldView {
 		// 	using wall intersection to calculate a frustum to cull by
 
 		let mut drawer = WorldDrawer{sprites, world, vertical_offset: 0.0};
-		let initial_transform = Mat2x3::rotate_translate(0.0, -pov.local_position);
+		let initial_transform = Mat2x3::rotate_translate(0.0, -world_position.local_position);
 
 
-		const MAX_DEPTH: i32 = 2;
+		const MAX_DEPTH: i32 = 9;
 
-		let mut room_stack = vec![(pov.room_index, initial_transform, 0)];
+		struct Entry {
+			room_index: usize,
+			transform: Mat2x3,
+			clip_by: Option<ClipState>,
+		}
 
-		while let Some((room_index, transform, current_depth)) = room_stack.pop() {
-			drawer.vertical_offset = -((current_depth-1).max(0) as f32 / 10.0);
+		let mut room_stack = vec![
+			Entry {
+				room_index: world_position.room_index,
+				transform: initial_transform,
+				clip_by: None,
+			}
+		];
+
+		while let Some(Entry{room_index, transform, clip_by}) = room_stack.pop() {
+			let depth = clip_by.map_or(0, |c| c.depth);
+
 			drawer.draw_room(room_index, &transform);
 
-			if current_depth >= MAX_DEPTH {
+			if depth >= MAX_DEPTH {
 				continue
 			}
 
@@ -199,18 +222,95 @@ impl WorldView {
 					}
 				});
 
+			let local_position = clip_by.map_or(world_position.local_position, |c| c.local_position);
+
 			for (current_wall_id, target_wall_id) in connections {
 				let portal_transform = calculate_portal_transform(world, current_wall_id, target_wall_id);
+				let inv_portal_transform = portal_transform.inverse();
+
 				let total_transform = transform * portal_transform;
 
-				room_stack.push((target_wall_id.room_index, total_transform, current_depth+1));
+				let (left_apperture, right_apperture) = {
+					let from_room = &world.rooms[current_wall_id.room_index];
+
+					let (start_vertex, end_vertex) = from_room.wall_vertices(current_wall_id.wall_index);
+
+					// If the apperture we're considering isn't CCW from our perspective then cull it and the room it connects to.
+					// TODO(pat.m): this doesn't work for rooms connecting to themselves
+					// TODO(pat.m): MATH EXTREMELY FUDGED PLS CHECK
+					if (end_vertex - local_position).wedge(start_vertex - local_position) < 0.0 {
+						continue;
+					}
+
+					let wall_length = (end_vertex - start_vertex).length();
+					let wall_dir = (end_vertex - start_vertex) / wall_length;
+					let opposing_wall_length = {
+						let opposing_room = &world.rooms[target_wall_id.room_index];
+						let (wall_start, wall_end) = opposing_room.wall_vertices(target_wall_id.wall_index);
+						(wall_end - wall_start).length()
+					};
+
+					let apperture_half_size = wall_length.min(opposing_wall_length) / 2.0;
+					let mut left_vertex = start_vertex + wall_dir * (wall_length/2.0 - apperture_half_size);
+					let mut right_vertex = start_vertex + wall_dir * (wall_length/2.0 + apperture_half_size);
+
+					if let Some(ClipState{left_apperture, right_apperture, ..}) = &clip_by {
+						let pos_to_left_clip = *left_apperture - local_position;
+						let pos_to_right_clip = *right_apperture - local_position;
+						let pos_to_left_vert = left_vertex - local_position;
+						let pos_to_right_vert = right_vertex - local_position;
+
+						// TODO(pat.m): MATH EXTREMELY FUDGED PLS CHECK
+						// TODO(pat.m): also this very doesn't work for rooms connecting to themselves
+						if pos_to_right_vert.wedge(pos_to_left_clip) < 0.0 {
+							continue
+						}
+
+						if pos_to_left_vert.wedge(pos_to_right_clip) > 0.0 {
+							continue
+						}
+
+						if pos_to_left_vert.wedge(pos_to_left_clip) < 0.0 {
+							left_vertex = *left_apperture;
+						}
+
+						if pos_to_right_vert.wedge(pos_to_right_clip) > 0.0 {
+							right_vertex = *right_apperture;
+						}
+					}
+
+					(left_vertex, right_vertex)
+				};
+
+				room_stack.push(Entry {
+					room_index: target_wall_id.room_index,
+					transform: total_transform,
+					clip_by: Some(ClipState {
+						depth: depth+1,
+
+						// All of these should be in the space of the target room
+						local_position: inv_portal_transform * local_position,
+						left_apperture: inv_portal_transform * left_apperture,
+						right_apperture: inv_portal_transform * right_apperture,
+					})
+				});
 
 				// If we connect to the same room then we need to draw again with the inverse transform to make sure both walls get recursed through
 				if current_wall_id.room_index == target_wall_id.room_index {
-					let portal_transform = calculate_portal_transform(world, target_wall_id, current_wall_id);
-					let total_transform = transform * portal_transform;
+					let total_transform = transform * inv_portal_transform;
 
-					room_stack.push((target_wall_id.room_index, total_transform, current_depth+1));
+					room_stack.push(Entry {
+						room_index: target_wall_id.room_index,
+						transform: total_transform,
+						clip_by: Some(ClipState {
+							depth: depth+1,
+
+							// All of these should be in the space of the target room
+							local_position: portal_transform * local_position,
+							left_apperture: portal_transform * right_apperture,
+							right_apperture: portal_transform * left_apperture,
+						})
+					});
 				}
 			}
 		}
@@ -258,7 +358,6 @@ pub struct GlobalWallId {
 	pub room_index: usize,
 	pub wall_index: usize,
 }
-
 
 struct WorldDrawer<'a> {
 	sprites: &'a mut super::Sprites,

@@ -113,8 +113,7 @@ impl GameScene {
 		}
 
 		// TODO(pat.m): factor out camera/player controller stuff
-		// TODO(pat.m): Allow free cam
-		/*if ctx.input.button_down(input::MouseButton::Left)*/ {
+		{
 			let (dx, dy) = ctx.input.mouse_delta().map_or((0.0, 0.0), Vec2::to_tuple);
 			self.yaw += dx * TAU;
 			self.yaw %= TAU;
