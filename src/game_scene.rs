@@ -90,15 +90,21 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!self.show_debug);
 
 		if self.show_debug {
-			egui::Window::new("Bleh")
+			// egui::Window::new("Bleh")
+			// 	.show(&ctx.egui, |ui| {
+			// 		use egui::{*, color_picker::*};
+
+			// 		let [r, g, b, a] = self.fog_color.to_array();
+			// 		let mut color = Rgba::from_rgb(r, g, b);
+			// 		color_edit_button_rgba(ui, &mut color, Alpha::Opaque);
+
+			// 		self.fog_color = Color::from([color.r(), color.g(), color.b(), a]);
+			// 	});
+
+
+			egui::Window::new("World")
 				.show(&ctx.egui, |ui| {
-					use egui::{*, color_picker::*};
-
-					let [r, g, b, a] = self.fog_color.to_array();
-					let mut color = Rgba::from_rgb(r, g, b);
-					color_edit_button_rgba(ui, &mut color, Alpha::Opaque);
-
-					self.fog_color = Color::from([color.r(), color.g(), color.b(), a]);
+					world::debug::draw_world_editor(ui, &mut self.world);
 				});
 
 			return;

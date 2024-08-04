@@ -1,8 +1,11 @@
 use toybox::common::*;
 
+pub mod debug;
+
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
 
+#[derive(Debug)]
 pub struct World {
 	pub rooms: Vec<Room>,
 	pub connections: Vec<(GlobalWallId, GlobalWallId)>,
@@ -20,6 +23,7 @@ impl World {
 						Vec2::new( 1.0,  1.0),
 						Vec2::new( 1.0, -1.0),
 					],
+					color: Color::red(),
 				},
 
 				Room {
@@ -30,6 +34,7 @@ impl World {
 						Vec2::new( 0.0,  1.0),
 						Vec2::new( 0.0, -1.5),
 					],
+					color: Color::cyan(),
 				},
 
 				Room {
@@ -40,19 +45,37 @@ impl World {
 						Vec2::new(4.0, 0.5),
 						Vec2::new(4.0, 0.0),
 					],
-				}
+					color: Color::green(),
+				},
+
+				Room {
+					walls: [Wall{color: Color::light_magenta()}; 4].into(),
+					wall_vertices: vec![
+						Vec2::new(0.0, 0.0),
+						Vec2::new(0.0, 0.8),
+						Vec2::new(2.5, 0.8),
+						Vec2::new(3.0, 0.0),
+					],
+					color: Color::magenta(),
+				},
 			],
 
 			connections: vec![
 				(GlobalWallId{room_index: 0, wall_index: 0}, GlobalWallId{room_index: 1, wall_index: 2}),
 
 				(GlobalWallId{room_index: 0, wall_index: 1}, GlobalWallId{room_index: 1, wall_index: 0}),
-				(GlobalWallId{room_index: 0, wall_index: 2}, GlobalWallId{room_index: 2, wall_index: 2}),
+				// (GlobalWallId{room_index: 0, wall_index: 2}, GlobalWallId{room_index: 2, wall_index: 2}),
 
 				// (GlobalWallId{room_index: 0, wall_index: 3}, GlobalWallId{room_index: 2, wall_index: 1}),
 				// (GlobalWallId{room_index: 2, wall_index: 2}, GlobalWallId{room_index: 1, wall_index: 0}),
 
-				(GlobalWallId{room_index: 2, wall_index: 1}, GlobalWallId{room_index: 2, wall_index: 3}),
+				// (GlobalWallId{room_index: 2, wall_index: 1}, GlobalWallId{room_index: 2, wall_index: 3}),
+
+				(GlobalWallId{room_index: 2, wall_index: 2}, GlobalWallId{room_index: 1, wall_index: 3}),
+				(GlobalWallId{room_index: 2, wall_index: 0}, GlobalWallId{room_index: 1, wall_index: 1}),
+
+				(GlobalWallId{room_index: 2, wall_index: 1}, GlobalWallId{room_index: 3, wall_index: 0}),
+				(GlobalWallId{room_index: 2, wall_index: 3}, GlobalWallId{room_index: 3, wall_index: 2}),
 			],
 		}
 	}
@@ -61,6 +84,8 @@ impl World {
 		if delta.dot(delta) <= 0.00001 {
 			return;
 		}
+
+		let mover_radius = 0.0;
 
 		let current_room = &self.rooms[position.room_index];
 		let mut desired_position = position.local_position + delta;
@@ -77,7 +102,7 @@ impl World {
 			// ASSUME: rooms are convex, and walls are specified in CCW order.
 
 			// Clockwise wedge product means desired position is on the 'inside'
-			if penetration < 0.0 {
+			if penetration < mover_radius {
 				continue
 			}
 
@@ -132,6 +157,11 @@ impl World {
 		// If we get here, no transitions have happened and desired_position has been adjusted to remove wall collisions
 		position.local_position = desired_position;
 	}
+
+	pub fn wall_vertices(&self, wall_id: GlobalWallId) -> (Vec2, Vec2) {
+		self.rooms[wall_id.room_index]
+			.wall_vertices(wall_id.wall_index)
+	}
 }
 
 
@@ -139,6 +169,7 @@ impl World {
 pub struct Room {
 	pub walls: Vec<Wall>,
 	pub wall_vertices: Vec<Vec2>,
+	pub color: Color,
 }
 
 impl Room {
@@ -164,6 +195,35 @@ struct ClipState {
 	right_apperture: Vec2,
 }
 
+fn clip_wall_segment((mut left_vertex, mut right_vertex): (Vec2, Vec2), clip_by: &ClipState) -> Option<(Vec2, Vec2)> {
+	let &ClipState{left_apperture, right_apperture, local_position, ..} = clip_by;
+
+	let pos_to_left_clip = left_apperture - local_position;
+	let pos_to_right_clip = right_apperture - local_position;
+	let pos_to_left_vert = left_vertex - local_position;
+	let pos_to_right_vert = right_vertex - local_position;
+
+	// Full cull
+	if pos_to_right_vert.wedge(pos_to_left_clip) < 0.0 {
+		return None
+	}
+
+	if pos_to_left_vert.wedge(pos_to_right_clip) > 0.0 {
+		return None
+	}
+
+	// Clip
+	// if pos_to_left_vert.wedge(pos_to_left_clip) < 0.0 {
+	// 	left_vertex = left_apperture;
+	// }
+
+	// if pos_to_right_vert.wedge(pos_to_right_clip) > 0.0 {
+	// 	right_vertex = right_apperture;
+	// }
+
+	Some((left_vertex, right_vertex))
+}
+
 
 
 pub struct WorldView {
@@ -186,7 +246,7 @@ impl WorldView {
 		let initial_transform = Mat2x3::rotate_translate(0.0, -world_position.local_position);
 
 
-		const MAX_DEPTH: i32 = 9;
+		const MAX_DEPTH: i32 = 40;
 
 		struct Entry {
 			room_index: usize,
@@ -205,7 +265,7 @@ impl WorldView {
 		while let Some(Entry{room_index, transform, clip_by}) = room_stack.pop() {
 			let depth = clip_by.map_or(0, |c| c.depth);
 
-			drawer.draw_room(room_index, &transform);
+			drawer.draw_room(room_index, &transform, &clip_by);
 
 			if depth >= MAX_DEPTH {
 				continue
@@ -222,65 +282,45 @@ impl WorldView {
 					}
 				});
 
-			let local_position = clip_by.map_or(world_position.local_position, |c| c.local_position);
-
-			for (current_wall_id, target_wall_id) in connections {
-				let portal_transform = calculate_portal_transform(world, current_wall_id, target_wall_id);
-				let inv_portal_transform = portal_transform.inverse();
-
-				let total_transform = transform * portal_transform;
+			fn try_add_connection(room_stack: &mut Vec<Entry>, world: &World, current_wall_id: GlobalWallId, target_wall_id: GlobalWallId,
+				transform: &Mat2x3, clip_by: &Option<ClipState>, local_position: Vec2, depth: i32)
+			{
+				let local_position = clip_by.map_or(local_position, |c| c.local_position);
 
 				let (left_apperture, right_apperture) = {
-					let from_room = &world.rooms[current_wall_id.room_index];
-
-					let (start_vertex, end_vertex) = from_room.wall_vertices(current_wall_id.wall_index);
+					let (start_vertex, end_vertex) = world.wall_vertices(current_wall_id);
 
 					// If the apperture we're considering isn't CCW from our perspective then cull it and the room it connects to.
-					// TODO(pat.m): this doesn't work for rooms connecting to themselves
-					// TODO(pat.m): MATH EXTREMELY FUDGED PLS CHECK
 					if (end_vertex - local_position).wedge(start_vertex - local_position) < 0.0 {
-						continue;
+						return;
 					}
 
 					let wall_length = (end_vertex - start_vertex).length();
 					let wall_dir = (end_vertex - start_vertex) / wall_length;
 					let opposing_wall_length = {
-						let opposing_room = &world.rooms[target_wall_id.room_index];
-						let (wall_start, wall_end) = opposing_room.wall_vertices(target_wall_id.wall_index);
+						let (wall_start, wall_end) = world.wall_vertices(target_wall_id);
 						(wall_end - wall_start).length()
 					};
 
 					let apperture_half_size = wall_length.min(opposing_wall_length) / 2.0;
-					let mut left_vertex = start_vertex + wall_dir * (wall_length/2.0 - apperture_half_size);
-					let mut right_vertex = start_vertex + wall_dir * (wall_length/2.0 + apperture_half_size);
+					let left_vertex = start_vertex + wall_dir * (wall_length/2.0 - apperture_half_size);
+					let right_vertex = start_vertex + wall_dir * (wall_length/2.0 + apperture_half_size);
 
-					if let Some(ClipState{left_apperture, right_apperture, ..}) = &clip_by {
-						let pos_to_left_clip = *left_apperture - local_position;
-						let pos_to_right_clip = *right_apperture - local_position;
-						let pos_to_left_vert = left_vertex - local_position;
-						let pos_to_right_vert = right_vertex - local_position;
-
-						// TODO(pat.m): MATH EXTREMELY FUDGED PLS CHECK
-						// TODO(pat.m): also this very doesn't work for rooms connecting to themselves
-						if pos_to_right_vert.wedge(pos_to_left_clip) < 0.0 {
-							continue
+					if let Some(clip_state) = &clip_by {
+						match clip_wall_segment((left_vertex, right_vertex), clip_state) {
+							Some(wall) => wall,
+							None => return,
 						}
 
-						if pos_to_left_vert.wedge(pos_to_right_clip) > 0.0 {
-							continue
-						}
-
-						if pos_to_left_vert.wedge(pos_to_left_clip) < 0.0 {
-							left_vertex = *left_apperture;
-						}
-
-						if pos_to_right_vert.wedge(pos_to_right_clip) > 0.0 {
-							right_vertex = *right_apperture;
-						}
+					} else {
+						(left_vertex, right_vertex)
 					}
 
-					(left_vertex, right_vertex)
 				};
+
+				let portal_transform = calculate_portal_transform(world, current_wall_id, target_wall_id);
+				let inv_portal_transform = portal_transform.inverse();
+				let total_transform = *transform * portal_transform;
 
 				room_stack.push(Entry {
 					room_index: target_wall_id.room_index,
@@ -294,23 +334,14 @@ impl WorldView {
 						right_apperture: inv_portal_transform * right_apperture,
 					})
 				});
+			}
+
+			for (current_wall_id, target_wall_id) in connections {
+				try_add_connection(&mut room_stack, world, current_wall_id, target_wall_id, &transform, &clip_by, world_position.local_position, depth);
 
 				// If we connect to the same room then we need to draw again with the inverse transform to make sure both walls get recursed through
 				if current_wall_id.room_index == target_wall_id.room_index {
-					let total_transform = transform * inv_portal_transform;
-
-					room_stack.push(Entry {
-						room_index: target_wall_id.room_index,
-						transform: total_transform,
-						clip_by: Some(ClipState {
-							depth: depth+1,
-
-							// All of these should be in the space of the target room
-							local_position: portal_transform * local_position,
-							left_apperture: portal_transform * right_apperture,
-							right_apperture: portal_transform * left_apperture,
-						})
-					});
+					try_add_connection(&mut room_stack, world, target_wall_id, current_wall_id, &transform, &clip_by, world_position.local_position, depth);
 				}
 			}
 		}
@@ -366,14 +397,14 @@ struct WorldDrawer<'a> {
 }
 
 impl WorldDrawer<'_> {
-	fn draw_room(&mut self, room_index: usize, transform: &Mat2x3) {
+	fn draw_room(&mut self, room_index: usize, transform: &Mat2x3, clip_by: &Option<ClipState>) {
 		let room = &self.world.rooms[room_index];
 
 		let verts = room.wall_vertices.iter()
 			.map(|&v| (*transform * v).to_x0y() + Vec3::from_y(self.vertical_offset));
 
 		// Floor
-		self.sprites.add_convex_poly(verts, Color::white());
+		self.sprites.add_convex_poly(verts, room.color);
 
 		// Walls
 		for wall_index in 0..room.walls.len() {
@@ -389,20 +420,29 @@ impl WorldDrawer<'_> {
 					}
 				);
 
-			self.draw_wall(wall_id, transform, connection);
+			self.draw_wall(wall_id, transform, clip_by, connection);
 		}
 	}
 
-	fn draw_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, transform: &Mat2x3, opposing_wall_id: Option<GlobalWallId>) {
+	fn draw_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, transform: &Mat2x3, clip_by: &Option<ClipState>, opposing_wall_id: Option<GlobalWallId>) {
 		let room = &self.world.rooms[room_index];
 
 		let wall_color = room.walls[wall_index].color;
-
 		let (start_vertex, end_vertex) = room.wall_vertices(wall_index);
-		let start_vertex_3d = (*transform * start_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
-		let end_vertex_3d = (*transform * end_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
 
-		let up = Vec3::from_y(0.2);
+		let (clipped_start_vertex, clipped_end_vertex) = match clip_by {
+			Some(clip_state) => match clip_wall_segment((start_vertex, end_vertex), clip_state) {
+				Some(wall) => wall,
+				None => return,
+			},
+
+			None => (start_vertex, end_vertex),
+		};
+
+		let start_vertex_3d = (*transform * clipped_start_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+		let end_vertex_3d = (*transform * clipped_end_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+
+		let up = Vec3::from_y(0.8);
 
 		if let Some(opposing_wall_id) = opposing_wall_id {
 			// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
@@ -420,8 +460,19 @@ impl WorldDrawer<'_> {
 			let left_vertex = start_vertex + wall_dir * (wall_length/2.0 - apperture_half_size);
 			let right_vertex = start_vertex + wall_dir * (wall_length/2.0 + apperture_half_size);
 
-			let left_vertex_3d = (*transform * left_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
-			let right_vertex_3d = (*transform * right_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+			let (clipped_left_vertex, clipped_right_vertex) = (left_vertex, right_vertex);
+
+			// let (clipped_left_vertex, clipped_right_vertex) = match clip_by {
+			// 	Some(clip_state) => match clip_wall_segment((left_vertex, right_vertex), clip_state) {
+			// 		Some(apperture) => apperture,
+			// 		None => return,
+			// 	},
+
+			// 	None => (start_vertex, end_vertex),
+			// };
+
+			let left_vertex_3d = (*transform * clipped_left_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
+			let right_vertex_3d = (*transform * clipped_right_vertex).to_x0y() + Vec3::from_y(self.vertical_offset);
 
 			let verts = [
 				start_vertex_3d,
