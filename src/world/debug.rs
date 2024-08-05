@@ -13,18 +13,37 @@ struct State {
 	vertex_drag: Option<VertexDrag>,
 }
 
+struct Context<'w> {
+	state: State,
+	world: &'w mut World,
+}
+
 pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World) {
 	let data_id = ui.next_auto_id();
 
-	let mut state: State = ui.data(|map| map.get_temp(data_id).unwrap_or_default());
+	let mut context = Context {
+		state: ui.data(|map| map.get_temp(data_id).unwrap_or_default()),
+		world,
+	};
 
+	draw_room_selector(ui, &mut context);
+	draw_room_viewport(ui, &mut context);
+
+	ui.data_mut(move |map| map.insert_temp(data_id, context.state));
+}
+
+
+fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 	for (idx, room) in world.rooms.iter().enumerate() {
 		let selected = idx == state.selection;
 		if ui.selectable_label(selected, format!("{idx}: {:?}", room.color)).clicked() {
 			state.selection = idx;
 		}
 	}
+}
 
+
+fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 	let (response, painter) = ui.allocate_painter(egui::vec2(ui.available_width(), ui.available_width()), egui::Sense::click_and_drag());
 	let rect = response.rect;
 	let center = response.rect.center();
@@ -92,6 +111,4 @@ pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World) {
 			}
 		}
 	}
-
-	ui.data_mut(move |map| map.insert_temp(data_id, state));
 }
