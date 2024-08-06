@@ -51,6 +51,8 @@ impl GameScene {
 			toy_renderer
 		};
 
+		let world = world::World::new();
+
 		Ok(GameScene {
 			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
@@ -63,8 +65,8 @@ impl GameScene {
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
 			audio,
-			world: world::World::new(),
-			world_view: world::WorldView::new(),
+			world_view: world::WorldView::new(&mut ctx.gfx, &world)?,
+			world,
 
 			show_debug: false,
 			fog_color: Color::light_magenta(),
@@ -104,7 +106,7 @@ impl GameScene {
 
 			egui::Window::new("World")
 				.show(&ctx.egui, |ui| {
-					world::debug::draw_world_editor(ui, &mut self.world);
+					world::debug::draw_world_editor(ui, &mut self.world, &mut self.world_view);
 				});
 
 			return;
@@ -201,17 +203,12 @@ impl GameScene {
 		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
 			.bind_rendertargets(&[self.test_rt, self.depth_rt]);
 
-		self.draw_world();
+		self.world_view.draw(gfx, &mut self.sprites, &self.world, self.world_pos);
 
 		// self.toy_renderer.draw(gfx);
 		self.sprites.draw(gfx);
 
 		self.dispatch_postprocess(gfx);
-	}
-
-	fn draw_world(&mut self) {
-		// self.world_view.build(&self.world);
-		self.world_view.draw(&mut self.sprites, &self.world, self.world_pos);
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use world::World;
+use world::{World, WorldView};
 
 #[derive(Copy, Clone, Default, Debug)]
 struct VertexDrag {
@@ -18,7 +18,7 @@ struct Context<'w> {
 	world: &'w mut World,
 }
 
-pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World) {
+pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World, world_view: &mut WorldView) {
 	let data_id = ui.next_auto_id();
 
 	let mut context = Context {
@@ -26,10 +26,16 @@ pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World) {
 		world,
 	};
 
+	let mut changed = false;
+
 	draw_room_selector(ui, &mut context);
-	draw_room_viewport(ui, &mut context);
+	changed |= draw_room_viewport(ui, &mut context);
 
 	ui.data_mut(move |map| map.insert_temp(data_id, context.state));
+
+	if changed {
+		world_view.needs_rebuild = true;
+	}
 }
 
 
@@ -43,7 +49,7 @@ fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 }
 
 
-fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
+fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) -> bool {
 	let (response, painter) = ui.allocate_painter(egui::vec2(ui.available_width(), ui.available_width()), egui::Sense::click_and_drag());
 	let rect = response.rect;
 	let center = response.rect.center();
@@ -51,6 +57,8 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 	painter.rect_filled(rect, 0.0, egui::Color32::BLACK);
 	painter.hline(rect.x_range(), center.y, (1.0, egui::Color32::DARK_GRAY));
 	painter.vline(center.x, rect.y_range(), (1.0, egui::Color32::DARK_GRAY));
+
+	let mut changed = false;
 
 	if let Some(room) = world.rooms.get_mut(state.selection) {
 		let num_walls = room.walls.len();
@@ -88,6 +96,8 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 					let delta = Vec2::new(delta_px.x, delta_px.y) / scale_factor;
 
 					*vertex += delta;
+
+					changed = true;
 				}
 
 				let vertex_px = *vertex * scale_factor;
@@ -111,4 +121,6 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 			}
 		}
 	}
+
+	changed
 }
