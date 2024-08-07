@@ -23,7 +23,8 @@ impl World {
 						Vec2::new( 1.0,  1.0),
 						Vec2::new( 1.0, -1.0),
 					],
-					color: Color::red(),
+					floor_color: Color::red(),
+					ceiling_color: Color::grey(0.5),
 				},
 
 				Room {
@@ -34,7 +35,8 @@ impl World {
 						Vec2::new( 0.0,  1.0),
 						Vec2::new( 0.0, -1.5),
 					],
-					color: Color::cyan(),
+					floor_color: Color::cyan(),
+					ceiling_color: Color::white(),
 				},
 
 				Room {
@@ -45,7 +47,8 @@ impl World {
 						Vec2::new(4.0, 0.5),
 						Vec2::new(4.0, 0.0),
 					],
-					color: Color::green(),
+					floor_color: Color::green(),
+					ceiling_color: Color::grey(0.5),
 				},
 
 				Room {
@@ -56,7 +59,8 @@ impl World {
 						Vec2::new(2.5, 0.8),
 						Vec2::new(3.0, 0.0),
 					],
-					color: Color::magenta(),
+					floor_color: Color::magenta(),
+					ceiling_color: Color::grey(0.5),
 				},
 			],
 
@@ -85,11 +89,27 @@ impl World {
 			return;
 		}
 
-		let mover_radius = 0.0;
+		let mover_radius = 0.1;
 
 		let current_room = &self.rooms[position.room_index];
 		let mut desired_position = position.local_position + delta;
 
+		fn collide_vertex(desired_position: &mut Vec2, vertex: Vec2, radius: f32) {
+			let delta = *desired_position - vertex;
+			let penetration = radius - delta.length();
+
+			if penetration > 0.0 {
+				let direction = delta.normalize();
+				*desired_position += direction * penetration;
+			}
+		}
+
+		// Collide with room verts
+		for vertex in current_room.wall_vertices.iter() {
+			collide_vertex(&mut desired_position, *vertex, mover_radius);
+		}
+
+		// Collide with walls
 		for wall_index in 0..current_room.walls.len() {
 			let (wall_start, wall_end) = current_room.wall_vertices(wall_index);
 
@@ -97,12 +117,18 @@ impl World {
 			let wall_length = (wall_end - wall_start).length();
 
 			let desired_delta_wall_space = desired_position - wall_start;
-			let penetration = wall_direction.wedge(desired_delta_wall_space);
+			let wall_penetration = wall_direction.wedge(desired_delta_wall_space);
 
 			// ASSUME: rooms are convex, and walls are specified in CCW order.
 
 			// Clockwise wedge product means desired position is on the 'inside'
-			if penetration < mover_radius {
+			if wall_penetration + mover_radius < 0.0 {
+				continue
+			}
+
+			// If the wall ends a long way away then don't continue
+			let distance_along_wall = wall_direction.dot(desired_delta_wall_space);
+			if distance_along_wall < 0.0 || distance_along_wall >= wall_length {
 				continue
 			}
 
@@ -128,12 +154,24 @@ impl World {
 					(wall_end - wall_start).length()
 				};
 
-				let apperture_size = wall_length.min(opposing_wall_length);
-				let intersection_dist_from_center = (wall_length/2.0 - wall_direction.dot(desired_delta_wall_space)).abs();
+				let apperture_extent = wall_length.min(opposing_wall_length) / 2.0;
+
+				let wall_center = wall_length/2.0;
+				let apperture_a = wall_start + (wall_center - apperture_extent) * wall_direction;
+				let apperture_b = wall_start + (wall_center + apperture_extent) * wall_direction;
+				let intersection_dist_from_center = (wall_center - distance_along_wall).abs();
+
+				// Collide with the virtual apperture verts
+				collide_vertex(&mut desired_position, apperture_a, mover_radius);
+				collide_vertex(&mut desired_position, apperture_b, mover_radius);
 
 				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
-				if intersection_dist_from_center < apperture_size/2.0 {
+				if intersection_dist_from_center < apperture_extent {
+					if wall_penetration < 0.0 {
+						continue
+					}
+
 					let transform = calculate_portal_transform(self, opposing_wall_id, wall_id);
 
 					position.room_index = opposing_wall_id.room_index;
@@ -146,12 +184,13 @@ impl World {
 						*yaw -= angle_delta;
 					}
 
+					// TODO(pat.m): collide with walls in opposing wall as well
 					return;
 				}
 			}
 
 			// Slide along wall
-			desired_position -= wall_direction.perp() * penetration;
+			desired_position -= wall_direction.perp() * (wall_penetration + mover_radius);
 		}
 
 		// If we get here, no transitions have happened and desired_position has been adjusted to remove wall collisions
@@ -169,7 +208,8 @@ impl World {
 pub struct Room {
 	pub walls: Vec<Wall>,
 	pub wall_vertices: Vec<Vec2>,
-	pub color: Color,
+	pub floor_color: Color,
+	pub ceiling_color: Color,
 }
 
 impl Room {
@@ -242,6 +282,8 @@ impl WorldView {
 			world,
 			vertices: Vec::new(),
 			indices: Vec::new(),
+
+			ceiling_height: 1.0,
 		};
 
 		let mut room_mesh_infos = Vec::new();
@@ -280,6 +322,8 @@ impl WorldView {
 				world,
 				vertices: Vec::new(),
 				indices: Vec::new(),
+
+				ceiling_height: 1.0,
 			};
 
 			self.room_mesh_infos.clear();
@@ -375,8 +419,7 @@ impl WorldView {
 							offset: room_info.base_index as usize * index_size,
 							size: room_info.num_elements as usize * index_size,
 						})
-					})
-					.sampled_image(0, rm.blank_white_image, rm.nearest_sampler);
+					});
 			}
 
 			let depth = clip_by.map_or(0, |c| c.depth);
@@ -515,6 +558,8 @@ struct RoomMeshBuilder<'a> {
 	world: &'a World,
 	vertices: Vec<gfx::StandardVertex>,
 	indices: Vec<u32>,
+
+	ceiling_height: f32,
 }
 
 impl RoomMeshBuilder<'_> {
@@ -538,12 +583,14 @@ impl RoomMeshBuilder<'_> {
 		let base_index = self.indices.len() as u32;
 
 		let room = &self.world.rooms[room_index];
+		let up = Vec3::from_y(self.ceiling_height);
 
-		let verts = room.wall_vertices.iter()
-			.map(|&v| v.to_x0y());
+		let floor_verts = room.wall_vertices.iter().map(|&v| v.to_x0y());
+		let ceiling_verts = floor_verts.clone().rev().map(|v| v + up);
 
-		// Floor
-		self.add_convex(verts, room.color);
+		// Floor/Ceiling
+		self.add_convex(floor_verts, room.floor_color);
+		self.add_convex(ceiling_verts, room.ceiling_color);
 
 		// Walls
 		for wall_index in 0..room.walls.len() {
@@ -559,7 +606,7 @@ impl RoomMeshBuilder<'_> {
 					}
 				);
 
-			self.draw_wall(wall_id, connection);
+			self.build_wall(wall_id, connection);
 		}
 
 		let num_elements = self.indices.len() as u32 - base_index;
@@ -567,7 +614,7 @@ impl RoomMeshBuilder<'_> {
 		RoomMeshInfo {base_vertex, base_index, num_elements}
 	}
 
-	fn draw_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, opposing_wall_id: Option<GlobalWallId>) {
+	fn build_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, opposing_wall_id: Option<GlobalWallId>) {
 		let room = &self.world.rooms[room_index];
 
 		let wall_color = room.walls[wall_index].color;
@@ -576,7 +623,7 @@ impl RoomMeshBuilder<'_> {
 		let start_vertex_3d = start_vertex.to_x0y();
 		let end_vertex_3d = end_vertex.to_x0y();
 
-		let up = Vec3::from_y(0.3);
+		let up = Vec3::from_y(self.ceiling_height);
 
 		if let Some(opposing_wall_id) = opposing_wall_id {
 			// Connected walls may be different lengths, so we need to calculate the aperture that we can actually

@@ -130,9 +130,10 @@ impl GameScene {
 			self.pitch = (self.pitch - 3.0*dy).clamp(-pitch_limit, pitch_limit);
 		}
 
-		let speed = match ctx.input.button_down(input::Key::LShift) {
-			true => 4.0 / 60.0,
-			false => 2.0 / 60.0,
+		let speed = match (ctx.input.button_down(input::Key::LShift), ctx.input.button_down(input::Key::LAlt)) {
+			(true, false) => 4.0 / 60.0,
+			(false, true) => 0.5 / 60.0,
+			_ => 2.0 / 60.0,
 		};
 
 		if self.free_cam {
@@ -200,8 +201,9 @@ impl GameScene {
 		gfx.frame_encoder.backbuffer_color(self.fog_color);
 		gfx.frame_encoder.bind_global_ubo(0, &[projection_view]);
 
-		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
-			.bind_rendertargets(&[self.test_rt, self.depth_rt]);
+		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
+		main_group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
+		main_group.bind_shared_sampled_image(0, gfx.resource_manager.blank_white_image, gfx.resource_manager.nearest_sampler);
 
 		self.world_view.draw(gfx, &mut self.sprites, &self.world, self.world_pos);
 

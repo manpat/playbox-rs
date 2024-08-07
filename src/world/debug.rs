@@ -42,7 +42,7 @@ pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World, world_view: &mut 
 fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 	for (idx, room) in world.rooms.iter().enumerate() {
 		let selected = idx == state.selection;
-		if ui.selectable_label(selected, format!("{idx}: {:?}", room.color)).clicked() {
+		if ui.selectable_label(selected, format!("{idx}: {:?}", room.floor_color)).clicked() {
 			state.selection = idx;
 		}
 	}
