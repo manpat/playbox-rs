@@ -95,11 +95,13 @@ impl World {
 		let mut desired_position = position.local_position + delta;
 
 		fn collide_vertex(desired_position: &mut Vec2, vertex: Vec2, radius: f32) {
-			let delta = *desired_position - vertex;
-			let penetration = radius - delta.length();
+			let desired_delta = *desired_position - vertex;
+			let penetration = radius - desired_delta.length();
+			// TODO(pat.m): this should involve the incoming direction so that a large
+			// enough delta can't just pass through the vertex
 
 			if penetration > 0.0 {
-				let direction = delta.normalize();
+				let direction = desired_delta.normalize();
 				*desired_position += direction * penetration;
 			}
 		}
