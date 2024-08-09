@@ -54,7 +54,7 @@ struct App {
 
 impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
-		// ctx.show_debug_menu = cfg!(debug_assertions);
+		ctx.show_debug_menu = cfg!(debug_assertions);
 
 		dbg!(&ctx.gfx.core.capabilities());
 		dbg!(ctx.resource_root_path());

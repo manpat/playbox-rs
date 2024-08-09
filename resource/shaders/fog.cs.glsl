@@ -18,7 +18,7 @@ void main() {
 	float ndc_depth = depth * 2.0 - 1.0;
 	float linear_depth = (2.0 * 0.01 * 100.0) / (100.0 + 0.01 - ndc_depth * (100.0 - 0.01));
 
-	texel *= pow(clamp(1.0 - linear_depth/20.0, 0.0, 1.0), 2.0);
+	texel *= pow(clamp(1.0 - linear_depth/15.0, 0.0, 1.0), 5.0);
 
 	imageStore(u_image, texel_uv, texel);
 }

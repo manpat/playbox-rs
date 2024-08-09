@@ -1,11 +1,9 @@
 use crate::prelude::*;
 
 pub struct GameScene {
-	posteffect_shader: gfx::ShaderHandle,
 	fog_shader: gfx::ShaderHandle,
 
 	test_rt: gfx::ImageHandle,
-	test2_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
 
 	toy_renderer: ToyRenderer,
@@ -15,7 +13,6 @@ pub struct GameScene {
 	audio: MyAudioSystem,
 
 	show_debug: bool,
-	fog_color: Color,
 
 	yaw: f32,
 	pitch: f32,
@@ -33,7 +30,6 @@ impl GameScene {
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
 		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::hdr_color()));
-		let test2_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget 2", gfx::ImageFormat::hdr_color()));
 		let depth_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth));
 
 		let toy_renderer = {
@@ -42,7 +38,7 @@ impl GameScene {
 			let project = toy::load(&project_data)?;
 
 			let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
-			toy_renderer.set_color_target(test2_rt);
+			toy_renderer.set_color_target(test_rt);
 			toy_renderer.set_depth_target(depth_rt);
 			toy_renderer.update(&core, |builder| {
 				builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
@@ -54,11 +50,9 @@ impl GameScene {
 		let world = world::World::new();
 
 		Ok(GameScene {
-			posteffect_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/post.cs.glsl")?),
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
 
 			test_rt,
-			test2_rt,
 			depth_rt,
 
 			toy_renderer,
@@ -69,7 +63,6 @@ impl GameScene {
 			world,
 
 			show_debug: false,
-			fog_color: Color::light_magenta(),
 
 			time: 0.0,
 			yaw: 0.0,
@@ -92,23 +85,7 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!self.show_debug);
 
 		if self.show_debug {
-			// egui::Window::new("Bleh")
-			// 	.show(&ctx.egui, |ui| {
-			// 		use egui::{*, color_picker::*};
-
-			// 		let [r, g, b, a] = self.fog_color.to_array();
-			// 		let mut color = Rgba::from_rgb(r, g, b);
-			// 		color_edit_button_rgba(ui, &mut color, Alpha::Opaque);
-
-			// 		self.fog_color = Color::from([color.r(), color.g(), color.b(), a]);
-			// 	});
-
-
-			egui::Window::new("World")
-				.show(&ctx.egui, |ui| {
-					world::debug::draw_world_editor(ui, &mut self.world, &mut self.world_view);
-				});
-
+			world::editor::draw_world_editor(&ctx.egui, &mut self.world, &mut self.world_view);
 			return;
 		}
 
@@ -198,7 +175,7 @@ impl GameScene {
 			* Mat4::rotate_y(self.yaw)
 			* Mat4::translate(-self.free_pos-Vec3::from_y(0.5));
 
-		gfx.frame_encoder.backbuffer_color(self.fog_color);
+		gfx.frame_encoder.backbuffer_color(self.world.fog_color);
 		gfx.frame_encoder.bind_global_ubo(0, &[projection_view]);
 
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
@@ -218,26 +195,13 @@ impl GameScene {
 
 		let mut group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
-		group.compute(self.posteffect_shader)
-			.image_rw(0, self.test2_rt)
-			.groups_from_image_size(self.test2_rt);
-
-		group.compute(self.fog_shader)
-			.image_rw(0, self.test2_rt)
-			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
-			.groups_from_image_size(self.test2_rt);
-
 		group.compute(self.fog_shader)
 			.image_rw(0, self.test_rt)
 			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
 			.groups_from_image_size(self.test_rt);
 
 		group.draw_fullscreen(None)
-			.sampled_image(0, self.test2_rt, rm.nearest_sampler)
-			.blend_mode(gfx::BlendMode::ALPHA);
-
-		group.draw_fullscreen(None)
 			.sampled_image(0, self.test_rt, rm.nearest_sampler)
-			.blend_mode(gfx::BlendMode::ALPHA);
+			.blend_mode(gfx::BlendMode::PREMULTIPLIED_ALPHA);
 	}
 }

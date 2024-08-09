@@ -22,20 +22,31 @@ struct Context<'w> {
 	world: &'w mut World,
 }
 
-pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World, world_view: &mut WorldView) {
-	let data_id = ui.next_auto_id();
+pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mut WorldView) {
+	let mut changed = false;
 
 	let mut context = Context {
-		state: ui.data(|map| map.get_temp(data_id).unwrap_or_default()),
+		state: ctx.data(|map| map.get_temp(egui::Id::null()).unwrap_or_default()),
 		world,
 	};
 
-	let mut changed = false;
+	egui::Window::new("Viewport")
+		.show(ctx, |ui| {
+			draw_room_selector(ui, &mut context);
+			changed |= draw_room_viewport(ui, &mut context);
+		});
 
-	draw_room_selector(ui, &mut context);
-	changed |= draw_room_viewport(ui, &mut context);
+	egui::Window::new("Inspector")
+		.show(ctx, |ui| {
+			changed |= draw_inspector(ui, &mut context);
+		});
 
-	ui.data_mut(move |map| map.insert_temp(data_id, context.state));
+	egui::Window::new("World")
+		.show(ctx, |ui| {
+			changed |= color_picker(ui, &mut context.world.fog_color);
+		});
+
+	ctx.data_mut(move |map| map.insert_temp(egui::Id::null(), context.state));
 
 	if changed {
 		world_view.needs_rebuild = true;
@@ -44,14 +55,35 @@ pub fn draw_world_editor(ui: &mut egui::Ui, world: &mut World, world_view: &mut 
 
 
 fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
-	for (idx, room) in world.rooms.iter().enumerate() {
-		let selected = idx == state.selection;
-		if ui.selectable_label(selected, format!("{idx}: {:?}", room.floor_color)).clicked() {
-			state.selection = idx;
+	ui.horizontal(|ui| {
+		for (idx, room) in world.rooms.iter().enumerate() {
+			let selected = idx == state.selection;
+			if ui.selectable_label(selected, format!("{idx}")).clicked() {
+				state.selection = idx;
+			}
 		}
-	}
+	});
 }
 
+fn draw_inspector(ui: &mut egui::Ui, ctx: &mut Context) -> bool {
+	draw_room_editor(ui, ctx)
+}
+
+fn draw_room_editor(ui: &mut egui::Ui, Context{world, state}: &mut Context) -> bool {
+	let Some(room) = world.rooms.get_mut(state.selection) else {
+		ui.label("<select a room>");
+		return false
+	};
+
+	let mut changed = false;
+
+	ui.horizontal(|ui| {
+		changed |= color_picker(ui, &mut room.ceiling_color);
+		changed |= color_picker(ui, &mut room.floor_color);
+	});
+
+	changed
+}
 
 fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) -> bool {
 	let (response, painter) = ui.allocate_painter(egui::vec2(ui.available_width(), ui.available_width()), egui::Sense::click_and_drag());
@@ -127,4 +159,15 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 
 		_ => false
 	}
+}
+
+pub fn color_picker(ui: &mut egui::Ui, color: &mut Color) -> bool {
+	use egui::{*, color_picker::*};
+
+	let [r, g, b, a] = color.to_array();
+	let mut rgba = Rgba::from_rgb(r, g, b);
+	let response = color_edit_button_rgba(ui, &mut rgba, Alpha::Opaque);
+	*color = Color::from([rgba.r(), rgba.g(), rgba.b(), a]);
+
+	response.changed()
 }

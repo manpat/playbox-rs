@@ -1,14 +1,16 @@
 use crate::prelude::*;
 
-pub mod debug;
+pub mod editor;
 
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
 	pub rooms: Vec<Room>,
 	pub connections: Vec<(GlobalWallId, GlobalWallId)>,
+
+	pub fog_color: Color,
 }
 
 impl World {
@@ -81,6 +83,8 @@ impl World {
 				(GlobalWallId{room_index: 2, wall_index: 1}, GlobalWallId{room_index: 3, wall_index: 0}),
 				(GlobalWallId{room_index: 2, wall_index: 3}, GlobalWallId{room_index: 3, wall_index: 2}),
 			],
+
+			fog_color: Color::light_magenta(),
 		}
 	}
 
@@ -206,7 +210,7 @@ impl World {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Room {
 	pub walls: Vec<Wall>,
 	pub wall_vertices: Vec<Vec2>,
@@ -221,7 +225,7 @@ impl Room {
 	}
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Wall {
 	pub color: Color,
 }
@@ -542,7 +546,7 @@ pub struct WorldPosition {
 	pub local_position: Vec2,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GlobalWallId {
 	pub room_index: usize,
 	pub wall_index: usize,
