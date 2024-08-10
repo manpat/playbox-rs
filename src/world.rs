@@ -18,6 +18,28 @@ impl World {
 		World {
 			rooms: vec![
 				Room {
+					walls: [Wall{color: Color::grey(0.4)}; 4].into(),
+					wall_vertices: vec![
+						Vec2::new(-1.0, -1.0),
+						Vec2::new(-1.0,  1.0),
+						Vec2::new( 1.0,  1.0),
+						Vec2::new( 1.0, -1.0),
+					],
+					floor_color: Color::grey(0.2),
+					ceiling_color: Color::grey(0.7),
+				},
+			],
+
+			connections: vec![],
+
+			fog_color: Color::white(),
+		}
+	}
+
+	pub fn new_old() -> World {
+		World {
+			rooms: vec![
+				Room {
 					walls: [Wall{color: Color::light_red()}; 4].into(),
 					wall_vertices: vec![
 						Vec2::new(-1.0, -1.0),
@@ -678,5 +700,29 @@ impl RoomMeshBuilder<'_> {
 
 			self.add_convex(verts, wall_color);
 		}
+	}
+}
+
+
+
+
+
+
+
+impl World {
+	pub fn save(&self, path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
+		let path = path.as_ref();
+
+		if let Some(parent_path) = path.parent() {
+			std::fs::create_dir_all(parent_path)?;
+		}
+
+		let data = serde_json::to_vec_pretty(self)?;
+		std::fs::write(path, &data).map_err(Into::into)
+	}
+
+	pub fn load(path: impl AsRef<std::path::Path>) -> anyhow::Result<World> {
+		let data = std::fs::read(path)?;
+		serde_json::from_slice(&data).map_err(Into::into)
 	}
 }

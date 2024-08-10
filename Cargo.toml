@@ -7,7 +7,8 @@ edition = "2021"
 [dependencies]
 slotmap = "1.0.6"
 fontdue = "0.8"
-serde = { version = "1.0" }
+serde = "1.0"
+serde_json = "1.0"
 
 
 [dependencies.tokio]

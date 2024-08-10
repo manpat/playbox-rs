@@ -47,7 +47,10 @@ impl GameScene {
 			toy_renderer
 		};
 
-		let world = world::World::new();
+		let world = match world::World::load("resource/worlds/default.world") {
+			Ok(world) => world,
+			Err(_) => world::World::new(),
+		};
 
 		Ok(GameScene {
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
@@ -203,5 +206,58 @@ impl GameScene {
 		group.draw_fullscreen(None)
 			.sampled_image(0, self.test_rt, rm.nearest_sampler)
 			.blend_mode(gfx::BlendMode::PREMULTIPLIED_ALPHA);
+	}
+}
+
+
+
+
+impl GameScene {
+	pub fn add_editor_debug_menu(&mut self, ui: &mut egui::Ui) {
+		let default_world_path = "resource/worlds/default.world";
+
+		ui.menu_button("Editor", |ui| {
+			if ui.button("New World").clicked() {
+				self.world = world::World::new();
+				self.world_view.needs_rebuild = true;
+				// TODO(pat.m): switch to Game state
+
+				ui.close_menu();
+			}
+
+			if ui.button("New Default World").clicked() {
+				self.world = world::World::new_old();
+				self.world_view.needs_rebuild = true;
+				// TODO(pat.m): switch to Game state
+
+				ui.close_menu();
+			}
+
+			if ui.button("Load World").clicked() {
+				// TODO(pat.m): get resource manager to find load/save path
+
+				match world::World::load(default_world_path) {
+					Ok(new_world) => {
+						self.world = new_world;
+						self.world_view.needs_rebuild = true;
+						// TODO(pat.m): switch to Game state
+					}
+
+					Err(error) => {
+						eprintln!("Failed to load world '{default_world_path}': {error}");
+					}
+				}
+
+				ui.close_menu();
+			}
+
+			if ui.button("Save World").clicked() {
+				if let Err(error) = self.world.save(default_world_path) {
+					eprintln!("Failed to save world to '{default_world_path}': {error}");
+				}
+
+				ui.close_menu();
+			}
+		});
 	}
 }

@@ -131,9 +131,13 @@ impl toybox::App for App {
 	}
 
 	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
-		ui.menu_button("Playbox", |ui| {
-			let _ = ui.button("???");
-		});
+		match self.active_scene {
+			ActiveScene::PauseMenu | ActiveScene::Game => {
+				self.game_scene.add_editor_debug_menu(ui);
+			}
+
+			_ => {}
+		}
 	}
 }
 

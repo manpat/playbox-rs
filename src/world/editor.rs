@@ -8,12 +8,16 @@ enum DragState {
 
 	Vertex {
 		index: usize,
-	}
+	},
+
+	Wall {
+		index: usize,
+	},
 }
 
 #[derive(Copy, Clone, Default, Debug)]
 struct State {
-	selection: usize,
+	selected_room: usize,
 	drag: DragState,
 }
 
@@ -30,6 +34,11 @@ pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mu
 		world,
 	};
 
+	egui::Window::new("World")
+		.show(ctx, |ui| {
+			changed |= color_picker(ui, &mut context.world.fog_color);
+		});
+
 	egui::Window::new("Viewport")
 		.show(ctx, |ui| {
 			draw_room_selector(ui, &mut context);
@@ -39,11 +48,6 @@ pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mu
 	egui::Window::new("Inspector")
 		.show(ctx, |ui| {
 			changed |= draw_inspector(ui, &mut context);
-		});
-
-	egui::Window::new("World")
-		.show(ctx, |ui| {
-			changed |= color_picker(ui, &mut context.world.fog_color);
 		});
 
 	ctx.data_mut(move |map| map.insert_temp(egui::Id::null(), context.state));
@@ -57,9 +61,9 @@ pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mu
 fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
 	ui.horizontal(|ui| {
 		for (idx, room) in world.rooms.iter().enumerate() {
-			let selected = idx == state.selection;
+			let selected = idx == state.selected_room;
 			if ui.selectable_label(selected, format!("{idx}")).clicked() {
-				state.selection = idx;
+				state.selected_room = idx;
 			}
 		}
 	});
@@ -70,7 +74,7 @@ fn draw_inspector(ui: &mut egui::Ui, ctx: &mut Context) -> bool {
 }
 
 fn draw_room_editor(ui: &mut egui::Ui, Context{world, state}: &mut Context) -> bool {
-	let Some(room) = world.rooms.get_mut(state.selection) else {
+	let Some(room) = world.rooms.get_mut(state.selected_room) else {
 		ui.label("<select a room>");
 		return false
 	};
@@ -95,7 +99,7 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 	painter.vline(center.x, rect.y_range(), (1.0, egui::Color32::DARK_GRAY));
 	let local_extent = 4.0;
 
-	let Some(room) = world.rooms.get_mut(state.selection) else {
+	let Some(room) = world.rooms.get_mut(state.selected_room) else {
 		return false
 	};
 
@@ -171,3 +175,6 @@ pub fn color_picker(ui: &mut egui::Ui, color: &mut Color) -> bool {
 
 	response.changed()
 }
+
+
+
