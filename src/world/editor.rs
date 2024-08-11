@@ -1,24 +1,25 @@
 use crate::prelude::*;
-use world::{World, WorldView};
+use world::{World, WorldView, GlobalVertexId, GlobalWallId};
 
-#[derive(Copy, Clone, Default, Debug)]
-enum DragState {
-	#[default]
-	None,
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Item {
+	Vertex(GlobalVertexId),
+	Wall(GlobalWallId),
+	Room(usize),
+}
 
-	Vertex {
-		index: usize,
-	},
-
-	Wall {
-		index: usize,
-	},
+#[derive(Copy, Clone, Debug)]
+enum Operation {
+	Drag(Item),
 }
 
 #[derive(Copy, Clone, Default, Debug)]
 struct State {
+	hovered: Option<Item>,
+	selection: Option<Item>,
+
 	selected_room: usize,
-	drag: DragState,
+	operation: Option<Operation>,
 }
 
 struct Context<'w> {
@@ -99,49 +100,123 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 	painter.vline(center.x, rect.y_range(), (1.0, egui::Color32::DARK_GRAY));
 	let local_extent = 4.0;
 
-	let Some(room) = world.rooms.get_mut(state.selected_room) else {
+	let room_index = state.selected_room;
+	let Some(room) = world.rooms.get_mut(room_index) else {
 		return false
 	};
 
 	let widget_extent = rect.size().x / 2.0;
 	let scale_factor = widget_extent / local_extent;
-	let center = center.to_vec2();
-
 	let num_walls = room.walls.len();
 
-	for wall_idx in 0..num_walls {
-		let (start, end) = room.wall_vertices(wall_idx);
+	// Figure out what is hovered (if no operations are happening)
+	if state.operation.is_none() {
+		state.hovered = None;
+		if let Some(hover_pos) = response.hover_pos() {
+			let egui::Vec2{x, y} = (hover_pos - center) / scale_factor;
+			let local_pos = Vec2::new(x, y);
+
+			let mut min_distance = 0.3;
+
+			// Pick vertices
+			for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
+				let distance = (*vertex - local_pos).length();
+				if distance < min_distance {
+					state.hovered = Some(Item::Vertex(GlobalVertexId {room_index, vertex_index}));
+					min_distance = distance;
+				}
+			}
+
+			// Pick walls
+			for wall_index in 0..num_walls {
+				let (start, end) = room.wall_vertices(wall_index);
+
+				let wall_diff = end - start;
+				let wall_length = wall_diff.length();
+				let wall_direction = wall_diff / wall_length;
+
+				let delta = local_pos - start;
+
+				let distance_along = wall_direction.dot(delta) / wall_length;
+				let distance_across = wall_direction.wedge(delta).abs();
+
+				let buffer = 0.2;
+
+				if distance_along < 0.0 || distance_along > 1.0 || distance_across >= min_distance {
+					continue;
+				}
+
+				let point_a = start + wall_direction * wall_length * buffer;
+				let point_b = end - wall_direction * wall_length * buffer;
+
+				let dist_a = (point_a - local_pos).length();
+				let dist_b = (point_b - local_pos).length();
+
+				let mut distance = f32::INFINITY;
+
+				if distance_along >= buffer && distance_along <= 1.0 - buffer {
+					distance = distance.min(distance_across);
+				}
+
+				distance = distance.min(dist_a).min(dist_b);
+
+				if distance < min_distance {
+					state.hovered = Some(Item::Wall(GlobalWallId {room_index, wall_index}));
+					min_distance = distance;
+				}
+			}
+		}
+	}
+
+
+	// Handle state transitions
+	if response.drag_started_by(egui::PointerButton::Primary) {
+		state.operation = state.hovered.map(Operation::Drag);
+	}
+
+	if response.clicked() && state.operation.is_none() {
+		state.selection = state.hovered;
+	}
+
+	if response.drag_released_by(egui::PointerButton::Primary) {
+		state.operation = None;
+	}
+
+
+	// Draw
+	let center = center.to_vec2();
+
+	for wall_index in 0..num_walls {
+		let (start, end) = room.wall_vertices(wall_index);
 		let start = start * scale_factor;
 		let end = end * scale_factor;
 
 		let start = egui::Pos2::from(start.to_tuple()) + center;
 		let end = egui::Pos2::from(end.to_tuple()) + center;
 
-		let (r, g, b) = room.walls[wall_idx].color.to_srgb().into();
+		let id = GlobalWallId {room_index, wall_index};
+
+		let wall_hovered = state.hovered == Some(Item::Wall(id));
+		let stroke_thickness = match wall_hovered {
+			false => 1.0,
+			true => 4.0,
+		};
+
+		let (r, g, b) = room.walls[wall_index].color.to_srgb().into();
 		let color = egui::Color32::from_rgb(r, g, b);
 
-		painter.line_segment([start, end], (1.0, color));
+		painter.line_segment([start, end], (stroke_thickness, color));
 	}
 
-	if response.drag_released_by(egui::PointerButton::Primary) {
-		state.drag = DragState::None;
-	}
-
-	if let Some(hover_pos) = response.hover_pos() {
-		// let hover_pos_room = (hover_pos - center) / scale_factor;
-
-		// TODO(pat.m): separate figuring out hovered item from drawing
-
-		for (index, vertex) in room.wall_vertices.iter_mut().enumerate() {
+	if response.hovered() {
+		for (vertex_index, vertex) in room.wall_vertices.iter_mut().enumerate() {
 			let vertex_px = *vertex * scale_factor;
 			let vertex_px = egui::Pos2::from(vertex_px.to_tuple());
 
 			let rect = egui::Rect::from_center_size(vertex_px + center, egui::vec2(12.0, 12.0));
 
-			let vertex_hovered = rect.contains(hover_pos);
-			if vertex_hovered && response.drag_started_by(egui::PointerButton::Primary) {
-				state.drag = DragState::Vertex {index};
-			}
+			let id = GlobalVertexId {room_index, vertex_index};
+			let vertex_hovered = state.hovered == Some(Item::Vertex(id));
 
 			if vertex_hovered {
 				painter.rect_filled(rect, 0.0, egui::Color32::GRAY);
@@ -151,14 +226,35 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 		}
 	}
 
-	match state.drag {
-		DragState::Vertex{index, ..} => {
-			let delta_px = response.drag_delta();
-			let delta = Vec2::new(delta_px.x, delta_px.y) / scale_factor;
+	// Perform operation
+	match state.operation {
+		Some(Operation::Drag(Item::Vertex(GlobalVertexId {room_index, vertex_index}))) => {
+			if let Some(room) = world.rooms.get_mut(room_index) {
+				let delta_px = response.drag_delta();
+				let delta = Vec2::new(delta_px.x, delta_px.y) / scale_factor;
 
-			room.wall_vertices[index] += delta;
+				room.wall_vertices[vertex_index] += delta;
 
-			true
+				true
+			} else {
+				false
+			}
+		}
+
+		Some(Operation::Drag(Item::Wall(GlobalWallId {room_index, wall_index}))) => {
+			if let Some(room) = world.rooms.get_mut(room_index) {
+				let delta_px = response.drag_delta();
+				let delta = Vec2::new(delta_px.x, delta_px.y) / scale_factor;
+
+				let wall_count = room.wall_vertices.len();
+
+				room.wall_vertices[wall_index] += delta;
+				room.wall_vertices[(wall_index+1) % wall_count] += delta;
+
+				true
+			} else {
+				false
+			}
 		}
 
 		_ => false

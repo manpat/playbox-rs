@@ -373,7 +373,7 @@ impl WorldView {
 
 		let initial_transform = Mat2x3::rotate_translate(0.0, -world_position.local_position);
 
-		const MAX_DEPTH: i32 = 30;
+		const MAX_DEPTH: i32 = 50;
 
 		struct Entry {
 			room_index: usize,
@@ -574,6 +574,11 @@ pub struct GlobalWallId {
 	pub wall_index: usize,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GlobalVertexId {
+	pub room_index: usize,
+	pub vertex_index: usize,
+}
 
 
 struct RoomMeshInfo {
