@@ -37,7 +37,7 @@ pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mu
 
 	egui::Window::new("World")
 		.show(ctx, |ui| {
-			changed |= color_picker(ui, &mut context.world.fog_color);
+			changed |= ui.color_edit_button_rgb(context.world.fog_color.as_mut()).changed();
 		});
 
 	egui::Window::new("Viewport")
@@ -83,8 +83,8 @@ fn draw_room_editor(ui: &mut egui::Ui, Context{world, state}: &mut Context) -> b
 	let mut changed = false;
 
 	ui.horizontal(|ui| {
-		changed |= color_picker(ui, &mut room.ceiling_color);
-		changed |= color_picker(ui, &mut room.floor_color);
+		changed |= ui.color_edit_button_rgb(room.ceiling_color.as_mut()).changed();
+		changed |= ui.color_edit_button_rgb(room.floor_color.as_mut()).changed();
 	});
 
 	changed
@@ -113,8 +113,8 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 	if state.operation.is_none() {
 		state.hovered = None;
 		if let Some(hover_pos) = response.hover_pos() {
-			let egui::Vec2{x, y} = (hover_pos - center) / scale_factor;
-			let local_pos = Vec2::new(x, y);
+			let local_pos = (hover_pos - center) / scale_factor;
+			let local_pos = Vec2::from_compatible(local_pos);
 
 			let mut min_distance = 0.3;
 
@@ -184,15 +184,13 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 
 
 	// Draw
-	let center = center.to_vec2();
-
 	for wall_index in 0..num_walls {
 		let (start, end) = room.wall_vertices(wall_index);
 		let start = start * scale_factor;
 		let end = end * scale_factor;
 
-		let start = egui::Pos2::from(start.to_tuple()) + center;
-		let end = egui::Pos2::from(end.to_tuple()) + center;
+		let start = center + start.to_egui_vec2();
+		let end = center + end.to_egui_vec2();
 
 		let id = GlobalWallId {room_index, wall_index};
 
@@ -202,8 +200,7 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 			true => 4.0,
 		};
 
-		let (r, g, b) = room.walls[wall_index].color.to_srgb().into();
-		let color = egui::Color32::from_rgb(r, g, b);
+		let color = room.walls[wall_index].color.to_egui_rgba();
 
 		painter.line_segment([start, end], (stroke_thickness, color));
 	}
@@ -211,9 +208,8 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 	if response.hovered() {
 		for (vertex_index, vertex) in room.wall_vertices.iter_mut().enumerate() {
 			let vertex_px = *vertex * scale_factor;
-			let vertex_px = egui::Pos2::from(vertex_px.to_tuple());
 
-			let rect = egui::Rect::from_center_size(vertex_px + center, egui::vec2(12.0, 12.0));
+			let rect = egui::Rect::from_center_size(center + vertex_px.to_egui_vec2(), egui::vec2(12.0, 12.0));
 
 			let id = GlobalVertexId {room_index, vertex_index};
 			let vertex_hovered = state.hovered == Some(Item::Vertex(id));
@@ -230,8 +226,7 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 	match state.operation {
 		Some(Operation::Drag(Item::Vertex(GlobalVertexId {room_index, vertex_index}))) => {
 			if let Some(room) = world.rooms.get_mut(room_index) {
-				let delta_px = response.drag_delta();
-				let delta = Vec2::new(delta_px.x, delta_px.y) / scale_factor;
+				let delta = Vec2::from_compatible(response.drag_delta()) / scale_factor;
 
 				room.wall_vertices[vertex_index] += delta;
 
@@ -243,8 +238,7 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 
 		Some(Operation::Drag(Item::Wall(GlobalWallId {room_index, wall_index}))) => {
 			if let Some(room) = world.rooms.get_mut(room_index) {
-				let delta_px = response.drag_delta();
-				let delta = Vec2::new(delta_px.x, delta_px.y) / scale_factor;
+				let delta = Vec2::from_compatible(response.drag_delta()) / scale_factor;
 
 				let wall_count = room.wall_vertices.len();
 
@@ -260,17 +254,3 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 		_ => false
 	}
 }
-
-pub fn color_picker(ui: &mut egui::Ui, color: &mut Color) -> bool {
-	use egui::{*, color_picker::*};
-
-	let [r, g, b, a] = color.to_array();
-	let mut rgba = Rgba::from_rgb(r, g, b);
-	let response = color_edit_button_rgba(ui, &mut rgba, Alpha::Opaque);
-	*color = Color::from([rgba.r(), rgba.g(), rgba.b(), a]);
-
-	response.changed()
-}
-
-
-

@@ -406,7 +406,7 @@ impl WorldView {
 					w.to_x0y()
 				]);
 
-				sprites.billboard(w.to_x0y() + Vec3::from_y(0.3), Vec2::splat(0.1), Color::white());
+				// sprites.billboard(w.to_x0y() + Vec3::from_y(0.3), Vec2::splat(0.1), Color::white());
 
 				#[derive(Copy, Clone)]
 				#[repr(C)]
@@ -562,7 +562,7 @@ fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalWallI
 
 
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct WorldPosition {
 	pub room_index: usize,
 	pub local_position: Vec2,
