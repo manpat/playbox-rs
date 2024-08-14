@@ -13,7 +13,7 @@ impl MainMenuScene {
 		})
 	}
 
-	pub fn update(&mut self, ctx: &mut Context<'_>) -> Option<MenuCmd> {
+	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		ctx.gfx.frame_encoder.backbuffer_color(Color::light_cyan());
 
 		ctx.input.set_capture_mouse(false);
@@ -24,11 +24,9 @@ impl MainMenuScene {
 
 		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
 
-		let mut cmd = None;
-
 		if builder.button("Play") || play_shortcut_pressed {
 			self.audio.trigger();
-			cmd = Some(MenuCmd::Play);
+			ctx.message_bus.emit(MenuCmd::Play);
 		}
 
 		if builder.button("I'm a big long test button and I go AAAAAAAA. lol. lmao? \"!£$%^&{}()[]") {
@@ -36,16 +34,14 @@ impl MainMenuScene {
 		}
 		// if builder.button("Settings") {
 		// 	self.audio.trigger();
-		// 	cmd = Some(MenuCmd::Settings);
+		// 	ctx.message_bus.emit(MenuCmd::Settings);
 		// }
 
 		if builder.button("Quit") {
-			cmd = Some(MenuCmd::Quit);
+			ctx.message_bus.emit(MenuCmd::Quit);
 		}
 
 		self.painter.submit(&mut ctx.gfx, screen_bounds);
-
-		cmd
 	}
 }
 
@@ -72,7 +68,7 @@ impl PauseMenuScene {
 		})
 	}
 
-	pub fn update(&mut self, ctx: &mut Context<'_>) -> Option<MenuCmd> {
+	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		ctx.input.set_capture_mouse(false);
 
 		let resume_shortcut_pressed = ctx.input.button_just_down(input::Key::Escape);
@@ -82,22 +78,18 @@ impl PauseMenuScene {
 
 		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
 
-		let mut cmd = None;
-
 		if builder.button("Resume") || resume_shortcut_pressed {
-			cmd = Some(MenuCmd::Play);
+			ctx.message_bus.emit(MenuCmd::Play);
 		}
 
 		if builder.button("Quit To Menu") {
-			cmd = Some(MenuCmd::ReturnToMain);
+			ctx.message_bus.emit(MenuCmd::ReturnToMain);
 		}
 
 		if builder.button("Quit To Desktop") {
-			cmd = Some(MenuCmd::Quit);
+			ctx.message_bus.emit(MenuCmd::Quit);
 		}
 
 		self.painter.submit(&mut ctx.gfx, screen_bounds);
-
-		cmd
 	}
 }

@@ -75,7 +75,7 @@ impl MenuPainter {
 		}
 	}
 
-	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx mut Context<'_>) -> MenuBuilder<'mp, 'ctx> {
+	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx Context<'_>) -> MenuBuilder<'mp, 'ctx> {
 		MenuBuilder::new(self, ctx)
 	}
 }

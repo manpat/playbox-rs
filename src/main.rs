@@ -10,6 +10,7 @@ pub mod toy_draw;
 pub mod game_scene;
 pub mod main_menu;
 pub mod glyph_cache;
+pub mod message_bus;
 
 pub mod editor;
 
@@ -29,6 +30,7 @@ pub mod prelude {
 	pub use crate::glyph_cache::GlyphCache;
 
 	pub use crate::Context;
+	pub use crate::message_bus::{MessageBus, Subscription};
 }
 
 use prelude::*;
@@ -54,6 +56,9 @@ struct App {
 	main_menu: MainMenuScene,
 	pause_menu: PauseMenuScene,
 	game_scene: GameScene,
+
+	message_bus: MessageBus,
+	menu_cmd_subscription: Subscription<MenuCmd>,
 }
 
 impl App {
@@ -63,6 +68,8 @@ impl App {
 		dbg!(&ctx.gfx.core.capabilities());
 		dbg!(ctx.resource_root_path());
 
+		let message_bus = MessageBus::new();
+
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
 
 		let mut active_scene = ActiveScene::MainMenu;
@@ -71,34 +78,27 @@ impl App {
 			active_scene = ActiveScene::Game;
 		}
 
-		let ctx = &mut Context::new(ctx);
+		let ctx = &mut Context::new(ctx, &message_bus);
 
 		Ok(App {
 			active_scene,
 			main_menu: MainMenuScene::new(ctx, audio.clone())?,
 			pause_menu: PauseMenuScene::new(ctx)?,
 			game_scene: GameScene::new(ctx, audio.clone())?,
+
+			menu_cmd_subscription: message_bus.subscribe(),
+			message_bus,
 		})
 	}
 }
 
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
+		self.message_bus.garbage_collect();
+
 		match self.active_scene {
 			ActiveScene::MainMenu => {
-				match self.main_menu.update(&mut Context::new(ctx)) {
-					Some(MenuCmd::Play) => {
-						self.active_scene = ActiveScene::Game;
-					}
-
-					Some(MenuCmd::Settings) => {}
-
-					Some(MenuCmd::Quit) => {
-						ctx.wants_quit = true;
-					}
-
-					_ => {}
-				}
+				self.main_menu.update(&mut Context::new(ctx, &self.message_bus));
 			}
 
 			ActiveScene::Game => {
@@ -106,30 +106,35 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				self.game_scene.update(&mut Context::new(ctx));
+				self.game_scene.update(&mut Context::new(ctx, &self.message_bus));
 				self.game_scene.draw(&mut ctx.gfx);
 			}
 
 			ActiveScene::PauseMenu => {
 				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
 				
-				match self.pause_menu.update(&mut Context::new(ctx)) {
-					Some(MenuCmd::Play) => {
-						self.active_scene = ActiveScene::Game;
-					}
+				self.pause_menu.update(&mut Context::new(ctx, &self.message_bus));
+				self.game_scene.draw(&mut ctx.gfx);
+			}
+		}
 
-					Some(MenuCmd::ReturnToMain) => {
-						self.active_scene = ActiveScene::MainMenu;
-					}
-
-					Some(MenuCmd::Quit) => {
-						ctx.wants_quit = true;
-					}
-
-					_ => {}
+		for menu_msg in self.message_bus.poll(&self.menu_cmd_subscription).iter() {
+			match menu_msg {
+				MenuCmd::Play => {
+					self.active_scene = ActiveScene::Game;
 				}
 
-				self.game_scene.draw(&mut ctx.gfx);
+				MenuCmd::ReturnToMain => {
+					self.active_scene = ActiveScene::MainMenu;
+				}
+
+				MenuCmd::Settings => {}
+
+				MenuCmd::Quit => {
+					ctx.wants_quit = true;
+				}
+
+				_ => {}
 			}
 		}
 	}
@@ -152,12 +157,15 @@ pub struct Context<'tb> {
 	pub input: &'tb mut toybox::input::System,
 	pub egui: &'tb mut toybox::egui::Context,
 	pub cfg: &'tb mut toybox::cfg::Config,
+
+	pub message_bus: &'tb MessageBus,
 }
 
 impl<'tb> Context<'tb> {
-	pub fn new(tb: &'tb mut toybox::Context) -> Self {
+	pub fn new(tb: &'tb mut toybox::Context, message_bus: &'tb MessageBus) -> Self {
 		let toybox::Context { gfx, audio, input, egui, cfg, .. } = tb;
 
-		Self {gfx, audio, input, egui, cfg}
+		Self {gfx, audio, input, egui, cfg, message_bus}
 	}
 }
+
