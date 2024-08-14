@@ -27,7 +27,6 @@ struct State {
 	hovered: Option<Item>,
 	selection: Option<Item>,
 
-	selected_room: usize,
 	operation: Option<Operation>,
 }
 
@@ -69,11 +68,13 @@ pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mu
 
 
 fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
+	let selected_room_index = state.selection.as_ref().map_or(0, Item::room_index);
+
 	ui.horizontal(|ui| {
-		for (idx, room) in world.rooms.iter().enumerate() {
-			let selected = idx == state.selected_room;
-			if ui.selectable_label(selected, format!("{idx}")).clicked() {
-				state.selected_room = idx;
+		for (room_index, room) in world.rooms.iter().enumerate() {
+			let selected = room_index == selected_room_index;
+			if ui.selectable_label(selected, format!("{room_index}")).clicked() {
+				state.selection = Some(Item::Room(room_index));
 			}
 		}
 	});
@@ -156,7 +157,7 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 	painter.vline(center.x, rect.y_range(), (1.0, egui::Color32::DARK_GRAY));
 	let local_extent = 4.0;
 
-	let room_index = state.selected_room;
+	let room_index = state.selection.as_ref().map_or(0, Item::room_index);
 	let Some(room) = world.rooms.get_mut(room_index) else {
 		return false
 	};
@@ -301,31 +302,32 @@ fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) ->
 
 	// Perform operation
 	match state.operation {
-		Some(Operation::Drag(Item::Vertex(GlobalVertexId {room_index, vertex_index}))) => {
-			if let Some(room) = world.rooms.get_mut(room_index) {
-				let delta = Vec2::from_compatible(response.drag_delta()) / scale_factor;
+		Some(Operation::Drag(item)) => {
+			let Some(room) = world.rooms.get_mut(item.room_index()) else {
+				return false
+			};
 
-				room.wall_vertices[vertex_index] += delta;
+			let delta = Vec2::from_compatible(response.drag_delta()) / scale_factor;
 
-				true
-			} else {
-				false
+			match item {
+				Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
+					room.wall_vertices[vertex_index] += delta;
+				}
+
+				Item::Wall(GlobalWallId {wall_index, ..}) => {
+					let wall_count = room.wall_vertices.len();
+					room.wall_vertices[wall_index] += delta;
+					room.wall_vertices[(wall_index+1) % wall_count] += delta;
+				}
+
+				Item::Room(_) => {
+					for vertex in room.wall_vertices.iter_mut() {
+						*vertex += delta;
+					}
+				}
 			}
-		}
 
-		Some(Operation::Drag(Item::Wall(GlobalWallId {room_index, wall_index}))) => {
-			if let Some(room) = world.rooms.get_mut(room_index) {
-				let delta = Vec2::from_compatible(response.drag_delta()) / scale_factor;
-
-				let wall_count = room.wall_vertices.len();
-
-				room.wall_vertices[wall_index] += delta;
-				room.wall_vertices[(wall_index+1) % wall_count] += delta;
-
-				true
-			} else {
-				false
-			}
+			true
 		}
 
 		_ => false
