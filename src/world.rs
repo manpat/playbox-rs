@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-pub mod editor;
-
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
 

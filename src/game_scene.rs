@@ -88,7 +88,7 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!self.show_debug);
 
 		if self.show_debug {
-			world::editor::draw_world_editor(&ctx.egui, &mut self.world, &mut self.world_view);
+			editor::draw_world_editor(&ctx.egui, &mut self.world, &mut self.world_view);
 			return;
 		}
 

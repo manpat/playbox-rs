@@ -11,6 +11,8 @@ pub mod game_scene;
 pub mod main_menu;
 pub mod glyph_cache;
 
+pub mod editor;
+
 pub mod prelude {
 	pub use toybox::prelude::*;
 
@@ -21,6 +23,8 @@ pub mod prelude {
 	pub use crate::toy_draw::ToyRenderer;
 	pub use crate::world;
 	pub use crate::menu;
+
+	pub use crate::editor;
 
 	pub use crate::glyph_cache::GlyphCache;
 
