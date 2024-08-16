@@ -59,6 +59,8 @@ struct App {
 
 	message_bus: MessageBus,
 	menu_cmd_subscription: Subscription<MenuCmd>,
+
+	audio: MyAudioSystem,
 }
 
 impl App {
@@ -78,16 +80,18 @@ impl App {
 			active_scene = ActiveScene::Game;
 		}
 
-		let ctx = &mut Context::new(ctx, &message_bus);
+		let ctx = &mut Context::new(ctx, &audio, &message_bus);
 
 		Ok(App {
 			active_scene,
-			main_menu: MainMenuScene::new(ctx, audio.clone())?,
+			main_menu: MainMenuScene::new(ctx)?,
 			pause_menu: PauseMenuScene::new(ctx)?,
-			game_scene: GameScene::new(ctx, audio.clone())?,
+			game_scene: GameScene::new(ctx)?,
 
 			menu_cmd_subscription: message_bus.subscribe(),
 			message_bus,
+
+			audio,
 		})
 	}
 }
@@ -98,7 +102,7 @@ impl toybox::App for App {
 
 		match self.active_scene {
 			ActiveScene::MainMenu => {
-				self.main_menu.update(&mut Context::new(ctx, &self.message_bus));
+				self.main_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
 			}
 
 			ActiveScene::Game => {
@@ -106,33 +110,41 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				self.game_scene.update(&mut Context::new(ctx, &self.message_bus));
+				self.game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
 				self.game_scene.draw(&mut ctx.gfx);
 			}
 
 			ActiveScene::PauseMenu => {
 				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
 				
-				self.pause_menu.update(&mut Context::new(ctx, &self.message_bus));
+				self.pause_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
 				self.game_scene.draw(&mut ctx.gfx);
 			}
 		}
 
 		for menu_msg in self.message_bus.poll(&self.menu_cmd_subscription).iter() {
 			match menu_msg {
-				MenuCmd::Play => {
+				MenuCmd::Play(..) => {
+					// TODO(pat.m): load world and create game scene
 					self.active_scene = ActiveScene::Game;
 				}
 
-				MenuCmd::ReturnToMain => {
+				MenuCmd::Resume => {
+					/* if game_scene.is_some() */
+					self.active_scene = ActiveScene::Game;
+				}
+
+				MenuCmd::QuitToMain => {
+					// TODO(pat.m): confirmation/save
 					self.active_scene = ActiveScene::MainMenu;
 				}
 
-				MenuCmd::Settings => {}
-
-				MenuCmd::Quit => {
+				MenuCmd::QuitToDesktop => {
+					// TODO(pat.m): confirmation/save
 					ctx.wants_quit = true;
 				}
+
+				MenuCmd::Settings => {}
 
 				_ => {}
 			}
@@ -153,19 +165,19 @@ impl toybox::App for App {
 
 pub struct Context<'tb> {
 	pub gfx: &'tb mut toybox::gfx::System,
-	pub audio: &'tb mut toybox::audio::System,
 	pub input: &'tb mut toybox::input::System,
 	pub egui: &'tb mut toybox::egui::Context,
 	pub cfg: &'tb mut toybox::cfg::Config,
 
 	pub message_bus: &'tb MessageBus,
+	pub audio: &'tb MyAudioSystem,
 }
 
 impl<'tb> Context<'tb> {
-	pub fn new(tb: &'tb mut toybox::Context, message_bus: &'tb MessageBus) -> Self {
-		let toybox::Context { gfx, audio, input, egui, cfg, .. } = tb;
+	pub fn new(tb: &'tb mut toybox::Context, audio: &'tb MyAudioSystem, message_bus: &'tb MessageBus) -> Self {
+		let toybox::Context { gfx, input, egui, cfg, .. } = tb;
 
-		Self {gfx, audio, input, egui, cfg, message_bus}
+		Self {gfx, input, egui, cfg, audio, message_bus}
 	}
 }
 

@@ -122,8 +122,6 @@ impl<T: Any> TypedMessageBus for TypedMessageBusConcrete<T> {
 			let to_drop = minimum_message_seq as usize;
 			self.messages.drain(..to_drop);
 
-			println!("Cleaning up {to_drop} messages");
-
 			for sub in self.subscribers.iter() {
 				let Some(sub) = sub.upgrade() else { continue };
 				let new_seq = sub.seen_message_seq.get() - minimum_message_seq;

@@ -10,7 +10,6 @@ pub struct GameScene {
 	sprites: Sprites,
 	world: world::World,
 	world_view: world::WorldView,
-	audio: MyAudioSystem,
 
 	show_debug: bool,
 
@@ -26,7 +25,7 @@ pub struct GameScene {
 }
 
 impl GameScene {
-	pub fn new(ctx: &mut Context<'_>, audio: MyAudioSystem) -> anyhow::Result<GameScene> {
+	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<GameScene> {
 		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
 
 		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::hdr_color()));
@@ -61,7 +60,6 @@ impl GameScene {
 			toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
-			audio,
 			world_view: world::WorldView::new(&mut ctx.gfx, &world)?,
 			world,
 
