@@ -6,11 +6,12 @@ pub struct GameScene {
 	test_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
 
-	toy_renderer: ToyRenderer,
+	// toy_renderer: ToyRenderer,
 	sprites: Sprites,
 	world: world::World,
-	world_view: world::WorldView,
+	world_view: world_view::WorldView,
 
+	message_bus: MessageBus,
 	show_debug: bool,
 
 	yaw: f32,
@@ -26,25 +27,25 @@ pub struct GameScene {
 
 impl GameScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<GameScene> {
-		let gfx::System{ core, resource_manager, .. } = &mut ctx.gfx;
+		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
 
 		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::hdr_color()));
 		let depth_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth));
 
-		let toy_renderer = {
-			let project_path = resource_manager.resource_path().join("toys/basic.toy");
-			let project_data = std::fs::read(&project_path)?;
-			let project = toy::load(&project_data)?;
+		// let toy_renderer = {
+		// 	let project_path = resource_manager.resource_path().join("toys/basic.toy");
+		// 	let project_data = std::fs::read(&project_path)?;
+		// 	let project = toy::load(&project_data)?;
 
-			let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
-			toy_renderer.set_color_target(test_rt);
-			toy_renderer.set_depth_target(depth_rt);
-			toy_renderer.update(&core, |builder| {
-				builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
-				builder.add_entities(project.find_scene("main").unwrap());
-			});
-			toy_renderer
-		};
+		// 	let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
+		// 	toy_renderer.set_color_target(test_rt);
+		// 	toy_renderer.set_depth_target(depth_rt);
+		// 	toy_renderer.update(&core, |builder| {
+		// 		builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
+		// 		builder.add_entities(project.find_scene("main").unwrap());
+		// 	});
+		// 	toy_renderer
+		// };
 
 		let world = match world::World::load("resource/worlds/default.world") {
 			Ok(world) => world,
@@ -57,11 +58,13 @@ impl GameScene {
 			test_rt,
 			depth_rt,
 
-			toy_renderer,
+			// toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
 
-			world_view: world::WorldView::new(&mut ctx.gfx, &world)?,
+			world_view: world_view::WorldView::new(&mut ctx.gfx, &world, ctx.message_bus.clone())?,
 			world,
+
+			message_bus: ctx.message_bus.clone(),
 
 			show_debug: false,
 
@@ -86,7 +89,7 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!self.show_debug);
 
 		if self.show_debug {
-			editor::draw_world_editor(&ctx.egui, &mut self.world, &mut self.world_view);
+			editor::draw_world_editor(&ctx.egui, &mut self.world, &self.message_bus);
 			return;
 		}
 
@@ -217,7 +220,8 @@ impl GameScene {
 		ui.menu_button("Editor", |ui| {
 			if ui.button("New World").clicked() {
 				self.world = world::World::new();
-				self.world_view.needs_rebuild = true;
+				self.message_bus.emit(world::WorldChangedEvent);
+
 				// TODO(pat.m): switch to Game state
 
 				ui.close_menu();
@@ -225,7 +229,7 @@ impl GameScene {
 
 			if ui.button("New Default World").clicked() {
 				self.world = world::World::new_old();
-				self.world_view.needs_rebuild = true;
+				self.message_bus.emit(world::WorldChangedEvent);
 				// TODO(pat.m): switch to Game state
 
 				ui.close_menu();
@@ -237,7 +241,7 @@ impl GameScene {
 				match world::World::load(default_world_path) {
 					Ok(new_world) => {
 						self.world = new_world;
-						self.world_view.needs_rebuild = true;
+						self.message_bus.emit(world::WorldChangedEvent);
 						// TODO(pat.m): switch to Game state
 					}
 

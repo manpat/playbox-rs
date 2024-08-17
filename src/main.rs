@@ -6,6 +6,7 @@ pub mod audio;
 pub mod menu;
 pub mod sprites;
 pub mod world;
+pub mod world_view;
 pub mod toy_draw;
 pub mod game_scene;
 pub mod main_menu;
@@ -23,6 +24,7 @@ pub mod prelude {
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
 	pub use crate::world;
+	pub use crate::world_view;
 	pub use crate::menu;
 
 	pub use crate::editor;

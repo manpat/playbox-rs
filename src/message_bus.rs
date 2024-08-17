@@ -6,13 +6,13 @@ use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct MessageBus {
-	inner: Rc<RefCell<Inner>>,
+	inner: Rc<RefCell<MessageBusInner>>,
 }
 
 impl MessageBus {
 	pub fn new() -> Self {
 		MessageBus {
-			inner: Rc::new(RefCell::new(Inner::default()))
+			inner: Rc::new(RefCell::new(MessageBusInner::default()))
 		}
 	}
 
@@ -26,7 +26,7 @@ impl MessageBus {
 				messages: Vec::new(),
 			}));
 
-		let typed_message_bus = message_bus.to_concrete_mut::<T>();
+		let typed_message_bus = message_bus.to_concrete_mut();
 
 		let subscription_inner = Rc::new(SubscriptionInner {
 			// Make sure this subscription doesn't see any messages already in the queue
@@ -75,7 +75,7 @@ impl MessageBus {
 }
 
 #[derive(Default)]
-struct Inner {
+struct MessageBusInner {
 	typed_busses: HashMap<TypeId, Box<dyn TypedMessageBus>>,
 }
 

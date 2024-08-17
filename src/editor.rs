@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use world::{World, WorldView, GlobalVertexId, GlobalWallId};
+use world::{World, WorldChangedEvent, GlobalVertexId, GlobalWallId};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum Item {
@@ -33,14 +33,16 @@ struct State {
 struct Context<'w> {
 	state: State,
 	world: &'w mut World,
+	message_bus: &'w MessageBus,
 }
 
-pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mut WorldView) {
+pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, message_bus: &MessageBus) {
 	let mut changed = false;
 
 	let mut context = Context {
 		state: ctx.data(|map| map.get_temp(egui::Id::null()).unwrap_or_default()),
 		world,
+		message_bus,
 	};
 
 	egui::Window::new("World")
@@ -62,12 +64,12 @@ pub fn draw_world_editor(ctx: &egui::Context, world: &mut World, world_view: &mu
 	ctx.data_mut(move |map| map.insert_temp(egui::Id::null(), context.state));
 
 	if changed {
-		world_view.needs_rebuild = true;
+		message_bus.emit(WorldChangedEvent);
 	}
 }
 
 
-fn draw_room_selector(ui: &mut egui::Ui, Context{world, state}: &mut Context) {
+fn draw_room_selector(ui: &mut egui::Ui, Context{world, state, ..}: &mut Context) {
 	let selected_room_index = state.selection.as_ref().map_or(0, Item::room_index);
 
 	ui.horizontal(|ui| {
@@ -147,10 +149,12 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{world, ..}: &mut Context, Glob
 	changed
 }
 
-fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state}: &mut Context) -> bool {
+fn draw_room_viewport(ui: &mut egui::Ui, Context{world, state, ..}: &mut Context) -> bool {
 	let (response, painter) = ui.allocate_painter(egui::vec2(ui.available_width(), ui.available_width()), egui::Sense::click_and_drag());
 	let rect = response.rect;
 	let center = response.rect.center();
+
+	let _modifiers = ui.input(|input| input.modifiers);
 
 	painter.rect_filled(rect, 0.0, egui::Color32::BLACK);
 	painter.hline(rect.x_range(), center.y, (1.0, egui::Color32::DARK_GRAY));
