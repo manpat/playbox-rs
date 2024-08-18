@@ -3,7 +3,7 @@ use crate::prelude::*;
 pub struct GameScene {
 	fog_shader: gfx::ShaderHandle,
 
-	test_rt: gfx::ImageHandle,
+	color_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
 
 	// toy_renderer: ToyRenderer,
@@ -29,8 +29,8 @@ impl GameScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<GameScene> {
 		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
 
-		let test_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test rendertarget", gfx::ImageFormat::hdr_color()));
-		let depth_rt = resource_manager.request(gfx::CreateImageRequest::rendertarget("test depthbuffer", gfx::ImageFormat::Depth));
+		let color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("test rendertarget", gfx::ImageFormat::hdr_color(), 4));
+		let depth_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("test depthbuffer", gfx::ImageFormat::Depth, 4));
 
 		// let toy_renderer = {
 		// 	let project_path = resource_manager.resource_path().join("toys/basic.toy");
@@ -38,7 +38,7 @@ impl GameScene {
 		// 	let project = toy::load(&project_data)?;
 
 		// 	let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
-		// 	toy_renderer.set_color_target(test_rt);
+		// 	toy_renderer.set_color_target(color_rt);
 		// 	toy_renderer.set_depth_target(depth_rt);
 		// 	toy_renderer.update(&core, |builder| {
 		// 		builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
@@ -55,7 +55,7 @@ impl GameScene {
 		Ok(GameScene {
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
 
-			test_rt,
+			color_rt,
 			depth_rt,
 
 			// toy_renderer,
@@ -174,16 +174,19 @@ impl GameScene {
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
 		let aspect = gfx.backbuffer_aspect();
-		let projection_view = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0)
+		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);
+		let projection_view = projection
 			* Mat4::rotate_x(self.pitch)
 			* Mat4::rotate_y(self.yaw)
 			* Mat4::translate(-self.free_pos-Vec3::from_y(0.5));
 
+		let inverse_projection = projection.inverse();
+
 		gfx.frame_encoder.backbuffer_color(self.world.fog_color);
-		gfx.frame_encoder.bind_global_ubo(0, &[projection_view]);
+		gfx.frame_encoder.bind_global_ubo(0, &[projection_view, inverse_projection]);
 
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
-		main_group.bind_rendertargets(&[self.test_rt, self.depth_rt]);
+		main_group.bind_rendertargets(&[self.color_rt, self.depth_rt]);
 		main_group.bind_shared_sampled_image(0, gfx.resource_manager.blank_white_image, gfx.resource_manager.nearest_sampler);
 
 		self.world_view.draw(gfx, &mut self.sprites, &self.world, self.world_pos);
@@ -200,12 +203,12 @@ impl GameScene {
 		let mut group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
 		group.compute(self.fog_shader)
-			.image_rw(0, self.test_rt)
+			.image_rw(0, self.color_rt)
 			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
-			.groups_from_image_size(self.test_rt);
+			.groups_from_image_size(self.color_rt);
 
 		group.draw_fullscreen(None)
-			.sampled_image(0, self.test_rt, rm.nearest_sampler)
+			.sampled_image(0, self.color_rt, rm.nearest_sampler)
 			.blend_mode(gfx::BlendMode::PREMULTIPLIED_ALPHA);
 	}
 }

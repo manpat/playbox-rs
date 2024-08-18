@@ -1,5 +1,4 @@
 
-
 struct Vertex {
 	vec3 pos;
 	uint uv_packed;
@@ -33,7 +32,6 @@ void main() {
 
 	vec3 world_pos = u_model * vec4(vertex.pos, 1.0);
 	gl_Position = u_projection_view * vec4(world_pos, 1.0);
-
 
 	gl_ClipDistance[0] = dot(u_plane_0.xyz, vertex.pos) - u_plane_0.w;
 	gl_ClipDistance[1] = dot(u_plane_1.xyz, vertex.pos) - u_plane_1.w;
