@@ -202,9 +202,18 @@ impl GameScene {
 
 		let mut group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
+		#[repr(C)]
+		#[derive(Copy, Clone)]
+		struct FogParameters {
+			fog_color: Color,
+		}
+
 		group.compute(self.fog_shader)
 			.image_rw(0, self.color_rt)
 			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
+			.ubo(1, &[FogParameters {
+				fog_color: self.world.fog_color
+			}])
 			.groups_from_image_size(self.color_rt);
 
 		group.draw_fullscreen(None)

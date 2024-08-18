@@ -6,6 +6,10 @@ layout(binding=0) uniform P {
 	mat4 u_inverse_projection;
 };
 
+layout(binding=1) uniform F {
+	vec4 u_fog_color;
+};
+
 layout(binding=0, rgba16f) uniform image2D u_image;
 layout(binding=1) uniform sampler2D u_depth;
 
@@ -27,7 +31,26 @@ void main() {
 
 	float distance = length(view.xyz);
 
-	texel *= pow(clamp(1.0 - distance / 20.0, 0.0, 1.0), 8.0);
+	float fog_factor = 1.0 - pow(clamp(1.0 - distance / 10.0, 0.0, 1.0), 10.0);
+
+	vec3 fog_color = u_fog_color.rgb;
+	// vec3 fog_absorption = vec3(1.0) - fog_color;
+
+
+	texel.rgb = mix(texel.rgb, fog_color, fog_factor);
+	texel.a = 1.0;
+
+	// texel.rgb -= texel.rgb * fog_absorption * pow(distance / 4.0, 0.7);
+	// texel.rgb -= texel.rgb * fog_absorption * max(distance + 50.0, 0.0) / 61.0;
+
+	texel.rgb += fog_color * pow(distance / 10.0, 2.0);
+
+	// texel.rgb = mix(texel.rgb, vec3(1.0) - (vec3(1.0) - texel.rgb * u_fog_color.rgb * fog_factor), fog_factor);
+
+
+	// texel.rgb += u_fog_color.rgb * fog_factor;
+
+	// texel.rgb = texel.rgb / (texel.rgb + vec3(1.0));
 
 	imageStore(u_image, texel_uv, texel);
 }
