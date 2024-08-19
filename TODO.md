@@ -1,3 +1,9 @@
+PLAYBOX TODO
+============
+
+
+
+
 TODO
 ====
 
@@ -8,7 +14,6 @@ preference/settings system
 	- something like sources commands? load maps with it
 
 flesh out texture support
-	- loading from disk
 	- async? like streamed audio playback?
 
 basic text rendering/layout

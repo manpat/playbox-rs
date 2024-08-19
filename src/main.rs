@@ -57,7 +57,7 @@ struct App {
 
 	main_menu: MainMenuScene,
 	pause_menu: PauseMenuScene,
-	game_scene: GameScene,
+	game_scene: Option<GameScene>,
 
 	message_bus: MessageBus,
 	menu_cmd_subscription: Subscription<MenuCmd>,
@@ -73,22 +73,23 @@ impl App {
 		dbg!(ctx.resource_root_path());
 
 		let message_bus = MessageBus::new();
-
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
+		let ctx = &mut Context::new(ctx, &audio, &message_bus);
 
 		let mut active_scene = ActiveScene::MainMenu;
+		let mut game_scene = None;
 
 		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
+			let world = Self::load_world_or_default("resource/worlds/default.world");
+			game_scene = Some(GameScene::new(ctx, world)?);
 		}
-
-		let ctx = &mut Context::new(ctx, &audio, &message_bus);
 
 		Ok(App {
 			active_scene,
 			main_menu: MainMenuScene::new(ctx)?,
 			pause_menu: PauseMenuScene::new(ctx)?,
-			game_scene: GameScene::new(ctx)?,
+			game_scene,
 
 			menu_cmd_subscription: message_bus.subscribe(),
 			message_bus,
@@ -96,11 +97,31 @@ impl App {
 			audio,
 		})
 	}
+
+	fn load_world_or_default(path: impl AsRef<std::path::Path>) -> world::World {
+		let path = path.as_ref();
+
+		match world::World::load(path) {
+			Ok(world) => world,
+			Err(err) => {
+				eprintln!("Failed to load world at '{}', creating empty world. {err}", path.display());
+				world::World::new()
+			},
+		}
+	}
 }
 
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
 		self.message_bus.garbage_collect();
+
+
+		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
+			&& self.game_scene.is_none()
+		{
+			eprintln!("Active scene wants game scene but no game scene is loaded. Transitioning back to main menu");
+			self.active_scene = ActiveScene::MainMenu;
+		}
 
 		match self.active_scene {
 			ActiveScene::MainMenu => {
@@ -108,36 +129,43 @@ impl toybox::App for App {
 			}
 
 			ActiveScene::Game => {
+				let game_scene = self.game_scene.as_mut().unwrap();
+
 				if ctx.input.button_just_down(input::Key::Escape) {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				self.game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
-				self.game_scene.draw(&mut ctx.gfx);
+				game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
+				game_scene.draw(&mut ctx.gfx);
 			}
 
 			ActiveScene::PauseMenu => {
 				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
+				let game_scene = self.game_scene.as_mut().unwrap();
 				
 				self.pause_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
-				self.game_scene.draw(&mut ctx.gfx);
+				game_scene.draw(&mut ctx.gfx);
 			}
 		}
 
 		for menu_msg in self.message_bus.poll(&self.menu_cmd_subscription).iter() {
 			match menu_msg {
 				MenuCmd::Play(..) => {
-					// TODO(pat.m): load world and create game scene
+					let world = Self::load_world_or_default("resource/worlds/default.world");
+					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus);
+					self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
 					self.active_scene = ActiveScene::Game;
 				}
 
 				MenuCmd::Resume => {
-					/* if game_scene.is_some() */
-					self.active_scene = ActiveScene::Game;
+					if self.game_scene.is_some() {
+						self.active_scene = ActiveScene::Game;
+					}
 				}
 
 				MenuCmd::QuitToMain => {
 					// TODO(pat.m): confirmation/save
+					self.game_scene = None;
 					self.active_scene = ActiveScene::MainMenu;
 				}
 
@@ -156,7 +184,9 @@ impl toybox::App for App {
 	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
 		match self.active_scene {
 			ActiveScene::PauseMenu | ActiveScene::Game => {
-				self.game_scene.add_editor_debug_menu(ui);
+				if let Some(game_scene) = &mut self.game_scene {
+					game_scene.add_editor_debug_menu(ui);
+				}
 			}
 
 			_ => {}

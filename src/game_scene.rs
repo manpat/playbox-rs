@@ -21,12 +21,10 @@ pub struct GameScene {
 	free_pos: Vec3,
 
 	free_cam: bool,
-
-	time: f32,
 }
 
 impl GameScene {
-	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<GameScene> {
+	pub fn new(ctx: &mut Context<'_>, world: world::World) -> anyhow::Result<GameScene> {
 		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
 
 		let color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("test rendertarget", gfx::ImageFormat::hdr_color(), 4));
@@ -47,11 +45,6 @@ impl GameScene {
 		// 	toy_renderer
 		// };
 
-		let world = match world::World::load("resource/worlds/default.world") {
-			Ok(world) => world,
-			Err(_) => world::World::new(),
-		};
-
 		Ok(GameScene {
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
 
@@ -68,7 +61,6 @@ impl GameScene {
 
 			show_debug: false,
 
-			time: 0.0,
 			yaw: 0.0,
 			pitch: 0.0,
 
@@ -80,8 +72,6 @@ impl GameScene {
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
-		self.time += 1.0/60.0;
-
 		if ctx.input.button_just_down(input::Key::F2) {
 			self.show_debug = !self.show_debug;
 		}
@@ -215,6 +205,9 @@ impl GameScene {
 				fog_color: self.world.fog_color
 			}])
 			.groups_from_image_size(self.color_rt);
+
+		// TODO(pat.m): bloom
+		// TODO(pat.m): tone map
 
 		group.draw_fullscreen(None)
 			.sampled_image(0, self.color_rt, rm.nearest_sampler)

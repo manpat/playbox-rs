@@ -6,38 +6,38 @@ use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct MessageBus {
-	inner: Rc<RefCell<MessageBusInner>>,
+	inner: Rc<MessageBusInner>,
 }
 
 impl MessageBus {
 	pub fn new() -> Self {
 		MessageBus {
-			inner: Rc::new(RefCell::new(MessageBusInner::default()))
+			inner: Rc::new(MessageBusInner::default())
 		}
 	}
 
 	pub fn subscribe<T: 'static>(&self) -> Subscription<T> {
-		let mut inner = self.inner.borrow_mut();
 		let type_id = TypeId::of::<T>();
 
-		let message_bus = inner.typed_busses.entry(type_id)
-			.or_insert_with(|| Box::new(TypedMessageBusConcrete::<T> {
-				subscribers: Vec::new(),
-				messages: Vec::new(),
-			}));
-
-		let typed_message_bus = message_bus.to_concrete_mut();
+		let current_message_count = self.inner.message_queues.borrow()
+			.get(&type_id)
+			.map_or(0, |queue| queue.current_message_count());
 
 		let subscription_inner = Rc::new(SubscriptionInner {
 			// Make sure this subscription doesn't see any messages already in the queue
-			seen_message_seq: Cell::new(typed_message_bus.messages.len() as u32),
-			_phantom: PhantomData,
+			seen_message_seq: Cell::new(current_message_count),
 		});
 
-		typed_message_bus.subscribers.push(Rc::downgrade(&subscription_inner));
+		let mut subscription_lists = self.inner.subscription_lists.borrow_mut();
+
+		let subscription_list = subscription_lists.entry(type_id)
+			.or_insert_with(Default::default);
+
+		subscription_list.subscribers.push(Rc::downgrade(&subscription_inner));
 
 		Subscription {
-			inner: subscription_inner
+			inner: subscription_inner,
+			_phantom: PhantomData,
 		}
 	}
 
@@ -45,75 +45,92 @@ impl MessageBus {
 		let type_id = TypeId::of::<T>();
 		let last_seen_message_seq = subscription.inner.seen_message_seq.get() as usize;
 
-		Ref::map(self.inner.borrow(), move |inner| {
-			inner.typed_busses.get(&type_id)
-				.map(|bus| {
-					let bus = bus.to_concrete();
+		Ref::map(self.inner.message_queues.borrow(), move |message_queues| {
+			message_queues.get(&type_id)
+				.map(|queue| {
+					let queue = queue.to_concrete();
 
-					subscription.inner.seen_message_seq.set(bus.messages.len() as u32);
-					&bus.messages[last_seen_message_seq..]
+					subscription.inner.seen_message_seq.set(queue.messages.len() as u32);
+					&queue.messages[last_seen_message_seq..]
 				})
 				.unwrap_or(&[])
 		})
 	}
 
+	// TODO(pat.m): this will panic while polling
 	pub fn emit<T: 'static>(&self, message: T) {
 		let type_id = TypeId::of::<T>();
 
-		if let Some(bus) = self.inner.borrow_mut().typed_busses.get_mut(&type_id) {
-			let bus = bus.to_concrete_mut();
-			bus.messages.push(message);
-		}
+		let mut message_queues = self.inner.message_queues.borrow_mut();
+		let message_queue = message_queues.entry(type_id)
+			.or_insert_with(|| Box::new(TypedMessageQueue::<T>::default()));
+
+		message_queue.to_concrete_mut().messages.push(message);
 	}
 
 	pub fn garbage_collect(&self) {
-		let mut inner = self.inner.borrow_mut();
-		for (_, bus) in inner.typed_busses.iter_mut() {
-			bus.garbage_collect();
+		let mut message_queues = self.inner.message_queues.borrow_mut();
+		let mut subscription_lists = self.inner.subscription_lists.borrow_mut();
+
+		for (type_id, queue) in message_queues.iter_mut() {
+			let subscription_list = subscription_lists.get_mut(&type_id);
+			queue.garbage_collect(subscription_list);
 		}
 	}
 }
 
 #[derive(Default)]
 struct MessageBusInner {
-	typed_busses: HashMap<TypeId, Box<dyn TypedMessageBus>>,
+	message_queues: RefCell<HashMap<TypeId, Box<dyn MessageQueue>>>,
+	subscription_lists: RefCell<HashMap<TypeId, SubscriptionList>>,
 }
 
 
 
-trait TypedMessageBus {
+trait MessageQueue {
 	fn as_any(&self) -> &dyn Any;
 	fn as_any_mut(&mut self) -> &mut dyn Any;
 
-	fn garbage_collect(&mut self);
+	fn current_message_count(&self) -> u32;
+
+	fn garbage_collect(&mut self, subscription_list: Option<&mut SubscriptionList>);
 }
 
-impl dyn TypedMessageBus {
-	fn to_concrete<T: Any>(&self) -> &TypedMessageBusConcrete<T> {
+impl dyn MessageQueue {
+	fn to_concrete<T: Any>(&self) -> &TypedMessageQueue<T> {
 		self.as_any()
 			.downcast_ref()
 			.unwrap()
 	}
 
-	fn to_concrete_mut<T: Any>(&mut self) -> &mut TypedMessageBusConcrete<T> {
+	fn to_concrete_mut<T: Any>(&mut self) -> &mut TypedMessageQueue<T> {
 		self.as_any_mut()
 			.downcast_mut()
 			.unwrap()
 	}
 }
 
-impl<T: Any> TypedMessageBus for TypedMessageBusConcrete<T> {
+impl<T: Any> MessageQueue for TypedMessageQueue<T> {
 	fn as_any(&self) -> &dyn Any { self as &dyn Any }
 	fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 
-	fn garbage_collect(&mut self) {
-		self.subscribers.retain(|subscriber| subscriber.strong_count() > 0);
-		if self.subscribers.is_empty() {
+	fn current_message_count(&self) -> u32 {
+		self.messages.len() as u32
+	}
+
+	fn garbage_collect(&mut self, subscription_list: Option<&mut SubscriptionList>) {
+		let Some(subscription_list) = subscription_list else {
+			self.messages.clear();
+			return;
+		};
+
+		subscription_list.subscribers.retain(|subscriber| subscriber.strong_count() > 0);
+		if subscription_list.subscribers.is_empty() {
 			self.messages.clear();
 			return;
 		}
 
-		let minimum_message_seq = self.subscribers.iter()
+		let minimum_message_seq = subscription_list.subscribers.iter()
 			.flat_map(|subscriber| subscriber.upgrade().map(|inner| inner.seen_message_seq.get()))
 			.min()
 			.unwrap_or(0);
@@ -122,7 +139,7 @@ impl<T: Any> TypedMessageBus for TypedMessageBusConcrete<T> {
 			let to_drop = minimum_message_seq as usize;
 			self.messages.drain(..to_drop);
 
-			for sub in self.subscribers.iter() {
+			for sub in subscription_list.subscribers.iter() {
 				let Some(sub) = sub.upgrade() else { continue };
 				let new_seq = sub.seen_message_seq.get() - minimum_message_seq;
 				sub.seen_message_seq.set(new_seq);
@@ -132,18 +149,28 @@ impl<T: Any> TypedMessageBus for TypedMessageBusConcrete<T> {
 }
 
 
-#[derive(Default)]
-struct TypedMessageBusConcrete<T: 'static> {
-	subscribers: Vec<Weak<SubscriptionInner<T>>>,
+struct TypedMessageQueue<T: 'static> {
 	messages: Vec<T>,
 }
 
-
-pub struct Subscription<T> {
-	inner: Rc<SubscriptionInner<T>>,
+impl<T: 'static> Default for TypedMessageQueue<T> {
+	fn default() -> Self {
+		Self { messages: Vec::default() }
+	}
 }
 
-struct SubscriptionInner<T> {
-	seen_message_seq: Cell<u32>,
+
+
+pub struct Subscription<T> {
+	inner: Rc<SubscriptionInner>,
 	_phantom: PhantomData<*const T>,
+}
+
+struct SubscriptionInner {
+	seen_message_seq: Cell<u32>,
+}
+
+#[derive(Default)]
+struct SubscriptionList {
+	subscribers: Vec<Weak<SubscriptionInner>>,
 }

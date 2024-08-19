@@ -38,6 +38,12 @@ void main() {
 
 
 	texel.rgb = mix(texel.rgb, fog_color, fog_factor);
+
+	// vec3 softlight = (1.0 - 2.0 * texel.rgb) * fog_color * fog_color + 2.0 * fog_color * texel.rgb;
+	// texel.rgb = overlay;
+	// texel.rgb = mix(texel.rgb, softlight, fog_factor);
+
+
 	texel.a = 1.0;
 
 	// texel.rgb -= texel.rgb * fog_absorption * pow(distance / 4.0, 0.7);
@@ -48,9 +54,10 @@ void main() {
 	// texel.rgb = mix(texel.rgb, vec3(1.0) - (vec3(1.0) - texel.rgb * u_fog_color.rgb * fog_factor), fog_factor);
 
 
-	// texel.rgb += u_fog_color.rgb * fog_factor;
+	// texel.rgb += fog_color * fog_factor;
 
-	// texel.rgb = texel.rgb / (texel.rgb + vec3(1.0));
+	texel.rgb = texel.rgb / (texel.rgb + vec3(1.0));
+
 
 	imageStore(u_image, texel_uv, texel);
 }
