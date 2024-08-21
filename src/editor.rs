@@ -82,10 +82,14 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, world: &World, 
 
 	egui::Window::new("World")
 		.show(ctx, |ui| {
-			let mut fog_color = world.fog_color;
-			if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
-				message_bus.emit(EditorCmd::SetFogParams(fog_color));
-			}
+			ui.horizontal(|ui| {
+				ui.label("Fog Color");
+
+				let mut fog_color = world.fog_color;
+				if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
+					message_bus.emit(EditorCmd::SetFogParams(fog_color));
+				}
+			});
 		});
 
 	egui::Window::new("Viewport")
