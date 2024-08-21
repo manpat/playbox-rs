@@ -23,13 +23,16 @@ impl Item {
 
 #[derive(Copy, Clone, Debug)]
 enum Operation {
-	Drag(Item),
+	Drag {
+		item: Item,
+		room_to_world: Mat2x3,
+	},
 }
 
 impl Operation {
 	fn relevant_item(&self) -> Option<Item> {
 		match *self {
-			Self::Drag(item) => Some(item),
+			Self::Drag{item, ..} => Some(item),
 		}
 	}
 }
@@ -38,6 +41,8 @@ impl Operation {
 #[derive(Copy, Clone, Default, Debug)]
 struct State {
 	hovered: Option<Item>,
+	hovered_transform: Option<Mat2x3>,
+
 	selection: Option<Item>,
 	focused_room_index: usize,
 
@@ -169,8 +174,30 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{world, ..}: &mut Context, Glob
 fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
 	let focused_room_index = context.state.selection.as_ref().map_or(context.state.focused_room_index, Item::room_index);
 
+	let mut neighbouring_rooms = Vec::new();
+
+	for wall_index in 0..context.world.rooms[focused_room_index].walls.len() {
+		let src_wall_id = GlobalWallId{room_index: focused_room_index, wall_index};
+		let Some(tgt_wall_id) = context.world.wall_target(src_wall_id)
+			else { continue };
+
+		let (start, end) = context.world.wall_vertices(src_wall_id);
+		let wall_normal = (end - start).normalize().perp();
+
+		let transform = world::calculate_portal_transform(context.world, src_wall_id, tgt_wall_id);
+		let offset_transform = Mat2x3::translate(wall_normal * 0.3) * transform;
+
+		neighbouring_rooms.push((tgt_wall_id.room_index, offset_transform));
+	}
+
 	let mut viewport = Viewport::new(ui, context);
-	viewport.add_room_at(focused_room_index, Vec2::zero());
-	viewport.ui(ui)
+	viewport.add_room(focused_room_index, Mat2x3::identity());
+	viewport.add_room_connections(focused_room_index, Mat2x3::identity());
+
+	for (room_index, transform) in neighbouring_rooms {
+		viewport.add_room(room_index, transform);
+	}
+
+	viewport.build()
 }
 

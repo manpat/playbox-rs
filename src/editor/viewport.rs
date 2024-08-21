@@ -51,6 +51,7 @@ struct ViewportItem {
 	shape: ViewportItemShape,
 	item: Item,
 	color: Color,
+	transform: Mat2x3,
 }
 
 
@@ -77,16 +78,17 @@ impl<'c> Viewport<'c> {
 		}
 	}
 
-	pub fn add_room_at(&mut self, room_index: usize, offset: Vec2) {
+	pub fn add_room(&mut self, room_index: usize, transform: Mat2x3) {
 		let room = &self.world.rooms[room_index];
 		let num_walls = room.walls.len();
 
 		// Add vertices
 		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Vertex(*vertex + offset),
+				shape: ViewportItemShape::Vertex(transform * *vertex),
 				item: Item::Vertex(GlobalVertexId {room_index, vertex_index}),
 				color: Color::grey(0.5),
+				transform,
 			});
 		}
 
@@ -95,22 +97,60 @@ impl<'c> Viewport<'c> {
 			let (start, end) = room.wall_vertices(wall_index);
 
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Line(start + offset, end + offset),
+				shape: ViewportItemShape::Line(transform * start, transform * end),
 				item: Item::Wall(GlobalWallId {room_index, wall_index}),
 				color: room.walls[wall_index].color,
+				transform,
 			});
 		}
 
 		// Pick room
 		let room_center = room.wall_vertices.iter().sum::<Vec2>() / num_walls as f32;
 		self.items.push(ViewportItem {
-			shape: ViewportItemShape::Vertex(room_center + offset),
+			shape: ViewportItemShape::Vertex(transform * room_center),
 			item: Item::Room(room_index),
 			color: Color::grey(0.5),
+			transform,
 		});
 	}
 
-	pub fn ui(mut self, _ui: &mut egui::Ui) -> egui::Response {
+	pub fn add_room_connections(&mut self, room_index: usize, transform: Mat2x3) {
+		let room = &self.world.rooms[room_index];
+		let num_walls = room.walls.len();
+
+		for wall_index in 0..num_walls {
+			let src_wall_id = GlobalWallId{room_index, wall_index};
+
+			let Some(tgt_wall_id) = self.world.wall_target(src_wall_id) else {
+				continue
+			};
+
+			let (src_start, src_end) = self.world.wall_vertices(src_wall_id);
+			let (tgt_start, tgt_end) = self.world.wall_vertices(tgt_wall_id);
+
+			let src_wall_length = (src_start - src_end).length();
+			let tgt_wall_length = (tgt_start - tgt_end).length();
+
+			let src_dir = (src_end - src_start).normalize();
+			let src_center = (src_start + src_end) / 2.0;
+
+			let apperture_half_size = src_wall_length.min(tgt_wall_length) / 2.0;
+			let apperture_offset = src_dir.perp() * 0.15;
+
+			let apperture_center = src_center + apperture_offset;
+			let apperture_start = apperture_center - src_dir * apperture_half_size;
+			let apperture_end = apperture_center + src_dir * apperture_half_size;
+
+			self.items.push(ViewportItem {
+				shape: ViewportItemShape::Line(transform * apperture_start, transform * apperture_end),
+				item: Item::Wall(tgt_wall_id),
+				color: Color::rgb(1.0, 0.6, 0.3),
+				transform,
+			});
+		}
+	}
+
+	pub fn build(mut self) -> egui::Response {
 		self.paint_background();
 
 		// Figure out what is hovered (if no operations are happening)
@@ -122,7 +162,7 @@ impl<'c> Viewport<'c> {
 			}
 		}
 
-		if let Some(Operation::Drag(..)) = self.state.operation {
+		if let Some(Operation::Drag{..}) = self.state.operation {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
 		} else if self.state.hovered.is_some() {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grab);
@@ -130,38 +170,9 @@ impl<'c> Viewport<'c> {
 
 		self.handle_item_interaction();
 
+		self.handle_operation();
+
 		self.draw_items();
-
-		// Perform operation
-		match self.state.operation {
-			Some(Operation::Drag(item)) => {
-				let delta = self.widget_to_world_delta(self.response.drag_delta());
-
-				if let Some(room) = self.world.rooms.get_mut(item.room_index()) {
-					match item {
-						Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
-							room.wall_vertices[vertex_index] += delta;
-						}
-
-						Item::Wall(GlobalWallId {wall_index, ..}) => {
-							let wall_count = room.wall_vertices.len();
-							room.wall_vertices[wall_index] += delta;
-							room.wall_vertices[(wall_index+1) % wall_count] += delta;
-						}
-
-						Item::Room(_) => {
-							for vertex in room.wall_vertices.iter_mut() {
-								*vertex += delta;
-							}
-						}
-					}
-
-					self.response.mark_changed();
-				}
-			}
-
-			_ => {}
-		}
 
 		self.response
 	}
@@ -225,10 +236,11 @@ impl Viewport<'_> {
 	fn handle_hover(&mut self, hover_pos_world: Vec2) {
 		let mut min_distance = 0.3;
 
-		for &ViewportItem {shape, item, ..} in self.items.iter() {
+		for &ViewportItem {shape, item, transform, ..} in self.items.iter() {
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
 				self.state.hovered = Some(item);
+				self.state.hovered_transform = Some(transform);
 				min_distance = distance;
 			}
 		}
@@ -236,7 +248,8 @@ impl Viewport<'_> {
 
 	fn handle_item_interaction(&mut self) {
 		if self.response.drag_started_by(egui::PointerButton::Primary) {
-			self.state.operation = self.state.hovered.map(Operation::Drag);
+			self.state.operation = self.state.hovered.zip(self.state.hovered_transform)
+				.map(|(item, room_to_world)| Operation::Drag{item, room_to_world});
 		}
 
 		if self.response.clicked() {
@@ -264,7 +277,7 @@ impl Viewport<'_> {
 	}
 
 	fn draw_items(&self) {
-		for &ViewportItem{item, shape, color} in self.items.iter() {
+		for &ViewportItem{item, shape, color, ..} in self.items.iter() {
 			let item_hovered = self.state.hovered == Some(item);
 			let color = color.to_egui_rgba();
 
@@ -309,6 +322,39 @@ impl Viewport<'_> {
 					self.painter.line_segment([start, end], (stroke_thickness, color));
 				}
 			}
+		}
+	}
+
+	fn handle_operation(&mut self) {
+		match self.state.operation {
+			Some(Operation::Drag{item, room_to_world}) => {
+				let world_delta = self.widget_to_world_delta(self.response.drag_delta());
+				let room_delta = room_to_world.inverse() * world_delta.extend(0.0);
+
+				if let Some(room) = self.world.rooms.get_mut(item.room_index()) {
+					match item {
+						Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
+							room.wall_vertices[vertex_index] += room_delta;
+						}
+
+						Item::Wall(GlobalWallId {wall_index, ..}) => {
+							let wall_count = room.wall_vertices.len();
+							room.wall_vertices[wall_index] += room_delta;
+							room.wall_vertices[(wall_index+1) % wall_count] += room_delta;
+						}
+
+						Item::Room(_) => {
+							for vertex in room.wall_vertices.iter_mut() {
+								*vertex += room_delta;
+							}
+						}
+					}
+
+					self.response.mark_changed();
+				}
+			}
+
+			_ => {}
 		}
 	}
 }

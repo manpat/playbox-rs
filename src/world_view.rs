@@ -288,16 +288,7 @@ impl RoomMeshBuilder<'_> {
 		// Walls
 		for wall_index in 0..room.walls.len() {
 			let wall_id = GlobalWallId{room_index, wall_index};
-			let connection = self.world.connections.iter()
-				.find_map(|&(a, b)|
-					if a == wall_id {
-						Some(b)
-					} else if b == wall_id {
-						Some(a)
-					} else {
-						None
-					}
-				);
+			let connection = self.world.wall_target(wall_id);
 
 			self.build_wall(wall_id, connection);
 		}
@@ -322,8 +313,7 @@ impl RoomMeshBuilder<'_> {
 			// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 			// pass through.
 			let opposing_wall_length = {
-				let opposing_room = &self.world.rooms[opposing_wall_id.room_index];
-				let (wall_start, wall_end) = opposing_room.wall_vertices(opposing_wall_id.wall_index);
+				let (wall_start, wall_end) = self.world.wall_vertices(opposing_wall_id);
 				(wall_end - wall_start).length()
 			};
 

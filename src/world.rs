@@ -164,17 +164,7 @@ impl World {
 			// We have some kind of intersection here - figure out if we need to transition to another room
 			// or if we need to slide against the wall
 			let wall_id = GlobalWallId{room_index: position.room_index, wall_index};
-			if let Some(opposing_wall_id) = self.connections.iter()
-				.find_map(|&(a, b)| {
-					if a == wall_id {
-						Some(b)
-					} else if b == wall_id {
-						Some(a)
-					} else {
-						None
-					}
-				})
-			{
+			if let Some(opposing_wall_id) = self.wall_target(wall_id) {
 				// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 				// pass through.
 				let opposing_wall_length = {
@@ -229,6 +219,19 @@ impl World {
 	pub fn wall_vertices(&self, wall_id: GlobalWallId) -> (Vec2, Vec2) {
 		self.rooms[wall_id.room_index]
 			.wall_vertices(wall_id.wall_index)
+	}
+
+	pub fn wall_target(&self, wall_id: GlobalWallId) -> Option<GlobalWallId> {
+		self.connections.iter()
+			.find_map(|&(a, b)| {
+				if a == wall_id {
+					Some(b)
+				} else if b == wall_id {
+					Some(a)
+				} else {
+					None
+				}
+			})
 	}
 }
 
