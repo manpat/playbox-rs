@@ -21,6 +21,8 @@ pub struct GameScene {
 	free_pos: Vec3,
 
 	free_cam: bool,
+
+	editor_state: editor::State,
 }
 
 impl GameScene {
@@ -68,6 +70,8 @@ impl GameScene {
 			free_pos: Vec3::zero(),
 
 			free_cam: false,
+
+			editor_state: editor::State::new(ctx.message_bus),
 		})
 	}
 
@@ -79,7 +83,8 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!self.show_debug);
 
 		if self.show_debug {
-			editor::draw_world_editor(&ctx.egui, &mut self.world, &self.message_bus);
+			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.world, &self.message_bus);
+			editor::handle_editor_cmds(&self.editor_state, &mut self.world, &self.message_bus);
 			return;
 		}
 

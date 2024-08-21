@@ -161,9 +161,9 @@ impl<T: 'static> Default for TypedMessageQueue<T> {
 
 
 
-pub struct Subscription<T> {
+pub struct Subscription<T: 'static> {
 	inner: Rc<SubscriptionInner>,
-	_phantom: PhantomData<*const T>,
+	_phantom: PhantomData<&'static T>,
 }
 
 struct SubscriptionInner {
@@ -173,4 +173,11 @@ struct SubscriptionInner {
 #[derive(Default)]
 struct SubscriptionList {
 	subscribers: Vec<Weak<SubscriptionInner>>,
+}
+
+
+impl<T: 'static> std::fmt::Debug for Subscription<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Subscription({})", std::any::type_name::<T>())
+	}
 }

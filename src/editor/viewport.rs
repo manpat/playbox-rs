@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use world::{World, GlobalVertexId, GlobalWallId};
-use super::{Item, Operation, State, Context};
+use super::{Item, Operation, State, Context, EditorCmd};
 
 #[derive(Copy, Clone)]
 enum ViewportItemShape {
@@ -60,7 +60,8 @@ pub struct Viewport<'c> {
 	response: egui::Response,
 
 	state: &'c mut State,
-	world: &'c mut World,
+	world: &'c World,
+	message_bus: &'c MessageBus,
 
 	items: Vec<ViewportItem>,
 }
@@ -74,6 +75,7 @@ impl<'c> Viewport<'c> {
 			response,
 			world: context.world,
 			state: &mut context.state,
+			message_bus: context.message_bus,
 			items: Vec::new(),
 		}
 	}
@@ -135,7 +137,7 @@ impl<'c> Viewport<'c> {
 			let src_center = (src_start + src_end) / 2.0;
 
 			let apperture_half_size = src_wall_length.min(tgt_wall_length) / 2.0;
-			let apperture_offset = src_dir.perp() * 0.15;
+			let apperture_offset = src_dir.perp() * 0.25;
 
 			let apperture_center = src_center + apperture_offset;
 			let apperture_start = apperture_center - src_dir * apperture_half_size;
@@ -154,7 +156,7 @@ impl<'c> Viewport<'c> {
 		self.paint_background();
 
 		// Figure out what is hovered (if no operations are happening)
-		if self.state.operation.is_none() {
+		if self.state.current_operation.is_none() {
 			self.state.hovered = None;
 
 			if let Some(hover_pos) = self.response.hover_pos() {
@@ -162,7 +164,7 @@ impl<'c> Viewport<'c> {
 			}
 		}
 
-		if let Some(Operation::Drag{..}) = self.state.operation {
+		if let Some(Operation::Drag{..}) = self.state.current_operation {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
 		} else if self.state.hovered.is_some() {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grab);
@@ -248,7 +250,7 @@ impl Viewport<'_> {
 
 	fn handle_item_interaction(&mut self) {
 		if self.response.drag_started_by(egui::PointerButton::Primary) {
-			self.state.operation = self.state.hovered.zip(self.state.hovered_transform)
+			self.state.current_operation = self.state.hovered.zip(self.state.hovered_transform)
 				.map(|(item, room_to_world)| Operation::Drag{item, room_to_world});
 		}
 
@@ -257,8 +259,8 @@ impl Viewport<'_> {
 		}
 
 		if self.response.drag_released_by(egui::PointerButton::Primary) {
-			self.state.selection = self.state.operation.and_then(|op| op.relevant_item()).or(self.state.selection);
-			self.state.operation = None;
+			// self.state.selection = self.state.current_operation.and_then(|op| op.relevant_item()).or(self.state.selection);
+			self.state.current_operation = None;
 		}
 
 		// TODO(pat.m): need to upgrade egui for this not to suck
@@ -326,32 +328,13 @@ impl Viewport<'_> {
 	}
 
 	fn handle_operation(&mut self) {
-		match self.state.operation {
+		match self.state.current_operation {
 			Some(Operation::Drag{item, room_to_world}) => {
 				let world_delta = self.widget_to_world_delta(self.response.drag_delta());
 				let room_delta = room_to_world.inverse() * world_delta.extend(0.0);
 
-				if let Some(room) = self.world.rooms.get_mut(item.room_index()) {
-					match item {
-						Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
-							room.wall_vertices[vertex_index] += room_delta;
-						}
-
-						Item::Wall(GlobalWallId {wall_index, ..}) => {
-							let wall_count = room.wall_vertices.len();
-							room.wall_vertices[wall_index] += room_delta;
-							room.wall_vertices[(wall_index+1) % wall_count] += room_delta;
-						}
-
-						Item::Room(_) => {
-							for vertex in room.wall_vertices.iter_mut() {
-								*vertex += room_delta;
-							}
-						}
-					}
-
-					self.response.mark_changed();
-				}
+				self.message_bus.emit(EditorCmd::TranslateItem(item, room_delta));
+				self.response.mark_changed();
 			}
 
 			_ => {}
