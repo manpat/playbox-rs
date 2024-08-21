@@ -79,7 +79,7 @@ impl App {
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
 
-		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
+		if true /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
 			let world = Self::load_world_or_default("resource/worlds/default.world");
 			game_scene = Some(GameScene::new(ctx, world)?);

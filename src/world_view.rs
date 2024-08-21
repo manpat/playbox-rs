@@ -47,7 +47,7 @@ impl WorldView {
 		})
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System, sprites: &mut super::Sprites, world: &World, world_position: WorldPosition) {
+	pub fn draw(&mut self, gfx: &mut gfx::System, _sprites: &mut super::Sprites, world: &World, world_position: WorldPosition) {
 		// Draw room you're in
 		// then for each wall,
 		// 	check if it has a neighbouring room, and if so
