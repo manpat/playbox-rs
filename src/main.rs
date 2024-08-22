@@ -69,9 +69,6 @@ impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
 		ctx.show_debug_menu = cfg!(debug_assertions);
 
-		dbg!(&ctx.gfx.core.capabilities());
-		dbg!(ctx.resource_root_path());
-
 		let message_bus = MessageBus::new();
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
 		let ctx = &mut Context::new(ctx, &audio, &message_bus);
