@@ -79,7 +79,7 @@ impl App {
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
 
-		if true /*ctx.cfg.read_bool("skip-main-menu")*/ {
+		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
 			let world = Self::load_world_or_default("resource/worlds/default.world");
 			game_scene = Some(GameScene::new(ctx, world)?);
@@ -131,7 +131,7 @@ impl toybox::App for App {
 			ActiveScene::Game => {
 				let game_scene = self.game_scene.as_mut().unwrap();
 
-				if ctx.input.button_just_down(input::Key::Escape) {
+				if ctx.input.button_just_down(input::keys::Escape) {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 

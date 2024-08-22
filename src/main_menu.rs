@@ -21,7 +21,7 @@ impl MainMenuScene {
 
 		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
 
-		if builder.button("Play") || ctx.input.button_just_down(input::Key::Space) {
+		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
 			ctx.message_bus.emit(MenuCmd::Play(()));
 		}
@@ -74,7 +74,7 @@ impl PauseMenuScene {
 
 		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
 
-		if builder.button("Resume") || ctx.input.button_just_down(input::Key::Escape) {
+		if builder.button("Resume") || ctx.input.button_just_down(input::keys::Escape) {
 			ctx.message_bus.emit(MenuCmd::Resume);
 		}
 

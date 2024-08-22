@@ -55,11 +55,19 @@ struct ViewportItem {
 }
 
 
+#[derive(Clone, Debug, Default)]
+struct ViewportState {
+
+}
+
+
 pub struct Viewport<'c> {
 	painter: egui::Painter,
 	response: egui::Response,
 
-	state: &'c mut State,
+	editor_state: &'c mut State,
+	viewport_state: ViewportState,
+
 	world: &'c World,
 	message_bus: &'c MessageBus,
 
@@ -69,12 +77,16 @@ pub struct Viewport<'c> {
 impl<'c> Viewport<'c> {
 	pub fn new<'w: 'c>(ui: &mut egui::Ui, context: &'c mut Context<'w>) -> Self {
 		let (response, painter) = ui.allocate_painter(egui::vec2(ui.available_width(), ui.available_height()), egui::Sense::click_and_drag());
+		let viewport_state = ui.ctx().data_mut(|data| data.get_temp(egui::Id::NULL)).unwrap_or_default();
 
 		Self {
 			painter,
 			response,
+
+			editor_state: &mut context.state,
+			viewport_state,
+
 			world: context.world,
-			state: &mut context.state,
 			message_bus: context.message_bus,
 			items: Vec::new(),
 		}
@@ -156,17 +168,17 @@ impl<'c> Viewport<'c> {
 		self.paint_background();
 
 		// Figure out what is hovered (if no operations are happening)
-		if self.state.current_operation.is_none() {
-			self.state.hovered = None;
+		if self.editor_state.current_operation.is_none() {
+			self.editor_state.hovered = None;
 
 			if let Some(hover_pos) = self.response.hover_pos() {
 				self.handle_hover(self.widget_to_world_pos(hover_pos));
 			}
 		}
 
-		if let Some(Operation::Drag{..}) = self.state.current_operation {
+		if let Some(Operation::Drag{..}) = self.editor_state.current_operation {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
-		} else if self.state.hovered.is_some() {
+		} else if self.editor_state.hovered.is_some() {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grab);
 		}
 
@@ -175,6 +187,8 @@ impl<'c> Viewport<'c> {
 		self.handle_operation();
 
 		self.draw_items();
+
+		self.response.ctx.data_mut(|data| data.insert_temp(egui::Id::NULL, self.viewport_state));
 
 		self.response
 	}
@@ -241,8 +255,8 @@ impl Viewport<'_> {
 		for &ViewportItem {shape, item, transform, ..} in self.items.iter() {
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
-				self.state.hovered = Some(item);
-				self.state.hovered_transform = Some(transform);
+				self.editor_state.hovered = Some(item);
+				self.editor_state.hovered_transform = Some(transform);
 				min_distance = distance;
 			}
 		}
@@ -250,21 +264,21 @@ impl Viewport<'_> {
 
 	fn handle_item_interaction(&mut self) {
 		if self.response.drag_started_by(egui::PointerButton::Primary) {
-			self.state.current_operation = self.state.hovered.zip(self.state.hovered_transform)
+			self.editor_state.current_operation = self.editor_state.hovered.zip(self.editor_state.hovered_transform)
 				.map(|(item, room_to_world)| Operation::Drag{item, room_to_world});
 		}
 
 		if self.response.clicked() {
-			self.state.selection = self.state.hovered;
+			self.editor_state.selection = self.editor_state.hovered;
 		}
 
-		if self.response.drag_released_by(egui::PointerButton::Primary) {
-			// self.state.selection = self.state.current_operation.and_then(|op| op.relevant_item()).or(self.state.selection);
-			self.state.current_operation = None;
+		if self.response.drag_stopped_by(egui::PointerButton::Primary) {
+			// self.editor_state.selection = self.editor_state.current_operation.and_then(|op| op.relevant_item()).or(self.editor_state.selection);
+			self.editor_state.current_operation = None;
 		}
 
 		// TODO(pat.m): need to upgrade egui for this not to suck
-		// if let Some(hovered_item) = self.state.hovered {
+		// if let Some(hovered_item) = self.editor_state.hovered {
 		// 	self.response = self.response.clone().context_menu(|ui| {
 		// 		if ui.button("uh").clicked() {
 		// 			ui.close_menu();
@@ -273,14 +287,14 @@ impl Viewport<'_> {
 		// }
 
 
-		if let Some(selected_item) = self.state.selection {
-			self.state.focused_room_index = selected_item.room_index();
+		if let Some(selected_item) = self.editor_state.selection {
+			self.editor_state.focused_room_index = selected_item.room_index();
 		}
 	}
 
 	fn draw_items(&self) {
 		for &ViewportItem{item, shape, color, ..} in self.items.iter() {
-			let item_hovered = self.state.hovered == Some(item);
+			let item_hovered = self.editor_state.hovered == Some(item);
 			let color = color.to_egui_rgba();
 
 			match shape {
@@ -328,7 +342,7 @@ impl Viewport<'_> {
 	}
 
 	fn handle_operation(&mut self) {
-		match self.state.current_operation {
+		match self.editor_state.current_operation {
 			Some(Operation::Drag{item, room_to_world}) => {
 				let world_delta = self.widget_to_world_delta(self.response.drag_delta());
 				let room_delta = room_to_world.inverse() * world_delta.extend(0.0);

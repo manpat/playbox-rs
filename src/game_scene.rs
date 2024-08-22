@@ -76,7 +76,7 @@ impl GameScene {
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
-		if ctx.input.button_just_down(input::Key::F2) {
+		if ctx.input.button_just_down(input::keys::F2) {
 			self.show_debug = !self.show_debug;
 		}
 
@@ -88,7 +88,7 @@ impl GameScene {
 			return;
 		}
 
-		if ctx.input.button_just_down(input::Key::V) {
+		if ctx.input.button_just_down(input::keys::KeyV) {
 			self.free_cam = !self.free_cam;
 
 			if !self.free_cam {
@@ -106,7 +106,7 @@ impl GameScene {
 			self.pitch = (self.pitch - 3.0*dy).clamp(-pitch_limit, pitch_limit);
 		}
 
-		let speed = match (ctx.input.button_down(input::Key::LShift), ctx.input.button_down(input::Key::LAlt)) {
+		let speed = match (ctx.input.button_down(input::keys::Shift), ctx.input.button_down(input::keys::Alt)) {
 			(true, false) => 4.0 / 60.0,
 			(false, true) => 0.5 / 60.0,
 			_ => 2.0 / 60.0,
@@ -121,19 +121,19 @@ impl GameScene {
 			let right = yaw_orientation.right();
 			let forward = orientation.forward();
 
-			if ctx.input.button_down(input::Key::W) {
+			if ctx.input.button_down(input::keys::KeyW) {
 				self.free_pos += forward * speed;
 			}
 
-			if ctx.input.button_down(input::Key::S) {
+			if ctx.input.button_down(input::keys::KeyS) {
 				self.free_pos -= forward * speed;
 			}
 
-			if ctx.input.button_down(input::Key::D) {
+			if ctx.input.button_down(input::keys::KeyD) {
 				self.free_pos += right * speed;
 			}
 
-			if ctx.input.button_down(input::Key::A) {
+			if ctx.input.button_down(input::keys::KeyA) {
 				self.free_pos -= right * speed;
 			}
 
@@ -143,19 +143,19 @@ impl GameScene {
 
 			let mut delta = Vec2::zero();
 
-			if ctx.input.button_down(input::Key::W) {
+			if ctx.input.button_down(input::keys::KeyW) {
 				delta += forward * speed;
 			}
 
-			if ctx.input.button_down(input::Key::S) {
+			if ctx.input.button_down(input::keys::KeyS) {
 				delta -= forward * speed;
 			}
 
-			if ctx.input.button_down(input::Key::D) {
+			if ctx.input.button_down(input::keys::KeyD) {
 				delta += right * speed;
 			}
 
-			if ctx.input.button_down(input::Key::A) {
+			if ctx.input.button_down(input::keys::KeyA) {
 				delta -= right * speed;
 			}
 
