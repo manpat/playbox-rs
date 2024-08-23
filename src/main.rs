@@ -1,7 +1,5 @@
 #![feature(let_chains)]
 
-use toybox::*;
-
 pub mod audio;
 pub mod menu;
 pub mod sprites;
@@ -78,7 +76,7 @@ impl App {
 
 		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
-			let world = Self::load_world_or_default("resource/worlds/default.world");
+			let world = Self::load_world_or_default(ctx.vfs.resource_root().join("worlds/default.world"));
 			game_scene = Some(GameScene::new(ctx, world)?);
 		}
 
@@ -148,7 +146,7 @@ impl toybox::App for App {
 		for menu_msg in self.message_bus.poll(&self.menu_cmd_subscription).iter() {
 			match menu_msg {
 				MenuCmd::Play(..) => {
-					let world = Self::load_world_or_default("resource/worlds/default.world");
+					let world = Self::load_world_or_default(ctx.vfs.resource_root().join("worlds/default.world"));
 					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus);
 					self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
 					self.active_scene = ActiveScene::Game;
@@ -197,6 +195,7 @@ pub struct Context<'tb> {
 	pub input: &'tb mut toybox::input::System,
 	pub egui: &'tb mut toybox::egui::Context,
 	pub cfg: &'tb mut toybox::cfg::Config,
+	pub vfs: &'tb toybox::vfs::Vfs,
 
 	pub message_bus: &'tb MessageBus,
 	pub audio: &'tb MyAudioSystem,
@@ -204,9 +203,9 @@ pub struct Context<'tb> {
 
 impl<'tb> Context<'tb> {
 	pub fn new(tb: &'tb mut toybox::Context, audio: &'tb MyAudioSystem, message_bus: &'tb MessageBus) -> Self {
-		let toybox::Context { gfx, input, egui, cfg, .. } = tb;
+		let toybox::Context { gfx, input, egui, cfg, vfs, .. } = tb;
 
-		Self {gfx, input, egui, cfg, audio, message_bus}
+		Self {gfx, input, egui, cfg, vfs, audio, message_bus}
 	}
 }
 
