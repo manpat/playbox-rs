@@ -29,6 +29,8 @@ void main() {
 	vec4 view = u_inverse_projection * ndc;
 	view.xyz /= view.w;
 
+	// view.xyz = round(view.xyz*4.0)/4.0;
+
 	float distance = length(view.xyz);
 
 	float fog_factor = 1.0 - pow(clamp(1.0 - distance / 10.0, 0.0, 1.0), 10.0);
@@ -55,9 +57,6 @@ void main() {
 
 
 	// texel.rgb += fog_color * fog_factor;
-
-	texel.rgb = texel.rgb / (texel.rgb + vec3(1.0));
-
 
 	imageStore(u_image, texel_uv, texel);
 }

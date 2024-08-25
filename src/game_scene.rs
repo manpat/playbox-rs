@@ -2,9 +2,12 @@ use crate::prelude::*;
 
 pub struct GameScene {
 	fog_shader: gfx::ShaderHandle,
+	hdr_to_ldr_shader: gfx::ShaderHandle,
 
-	color_rt: gfx::ImageHandle,
+	hdr_color_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
+
+	ldr_color_image: gfx::ImageHandle,
 
 	// toy_renderer: ToyRenderer,
 	sprites: Sprites,
@@ -22,6 +25,8 @@ pub struct GameScene {
 
 	free_cam: bool,
 
+	time: f32,
+
 	editor_state: editor::State,
 }
 
@@ -29,8 +34,11 @@ impl GameScene {
 	pub fn new(ctx: &mut Context<'_>, world: world::World) -> anyhow::Result<GameScene> {
 		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
 
-		let color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("test rendertarget", gfx::ImageFormat::hdr_color(), 4));
-		let depth_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("test depthbuffer", gfx::ImageFormat::Depth, 4));
+		let rt_fraction = 4;
+		let hdr_color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::hdr_color(), rt_fraction));
+		let depth_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction));
+
+		let ldr_color_image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
 
 		// let toy_renderer = {
 		// 	let project_path = resource_manager.resource_path().join("toys/basic.toy");
@@ -38,7 +46,7 @@ impl GameScene {
 		// 	let project = toy::load(&project_data)?;
 
 		// 	let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
-		// 	toy_renderer.set_color_target(color_rt);
+		// 	toy_renderer.set_color_target(hdr_color_rt);
 		// 	toy_renderer.set_depth_target(depth_rt);
 		// 	toy_renderer.update(&core, |builder| {
 		// 		builder.set_root_transform(Mat3x4::scale_translate(Vec3::splat(0.2), Vec3::from_y(0.3)));
@@ -49,9 +57,12 @@ impl GameScene {
 
 		Ok(GameScene {
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
+			hdr_to_ldr_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/hdr_to_ldr.cs.glsl")?),
 
-			color_rt,
+			hdr_color_rt,
 			depth_rt,
+
+			ldr_color_image,
 
 			// toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
@@ -70,6 +81,8 @@ impl GameScene {
 			free_pos: Vec3::zero(),
 
 			free_cam: false,
+
+			time: 0.0,
 
 			editor_state: editor::State::new(ctx.message_bus),
 		})
@@ -168,6 +181,8 @@ impl GameScene {
 	}
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
+		self.time += 1.0/60.0;
+
 		let aspect = gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);
 		let projection_view = projection
@@ -181,7 +196,7 @@ impl GameScene {
 		gfx.frame_encoder.bind_global_ubo(0, &[projection_view, inverse_projection]);
 
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
-		main_group.bind_rendertargets(&[self.color_rt, self.depth_rt]);
+		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 		main_group.bind_shared_sampled_image(0, gfx.resource_manager.blank_white_image, gfx.resource_manager.nearest_sampler);
 
 		self.world_view.draw(gfx, &mut self.sprites, &self.world, self.world_pos);
@@ -204,19 +219,25 @@ impl GameScene {
 		}
 
 		group.compute(self.fog_shader)
-			.image_rw(0, self.color_rt)
+			.image_rw(0, self.hdr_color_rt)
 			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
 			.ubo(1, &[FogParameters {
 				fog_color: self.world.fog_color
 			}])
-			.groups_from_image_size(self.color_rt);
+			.groups_from_image_size(self.hdr_color_rt);
 
 		// TODO(pat.m): bloom
 		// TODO(pat.m): tone map
 
+		group.compute(self.hdr_to_ldr_shader)
+			.image(0, self.hdr_color_rt)
+			.image_rw(1, self.ldr_color_image)
+			.ssbo(0, &[self.time])
+			.groups_from_image_size(self.hdr_color_rt);
+
+		// TODO(pat.m): blit
 		group.draw_fullscreen(None)
-			.sampled_image(0, self.color_rt, rm.nearest_sampler)
-			.blend_mode(gfx::BlendMode::PREMULTIPLIED_ALPHA);
+			.sampled_image(0, self.ldr_color_image, rm.nearest_sampler);
 	}
 }
 
