@@ -171,7 +171,7 @@ impl GameScene {
 
 impl GameScene {
 	pub fn add_editor_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
-		let default_world_path = ctx.vfs.resource_root().join("worlds/default.world");
+		let default_world_path = ctx.vfs.resource_path("worlds/default.world");
 
 		ui.menu_button("Editor", |ui| {
 			if ui.button("New World").clicked() {

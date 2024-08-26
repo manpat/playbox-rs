@@ -147,7 +147,7 @@ impl toybox::App for App {
 		for menu_msg in self.message_bus.poll(&self.menu_cmd_subscription).iter() {
 			match menu_msg {
 				MenuCmd::Play(..) => {
-					let world = Self::load_world_or_default(ctx.vfs.resource_root().join("worlds/default.world"));
+					let world = Self::load_world_or_default(ctx.vfs.resource_path("worlds/default.world"));
 					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus);
 					self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
 					self.active_scene = ActiveScene::Game;
