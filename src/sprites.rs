@@ -9,7 +9,7 @@ pub struct Sprites {
 	v_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
 
-	atlas: gfx::ImageNameOrHandle,
+	atlas: gfx::ImageArgument,
 
 	up: Vec3,
 	right: Vec3,
@@ -24,7 +24,7 @@ impl Sprites {
 			v_shader: gfx.resource_manager.standard_vs_shader,
 			f_shader: gfx.resource_manager.flat_fs_shader,
 
-			atlas: gfx.resource_manager.blank_white_image.into(), //gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+			atlas: gfx::BlankImage::White.into(), //gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
 			up: Vec3::from_y(1.0),
 			right: Vec3::from_x(1.0),
@@ -42,7 +42,7 @@ impl Sprites {
 			.elements(self.indices.len() as u32)
 			.indexed(&self.indices)
 			.ssbo(0, &self.vertices)
-			.sampled_image(0, self.atlas, gfx.resource_manager.nearest_sampler);
+			.sampled_image(0, self.atlas, gfx::CommonSampler::Nearest);
 
 		self.vertices.clear();
 		self.indices.clear();

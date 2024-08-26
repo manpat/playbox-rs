@@ -98,7 +98,6 @@ impl GameScene {
 
 		self.model.player.handle_input(ctx, &self.model.world);
 
-
 		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.model.player.yaw));
 		// self.update_interactive_objects(ctx);
 	}
@@ -122,7 +121,7 @@ impl GameScene {
 
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
-		main_group.bind_shared_sampled_image(0, gfx.resource_manager.blank_white_image, gfx.resource_manager.nearest_sampler);
+		main_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
 		self.world_view.draw(gfx, &mut self.sprites, &self.model.world, player.position);
 
@@ -133,7 +132,7 @@ impl GameScene {
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {
-		let gfx::System { resource_manager: rm, frame_encoder, .. } = gfx;
+		let gfx::System { frame_encoder, .. } = gfx;
 
 		let mut group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
 
@@ -145,7 +144,7 @@ impl GameScene {
 
 		group.compute(self.fog_shader)
 			.image_rw(0, self.hdr_color_rt)
-			.sampled_image(1, self.depth_rt, rm.nearest_sampler)
+			.sampled_image(1, self.depth_rt, gfx::CommonSampler::Nearest)
 			.ubo(1, &[FogParameters {
 				fog_color: self.model.world.fog_color
 			}])
@@ -162,7 +161,7 @@ impl GameScene {
 
 		// TODO(pat.m): blit
 		group.draw_fullscreen(None)
-			.sampled_image(0, self.ldr_color_image, rm.nearest_sampler);
+			.sampled_image(0, self.ldr_color_image, gfx::CommonSampler::Nearest);
 	}
 }
 
@@ -171,8 +170,6 @@ impl GameScene {
 
 impl GameScene {
 	pub fn add_editor_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
-		let default_world_path = ctx.vfs.resource_path("worlds/default.world");
-
 		ui.menu_button("Editor", |ui| {
 			if ui.button("New World").clicked() {
 				self.model.world = model::World::new();
@@ -183,16 +180,9 @@ impl GameScene {
 				ui.close_menu();
 			}
 
-			if ui.button("New Default World").clicked() {
-				self.model.world = model::World::new_old();
-				self.message_bus.emit(model::WorldChangedEvent);
-				// TODO(pat.m): switch to Game state
-
-				ui.close_menu();
-			}
-
 			if ui.button("Load World").clicked() {
 				// TODO(pat.m): get resource manager to find load/save path
+				let default_world_path = ctx.vfs.resource_path("worlds/default.world");
 
 				match model::World::load(&default_world_path) {
 					Ok(new_world) => {
@@ -210,6 +200,8 @@ impl GameScene {
 			}
 
 			if ui.button("Save World").clicked() {
+				let default_world_path = ctx.vfs.resource_path("worlds/default.world");
+
 				if let Err(error) = self.model.world.save(&default_world_path) {
 					eprintln!("Failed to save world to '{}': {error}", default_world_path.display());
 				}

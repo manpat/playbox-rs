@@ -52,7 +52,7 @@ impl MenuPainter {
 				.indexed(&self.shape_layer.indices)
 				.ssbo(0, &self.shape_layer.vertices)
 				.ubo(0, projection)
-				.sampled_image(0, gfx.resource_manager.blank_white_image, gfx.resource_manager.nearest_sampler)
+				.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
 				.blend_mode(gfx::BlendMode::ALPHA)
 				.depth_test(false);
 
@@ -67,7 +67,7 @@ impl MenuPainter {
 				.indexed(&self.text_layer.indices)
 				.ssbo(0, &self.text_layer.vertices)
 				.ubo(0, projection)
-				.sampled_image(0, self.glyph_atlas.font_atlas, gfx.resource_manager.nearest_sampler)
+				.sampled_image(0, self.glyph_atlas.font_atlas, gfx::CommonSampler::Nearest)
 				.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
 				.depth_test(false);
 

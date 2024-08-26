@@ -3,7 +3,7 @@ use toybox::prelude::*;
 
 #[derive(Debug)]
 pub struct ToyRenderer {
-	texture: gfx::ImageNameOrHandle,
+	texture: gfx::ImageArgument,
 	color_target: Option<gfx::ImageHandle>,
 	depth_target: Option<gfx::ImageHandle>,
 	framestage: gfx::FrameStage,
@@ -21,7 +21,7 @@ pub struct ToyRenderer {
 impl ToyRenderer {
 	pub fn new(core: &gfx::Core, rm: &mut gfx::ResourceManager) -> ToyRenderer {
 		ToyRenderer {
-			texture: rm.blank_white_image.into(),
+			texture: gfx::BlankImage::White.into(),
 			color_target: None,
 			depth_target: None,
 			framestage: gfx::FrameStage::Main,
@@ -62,7 +62,7 @@ impl ToyRenderer {
 
 			command.indexed(self.index_buffer)
 				.ssbo(0, self.vertex_buffer)
-				.sampled_image(0, self.texture, gfx.resource_manager.nearest_sampler)
+				.sampled_image(0, self.texture, gfx::CommonSampler::Nearest)
 				.elements(self.element_count);
 
 			match (self.color_target, self.depth_target) {
