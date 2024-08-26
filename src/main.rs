@@ -3,10 +3,10 @@
 pub mod audio;
 pub mod menu;
 pub mod sprites;
-pub mod world;
 pub mod world_view;
 pub mod toy_draw;
 pub mod game_scene;
+pub mod model;
 pub mod main_menu;
 pub mod glyph_cache;
 pub mod message_bus;
@@ -21,9 +21,10 @@ pub mod prelude {
 	pub use crate::main_menu::{MainMenuScene, MenuCmd, PauseMenuScene};
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
-	pub use crate::world;
 	pub use crate::world_view;
 	pub use crate::menu;
+
+	pub use crate::model;
 
 	pub use crate::editor;
 
@@ -93,14 +94,14 @@ impl App {
 		})
 	}
 
-	fn load_world_or_default(path: impl AsRef<std::path::Path>) -> world::World {
+	fn load_world_or_default(path: impl AsRef<std::path::Path>) -> model::World {
 		let path = path.as_ref();
 
-		match world::World::load(path) {
+		match model::World::load(path) {
 			Ok(world) => world,
 			Err(err) => {
 				eprintln!("Failed to load world at '{}', creating empty world. {err}", path.display());
-				world::World::new()
+				model::World::new()
 			},
 		}
 	}
@@ -170,17 +171,15 @@ impl toybox::App for App {
 				}
 
 				MenuCmd::Settings => {}
-
-				_ => {}
 			}
 		}
 	}
 
-	fn customise_debug_menu(&mut self, ui: &mut egui::Ui) {
+	fn customise_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
 		match self.active_scene {
 			ActiveScene::PauseMenu | ActiveScene::Game => {
 				if let Some(game_scene) = &mut self.game_scene {
-					game_scene.add_editor_debug_menu(ui);
+					game_scene.add_editor_debug_menu(ctx, ui);
 				}
 			}
 

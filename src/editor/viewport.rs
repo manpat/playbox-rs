@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use world::{World, GlobalVertexId, GlobalWallId};
+use model::{World, GlobalVertexId, GlobalWallId};
 use super::{Item, Operation, State, Context, EditorCmd};
 
 #[derive(Copy, Clone)]
@@ -86,7 +86,7 @@ impl<'c> Viewport<'c> {
 			editor_state: &mut context.state,
 			viewport_state,
 
-			world: context.world,
+			world: &context.model.world,
 			message_bus: context.message_bus,
 			items: Vec::new(),
 		}

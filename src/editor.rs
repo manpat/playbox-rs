@@ -1,5 +1,6 @@
 use crate::prelude::*;
-use world::{World, WorldChangedEvent, GlobalVertexId, GlobalWallId};
+
+use model::{WorldChangedEvent, GlobalVertexId, GlobalWallId};
 
 mod viewport;
 use viewport::Viewport;
@@ -69,14 +70,14 @@ impl State {
 
 struct Context<'w> {
 	state: &'w mut State,
-	world: &'w World,
+	model: &'w model::Model,
 	message_bus: &'w MessageBus,
 }
 
-pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, world: &World, message_bus: &MessageBus) {
+pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
 	let mut context = Context {
 		state,
-		world,
+		model,
 		message_bus,
 	};
 
@@ -85,7 +86,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, world: &World, 
 			ui.horizontal(|ui| {
 				ui.label("Fog Color");
 
-				let mut fog_color = world.fog_color;
+				let mut fog_color = model.world.fog_color;
 				if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
 					message_bus.emit(EditorCmd::SetFogParams(fog_color));
 				}
@@ -105,13 +106,13 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, world: &World, 
 }
 
 
-pub fn handle_editor_cmds(state: &State, world: &mut World, message_bus: &MessageBus) {
+pub fn handle_editor_cmds(state: &State, model: &mut model::Model, message_bus: &MessageBus) {
 	let mut changed = false;
 
 	for cmd in message_bus.poll(&state.editor_cmd_sub).iter() {
 		match cmd {
 			&EditorCmd::TranslateItem(item, delta) => {
-				if let Some(room) = world.rooms.get_mut(item.room_index()) {
+				if let Some(room) = model.world.rooms.get_mut(item.room_index()) {
 					match item {
 						Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
 							room.wall_vertices[vertex_index] += delta;
@@ -133,19 +134,19 @@ pub fn handle_editor_cmds(state: &State, world: &mut World, message_bus: &Messag
 			}
 
 			&EditorCmd::SetCeilingColor(room_index, color) => {
-				if let Some(room) = world.rooms.get_mut(room_index) {
+				if let Some(room) = model.world.rooms.get_mut(room_index) {
 					room.ceiling_color = color;
 				}
 			}
 
 			&EditorCmd::SetFloorColor(room_index, color) => {
-				if let Some(room) = world.rooms.get_mut(room_index) {
+				if let Some(room) = model.world.rooms.get_mut(room_index) {
 					room.floor_color = color;
 				}
 			}
 
 			&EditorCmd::SetWallColor(wall_id, color) => {
-				if let Some(wall) = world.rooms.get_mut(wall_id.room_index)
+				if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
 					.and_then(|room| room.walls.get_mut(wall_id.wall_index))
 				{
 					wall.color = color;
@@ -153,7 +154,7 @@ pub fn handle_editor_cmds(state: &State, world: &mut World, message_bus: &Messag
 			}
 
 			&EditorCmd::SetFogParams(color) => {
-				world.fog_color = color;
+				model.world.fog_color = color;
 			}
 		}
 
@@ -166,11 +167,11 @@ pub fn handle_editor_cmds(state: &State, world: &mut World, message_bus: &Messag
 }
 
 
-fn draw_room_selector(ui: &mut egui::Ui, Context{world, state, ..}: &mut Context) {
+fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context) {
 	let selected_room_index = state.selection.as_ref().map_or(state.focused_room_index, Item::room_index);
 
 	ui.horizontal(|ui| {
-		for (room_index, _room) in world.rooms.iter().enumerate() {
+		for (room_index, _room) in model.world.rooms.iter().enumerate() {
 			let selected = room_index == selected_room_index;
 			if ui.selectable_label(selected, format!("{room_index}")).clicked() {
 				state.selection = Some(Item::Room(room_index));
@@ -202,8 +203,8 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 
 }
 
-fn draw_room_inspector(ui: &mut egui::Ui, Context{world, message_bus, ..}: &mut Context, room_index: usize) {
-	let Some(room) = world.rooms.get(room_index) else {
+fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, room_index: usize) {
+	let Some(room) = model.world.rooms.get(room_index) else {
 		return
 	};
 
@@ -228,10 +229,10 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{world, message_bus, ..}: &mut 
 	});
 }
 
-fn draw_wall_inspector(ui: &mut egui::Ui, Context{world, message_bus, ..}: &mut Context, wall_id: GlobalWallId) {
+fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, wall_id: GlobalWallId) {
 	let GlobalWallId{room_index, wall_index} = wall_id;
 
-	let Some(wall) = world.rooms.get(room_index)
+	let Some(wall) = model.world.rooms.get(room_index)
 		.and_then(|room| room.walls.get(wall_index))
 	else {
 		return
@@ -256,15 +257,15 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 	let mut neighbouring_rooms = Vec::new();
 
-	for wall_index in 0..context.world.rooms[focused_room_index].walls.len() {
+	for wall_index in 0..context.model.world.rooms[focused_room_index].walls.len() {
 		let src_wall_id = GlobalWallId{room_index: focused_room_index, wall_index};
-		let Some(tgt_wall_id) = context.world.wall_target(src_wall_id)
+		let Some(tgt_wall_id) = context.model.world.wall_target(src_wall_id)
 			else { continue };
 
-		let (start, end) = context.world.wall_vertices(src_wall_id);
+		let (start, end) = context.model.world.wall_vertices(src_wall_id);
 		let wall_normal = (end - start).normalize().perp();
 
-		let transform = world::calculate_portal_transform(context.world, src_wall_id, tgt_wall_id);
+		let transform = model::calculate_portal_transform(&context.model.world, src_wall_id, tgt_wall_id);
 		let offset_transform = Mat2x3::translate(wall_normal * 0.3) * transform;
 
 		neighbouring_rooms.push((tgt_wall_id.room_index, offset_transform));

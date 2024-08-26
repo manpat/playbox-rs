@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use model::{WorldPosition, GlobalWallId};
 
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
@@ -285,30 +286,6 @@ pub fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalW
 		translation,
 	])
 }
-
-
-
-#[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct WorldPosition {
-	pub room_index: usize,
-	pub local_position: Vec2,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct GlobalWallId {
-	pub room_index: usize,
-	pub wall_index: usize,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct GlobalVertexId {
-	pub room_index: usize,
-	pub vertex_index: usize,
-}
-
-
-
-
 
 
 impl World {

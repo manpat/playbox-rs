@@ -1,7 +1,13 @@
 PLAYBOX TODO
 ============
 
+shader reflection + simpler parameterisation
 
+effect system
+
+resource trashcan
+
+transient resources
 
 
 TODO
