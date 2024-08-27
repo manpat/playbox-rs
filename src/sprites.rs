@@ -6,9 +6,6 @@ pub struct Sprites {
 	vertices: Vec<gfx::StandardVertex>,
 	indices: Vec<u32>,
 
-	v_shader: gfx::ShaderHandle,
-	f_shader: gfx::ShaderHandle,
-
 	atlas: gfx::ImageArgument,
 
 	up: Vec3,
@@ -20,9 +17,6 @@ impl Sprites {
 		Ok(Sprites {
 			vertices: Vec::new(),
 			indices: Vec::new(),
-
-			v_shader: gfx.resource_manager.standard_vs_shader,
-			f_shader: gfx.resource_manager.flat_fs_shader,
 
 			atlas: gfx::BlankImage::White.into(), //gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
@@ -38,7 +32,7 @@ impl Sprites {
 
 		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
 			.annotate("Sprites")
-			.draw(self.v_shader, self.f_shader)
+			.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
 			.elements(self.indices.len() as u32)
 			.indexed(&self.indices)
 			.ssbo(0, &self.vertices)

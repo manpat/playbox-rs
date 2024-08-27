@@ -15,8 +15,6 @@ pub struct MenuPainter {
 	pub font: fontdue::Font,
 	pub glyph_atlas: GlyphCache,
 
-	v_shader: gfx::ShaderHandle,
-	f_shader: gfx::ShaderHandle,
 	f_text_shader: gfx::ShaderHandle,
 }
 
@@ -32,8 +30,6 @@ impl MenuPainter {
 			font,
 			glyph_atlas: GlyphCache::new(gfx),
 
-			v_shader: gfx.resource_manager.standard_vs_shader,
-			f_shader: gfx.resource_manager.flat_fs_shader,
 			f_text_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::fragment("shaders/text.fs.glsl")),
 		})
 	}
@@ -47,7 +43,7 @@ impl MenuPainter {
 		if !self.shape_layer.is_empty() {
 			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0))
 				.annotate("Menu")
-				.draw(self.v_shader, self.f_shader)
+				.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
 				.elements(self.shape_layer.indices.len() as u32)
 				.indexed(&self.shape_layer.indices)
 				.ssbo(0, &self.shape_layer.vertices)
@@ -62,7 +58,7 @@ impl MenuPainter {
 		if !self.text_layer.is_empty() {
 			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(1))
 				.annotate("Menu (Text)")
-				.draw(self.v_shader, self.f_text_shader)
+				.draw(gfx::CommonShader::StandardVertex, self.f_text_shader)
 				.elements(self.text_layer.indices.len() as u32)
 				.indexed(&self.text_layer.indices)
 				.ssbo(0, &self.text_layer.vertices)

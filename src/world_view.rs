@@ -143,7 +143,7 @@ impl WorldView {
 					None => (Vec4::from_w(-1.0), Vec4::from_w(-1.0)),
 				};
 
-				group.draw(self.v_shader, rm.flat_fs_shader)
+				group.draw(self.v_shader, gfx::CommonShader::FlatTexturedFragment)
 					.elements(room_info.num_elements)
 					.ssbo(0, self.vbo)
 					.ubo(1, &[RoomUniforms {

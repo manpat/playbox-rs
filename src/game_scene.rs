@@ -20,7 +20,6 @@ pub struct GameScene {
 
 	time: f32,
 
-
 	editor_state: editor::State,
 }
 
@@ -151,7 +150,6 @@ impl GameScene {
 			.groups_from_image_size(self.hdr_color_rt);
 
 		// TODO(pat.m): bloom
-		// TODO(pat.m): tone map
 
 		group.compute(self.hdr_to_ldr_shader)
 			.image(0, self.hdr_color_rt)

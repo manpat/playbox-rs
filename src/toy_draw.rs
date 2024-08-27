@@ -8,9 +8,6 @@ pub struct ToyRenderer {
 	depth_target: Option<gfx::ImageHandle>,
 	framestage: gfx::FrameStage,
 
-	v_shader: gfx::ShaderHandle,
-	f_shader: gfx::ShaderHandle,
-
 	vertex_buffer: gfx::BufferName,
 	index_buffer: gfx::BufferName,
 	element_count: u32,
@@ -19,15 +16,12 @@ pub struct ToyRenderer {
 }
 
 impl ToyRenderer {
-	pub fn new(core: &gfx::Core, rm: &mut gfx::ResourceManager) -> ToyRenderer {
+	pub fn new(core: &gfx::Core, _rm: &mut gfx::ResourceManager) -> ToyRenderer {
 		ToyRenderer {
 			texture: gfx::BlankImage::White.into(),
 			color_target: None,
 			depth_target: None,
 			framestage: gfx::FrameStage::Main,
-
-			v_shader: rm.standard_vs_shader,
-			f_shader: rm.flat_fs_shader,
 
 			vertex_buffer: core.create_buffer(),
 			index_buffer: core.create_buffer(),
@@ -58,7 +52,7 @@ impl ToyRenderer {
 	pub fn draw(&self, gfx: &mut gfx::System) {
 		if self.element_count > 0 {
 			let mut group = gfx.frame_encoder.command_group(self.framestage).annotate("Toy");
-			let mut command = group.draw(self.v_shader, self.f_shader);
+			let mut command = group.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment);
 
 			command.indexed(self.index_buffer)
 				.ssbo(0, self.vertex_buffer)
