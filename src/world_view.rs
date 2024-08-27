@@ -19,6 +19,7 @@ impl WorldView {
 			world,
 			vertices: Vec::new(),
 			indices: Vec::new(),
+			base_vertex: 0,
 
 			ceiling_height: 1.0,
 		};
@@ -58,6 +59,7 @@ impl WorldView {
 				world,
 				vertices: Vec::new(),
 				indices: Vec::new(),
+				base_vertex: 0,
 
 				ceiling_height: 1.0,
 			};
@@ -149,13 +151,14 @@ impl WorldView {
 						plane_0,
 						plane_1,
 					}])
-					.indexed(gfx::bindings::BufferBindSource::Name {
+					.indexed(gfx::BufferArgument::Name {
 						name: self.ebo,
 						range: Some(gfx::BufferRange {
 							offset: room_info.base_index as usize * index_size,
 							size: room_info.num_elements as usize * index_size,
 						})
-					});
+					})
+					.base_vertex(room_info.base_vertex);
 			}
 
 			let depth = clip_by.map_or(0, |c| c.depth);
@@ -251,6 +254,7 @@ struct RoomMeshBuilder<'a> {
 	world: &'a World,
 	vertices: Vec<gfx::StandardVertex>,
 	indices: Vec<u32>,
+	base_vertex: u32,
 
 	ceiling_height: f32,
 }
@@ -260,7 +264,7 @@ impl RoomMeshBuilder<'_> {
 		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
 	{
 		let vs = vs.into_iter();
-		let start_index = self.vertices.len() as u32;
+		let start_index = self.vertices.len() as u32 - self.base_vertex;
 		let indices = (1..vs.len() as u32 - 1)
 			.flat_map(|i| [start_index, start_index + i, start_index + i + 1]);
 
@@ -272,7 +276,7 @@ impl RoomMeshBuilder<'_> {
 	}
 
 	fn build_room(&mut self, room_index: usize) -> RoomMeshInfo {
-		let base_vertex = self.vertices.len() as u32;
+		self.base_vertex = self.vertices.len() as u32;
 		let base_index = self.indices.len() as u32;
 
 		let room = &self.world.rooms[room_index];
@@ -295,7 +299,7 @@ impl RoomMeshBuilder<'_> {
 
 		let num_elements = self.indices.len() as u32 - base_index;
 
-		RoomMeshInfo {base_vertex, base_index, num_elements}
+		RoomMeshInfo {base_vertex: self.base_vertex, base_index, num_elements}
 	}
 
 	fn build_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, opposing_wall_id: Option<GlobalWallId>) {
