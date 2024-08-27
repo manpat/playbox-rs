@@ -106,7 +106,7 @@ impl WorldView {
 			// Draw
 			{
 				let room_info = &self.room_mesh_infos[room_index];
-				let index_size = std::mem::size_of::<u32>();
+				let index_size = std::mem::size_of::<u32>() as u32;
 
 				let [x,z,w] = transform.columns();
 				let transform = Mat3x4::from_columns([
@@ -151,13 +151,10 @@ impl WorldView {
 						plane_0,
 						plane_1,
 					}])
-					.indexed(gfx::BufferArgument::Name {
-						name: self.ebo,
-						range: Some(gfx::BufferRange {
-							offset: room_info.base_index as usize * index_size,
-							size: room_info.num_elements as usize * index_size,
-						})
-					})
+					.indexed(self.ebo.with_offset_size(
+						room_info.base_index * index_size,
+						room_info.num_elements * index_size
+					))
 					.base_vertex(room_info.base_vertex);
 			}
 
