@@ -21,7 +21,7 @@ pub struct MenuPainter {
 impl MenuPainter {
 	pub fn new(gfx: &mut gfx::System) -> anyhow::Result<MenuPainter> {
 		let font = fontdue::Font::from_bytes(FONT_DATA, fontdue::FontSettings::default())
-			.map_err(|err| anyhow::anyhow!("{}", err))?;
+			.map_err(|err| anyhow::anyhow!("{err}"))?;
 
 		Ok(MenuPainter {
 			shape_layer: MenuPainterLayer::new(),

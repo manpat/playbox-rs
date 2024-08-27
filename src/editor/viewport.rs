@@ -168,7 +168,7 @@ impl<'c> Viewport<'c> {
 		self.paint_background();
 
 		// Figure out what is hovered (if no operations are happening)
-		if self.editor_state.current_operation.is_none() {
+		if self.editor_state.current_operation.is_none() && !self.response.context_menu_opened() {
 			self.editor_state.hovered = None;
 
 			if let Some(hover_pos) = self.response.hover_pos() {
@@ -273,19 +273,50 @@ impl Viewport<'_> {
 		}
 
 		if self.response.drag_stopped_by(egui::PointerButton::Primary) {
-			// self.editor_state.selection = self.editor_state.current_operation.and_then(|op| op.relevant_item()).or(self.editor_state.selection);
 			self.editor_state.current_operation = None;
 		}
 
-		// TODO(pat.m): need to upgrade egui for this not to suck
-		// if let Some(hovered_item) = self.editor_state.hovered {
-		// 	self.response = self.response.clone().context_menu(|ui| {
-		// 		if ui.button("uh").clicked() {
-		// 			ui.close_menu();
-		// 		}
-		// 	});
-		// }
+		if let Some(hovered_item) = self.editor_state.hovered {
+			self.response.context_menu(|ui| {
+				ui.set_min_width(200.0);
 
+				match hovered_item {
+					Item::Wall(wall_id) => {
+						let wall_target = self.world.wall_target(wall_id);
+
+						if ui.button("Add Vertex").clicked() {
+							ui.close_menu();
+						}
+
+						if ui.button("Add Room").clicked() {
+							ui.close_menu();
+						}
+
+						if wall_target.is_some() {
+							if ui.button("Remove Connection").clicked() {
+								ui.close_menu();
+							}
+						} else {
+							if ui.button("Add Connection").clicked() {
+								ui.close_menu();
+							}
+						}
+					}
+
+					Item::Room(_room_index) => {
+						if ui.button("Delete Room").clicked() {
+							ui.close_menu();
+						}
+					}
+
+					Item::Vertex(_) => {
+						if ui.button("Delete Vertex").clicked() {
+							ui.close_menu();
+						}
+					}
+				}
+			});
+		}
 
 		if let Some(selected_item) = self.editor_state.selection {
 			self.editor_state.focused_room_index = selected_item.room_index();

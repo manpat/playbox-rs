@@ -286,7 +286,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 
 #[derive(Debug)]
-pub enum EditorCmd {
+enum EditorCmd {
 	TranslateItem(Item, Vec2),
 
 	SetCeilingColor(usize, Color),
