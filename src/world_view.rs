@@ -100,7 +100,6 @@ impl WorldView {
 		];
 
 		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
-		let rm = &mut gfx.resource_manager;
 
 		while let Some(Entry{room_index, transform, clip_by}) = room_stack.pop() {
 			// Draw

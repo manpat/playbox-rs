@@ -176,6 +176,10 @@ impl Room {
 		let end_vertex_idx = (wall_index+1) % self.wall_vertices.len();
 		(self.wall_vertices[wall_index], self.wall_vertices[end_vertex_idx])
 	}
+
+	pub fn bounds(&self) -> Aabb2 {
+		Aabb2::from_points(&self.wall_vertices)
+	}
 }
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]

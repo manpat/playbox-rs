@@ -91,9 +91,11 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 					message_bus.emit(EditorCmd::SetFogParams(fog_color));
 				}
 			});
+
+			draw_all_room_viewport(ui, &mut context);
 		});
 
-	egui::Window::new("Viewport")
+	egui::Window::new("Focused Room")
 		.show(ctx, |ui| {
 			draw_room_selector(ui, &mut context);
 			draw_focused_room_viewport(ui, &mut context);
@@ -277,6 +279,29 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 	for (room_index, transform) in neighbouring_rooms {
 		viewport.add_room(room_index, transform);
+	}
+
+	viewport.build()
+}
+
+
+
+fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
+	// let focused_room_index = context.state.selection.as_ref().map_or(context.state.focused_room_index, Item::room_index);
+
+	let world = &context.model.world;
+
+	let mut viewport = Viewport::new(ui, context);
+	let mut position_x = 0.0;
+
+	for (room_index, room) in world.rooms.iter().enumerate() {
+		let bounds = room.bounds();
+		let offset = Vec2::from_x(position_x) - bounds.center();
+
+		viewport.add_room(room_index, Mat2x3::translate(offset));
+		viewport.add_room_connections(room_index, Mat2x3::translate(offset));
+
+		position_x += bounds.width();
 	}
 
 	viewport.build()
