@@ -78,7 +78,7 @@ impl MenuPainter {
 
 impl MenuPainter {
 	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
-		self.shape_layer.draw_quad(geom, Aabb2::point(Vec2::zero()), color);
+		self.shape_layer.draw_quad(geom, Aabb2::zero(), color);
 	}
 
 	pub fn text(&mut self, origin: Vec2, font_size: u32, s: &str, color: impl Into<Color>) {
@@ -93,7 +93,7 @@ impl MenuPainter {
 	pub fn text_rect(&mut self, font_size: u32, s: &str) -> Aabb2 {
 		let mut full = Aabb2::zero();
 		self.glyph_atlas.layout(&self.font, font_size, s, |geom_rect, _| {
-			full = full.expand_to_include_rect(geom_rect);
+			full = full.include_rect(geom_rect);
 		});
 		full
 	}

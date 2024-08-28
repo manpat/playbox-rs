@@ -71,7 +71,7 @@ impl GlyphCache {
 
 				let uv_pos = pos_px.to_vec2() / self.atlas_size.to_vec2();
 				let uv_size = size_px.to_vec2() / self.atlas_size.to_vec2();
-				let uv_rect = Aabb2::new(uv_pos, uv_pos + uv_size);
+				let uv_rect = Aabb2::from_min_size(uv_pos, uv_size);
 
 				self.to_insert.push(GlyphInsertion {pos_px, size_px, data});
 
@@ -106,7 +106,7 @@ impl GlyphCache {
 			let info = self.get(font, font_size, ch);
 
 			let offset = Vec2::new(glyph.x, glyph.y);
-			let geom_rect = Aabb2::new(offset, offset + info.size_px.to_vec2());
+			let geom_rect = Aabb2::from_min_size(offset, info.size_px.to_vec2());
 			f(geom_rect, info.uv_rect);
 		}
 	}
