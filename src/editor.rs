@@ -1,9 +1,14 @@
 use crate::prelude::*;
 
-use model::{WorldChangedEvent, GlobalVertexId, GlobalWallId};
+use model::{GlobalVertexId, GlobalWallId};
 
 mod viewport;
 use viewport::Viewport;
+
+mod commands;
+use commands::*;
+
+pub use commands::handle_editor_cmds;
 
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -44,12 +49,14 @@ pub struct State {
 	hovered: Option<Item>,
 	hovered_transform: Option<Mat2x3>,
 
+	interaction_target: Option<Item>,
+
 	selection: Option<Item>,
 	focused_room_index: usize,
 
 	current_operation: Option<Operation>,
 
-	editor_cmd_sub: Subscription<EditorCmd>,
+	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 }
 
 impl State {
@@ -58,12 +65,14 @@ impl State {
 			hovered: None,
 			hovered_transform: None,
 
+			interaction_target: None,
+
 			selection: None,
 			focused_room_index: 0,
 
 			current_operation: None,
 
-			editor_cmd_sub: message_bus.subscribe(),
+			editor_world_edit_cmd_sub: message_bus.subscribe(),
 		}
 	}
 }
@@ -88,7 +97,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 
 				let mut fog_color = model.world.fog_color;
 				if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
-					message_bus.emit(EditorCmd::SetFogParams(fog_color));
+					message_bus.emit(EditorWorldEditCmd::SetFogParams(fog_color));
 				}
 			});
 
@@ -105,67 +114,6 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 		.show(ctx, |ui| {
 			draw_item_inspector(ui, &mut context);
 		});
-}
-
-
-pub fn handle_editor_cmds(state: &State, model: &mut model::Model, message_bus: &MessageBus) {
-	let mut changed = false;
-
-	for cmd in message_bus.poll(&state.editor_cmd_sub).iter() {
-		match cmd {
-			&EditorCmd::TranslateItem(item, delta) => {
-				if let Some(room) = model.world.rooms.get_mut(item.room_index()) {
-					match item {
-						Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
-							room.wall_vertices[vertex_index] += delta;
-						}
-
-						Item::Wall(GlobalWallId {wall_index, ..}) => {
-							let wall_count = room.wall_vertices.len();
-							room.wall_vertices[wall_index] += delta;
-							room.wall_vertices[(wall_index+1) % wall_count] += delta;
-						}
-
-						Item::Room(_) => {
-							for vertex in room.wall_vertices.iter_mut() {
-								*vertex += delta;
-							}
-						}
-					}
-				}
-			}
-
-			&EditorCmd::SetCeilingColor(room_index, color) => {
-				if let Some(room) = model.world.rooms.get_mut(room_index) {
-					room.ceiling_color = color;
-				}
-			}
-
-			&EditorCmd::SetFloorColor(room_index, color) => {
-				if let Some(room) = model.world.rooms.get_mut(room_index) {
-					room.floor_color = color;
-				}
-			}
-
-			&EditorCmd::SetWallColor(wall_id, color) => {
-				if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
-					.and_then(|room| room.walls.get_mut(wall_id.wall_index))
-				{
-					wall.color = color;
-				}
-			}
-
-			&EditorCmd::SetFogParams(color) => {
-				model.world.fog_color = color;
-			}
-		}
-
-		changed = true;
-	}
-
-	if changed {
-		message_bus.emit(WorldChangedEvent);
-	}
 }
 
 
@@ -217,7 +165,7 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 		let mut ceiling_color = room.ceiling_color;
 		if ui.color_edit_button_rgb(ceiling_color.as_mut()).changed() {
-			message_bus.emit(EditorCmd::SetCeilingColor(room_index, ceiling_color));
+			message_bus.emit(EditorWorldEditCmd::SetCeilingColor(room_index, ceiling_color));
 		}
 	});
 
@@ -226,7 +174,7 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 		let mut floor_color = room.floor_color;
 		if ui.color_edit_button_rgb(floor_color.as_mut()).changed() {
-			message_bus.emit(EditorCmd::SetFloorColor(room_index, floor_color));
+			message_bus.emit(EditorWorldEditCmd::SetFloorColor(room_index, floor_color));
 		}
 	});
 }
@@ -247,7 +195,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		
 		let mut wall_color = wall.color;
 		if ui.color_edit_button_rgb(wall_color.as_mut()).changed() {
-			message_bus.emit(EditorCmd::SetWallColor(wall_id, wall_color));
+			message_bus.emit(EditorWorldEditCmd::SetWallColor(wall_id, wall_color));
 		}
 	});
 }
@@ -310,15 +258,3 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 }
 
 
-
-
-#[derive(Debug)]
-enum EditorCmd {
-	TranslateItem(Item, Vec2),
-
-	SetCeilingColor(usize, Color),
-	SetFloorColor(usize, Color),
-	SetWallColor(GlobalWallId, Color),
-
-	SetFogParams(Color),
-}

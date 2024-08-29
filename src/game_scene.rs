@@ -91,7 +91,7 @@ impl GameScene {
 
 		if self.show_debug {
 			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, &self.message_bus);
-			editor::handle_editor_cmds(&self.editor_state, &mut self.model, &self.message_bus);
+			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
 			return;
 		}
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use model::{World, GlobalVertexId, GlobalWallId};
-use super::{Item, Operation, State, Context, EditorCmd};
+use super::{Item, Operation, State, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
 enum ViewportItemShape {
@@ -52,6 +52,7 @@ struct ViewportItem {
 	item: Item,
 	color: Color,
 	transform: Mat2x3,
+	interactive: bool,
 }
 
 
@@ -68,6 +69,7 @@ pub struct Viewport<'c> {
 
 	editor_state: &'c mut State,
 	viewport_state: ViewportState,
+	viewport_metrics: ViewportMetrics,
 
 	world: &'c World,
 	message_bus: &'c MessageBus,
@@ -84,12 +86,16 @@ impl<'c> Viewport<'c> {
 				camera_pivot: Vec2::zero(),
 			});
 
+		let viewport_metrics = ViewportMetrics::new(response.rect, &viewport_state);
+
 		Self {
 			painter,
 			response,
 
 			editor_state: &mut context.state,
+
 			viewport_state,
+			viewport_metrics,
 
 			world: &context.model.world,
 			message_bus: context.message_bus,
@@ -108,6 +114,7 @@ impl<'c> Viewport<'c> {
 				item: Item::Vertex(GlobalVertexId {room_index, vertex_index}),
 				color: Color::grey(0.5),
 				transform,
+				interactive: true,
 			});
 		}
 
@@ -120,6 +127,7 @@ impl<'c> Viewport<'c> {
 				item: Item::Wall(GlobalWallId {room_index, wall_index}),
 				color: room.walls[wall_index].color,
 				transform,
+				interactive: true,
 			});
 		}
 
@@ -130,6 +138,7 @@ impl<'c> Viewport<'c> {
 			item: Item::Room(room_index),
 			color: Color::grey(0.5),
 			transform,
+			interactive: true,
 		});
 	}
 
@@ -165,6 +174,7 @@ impl<'c> Viewport<'c> {
 				item: Item::Wall(tgt_wall_id),
 				color: Color::rgb(1.0, 0.6, 0.3),
 				transform,
+				interactive: false,
 			});
 		}
 	}
@@ -174,13 +184,10 @@ impl<'c> Viewport<'c> {
 
 		self.handle_camera();
 
-		// Figure out what is hovered (if no operations are happening)
-		if self.editor_state.current_operation.is_none() && !self.response.context_menu_opened() {
+		// Figure out what is hovered
+		if let Some(hover_pos) = self.response.hover_pos() {
 			self.editor_state.hovered = None;
-
-			if let Some(hover_pos) = self.response.hover_pos() {
-				self.handle_hover(self.widget_to_world_position(hover_pos));
-			}
+			self.handle_hover(self.viewport_metrics.widget_to_world_position(hover_pos));
 		}
 
 		if let Some(Operation::Drag{..}) = self.editor_state.current_operation {
@@ -203,50 +210,6 @@ impl<'c> Viewport<'c> {
 
 
 impl Viewport<'_> {
-	fn widget_to_world_position(&self, pos: egui::Pos2) -> Vec2 {
-		let rect = self.response.rect;
-
-		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = self.viewport_state.zoom;
-		let scale_factor = widget_extent / viewport_extent;
-		let local_pos = (pos - rect.center()) / scale_factor;
-
-		Vec2::from_compatible(local_pos) + self.viewport_state.camera_pivot
-	}
-
-	fn widget_to_world_delta(&self, pos: egui::Vec2) -> Vec2 {
-		let rect = self.response.rect;
-
-		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = self.viewport_state.zoom;
-		let scale_factor = widget_extent / viewport_extent;
-
-		Vec2::from_compatible(pos / scale_factor)
-	}
-
-	fn world_to_widget_position(&self, pos: Vec2) -> egui::Pos2 {
-		let rect = self.response.rect;
-
-		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = self.viewport_state.zoom;
-		let scale_factor = widget_extent / viewport_extent;
-
-		rect.center() + ((pos - self.viewport_state.camera_pivot) * scale_factor).to_egui_vec2()
-	}
-
-	fn world_to_widget_delta(&self, pos: Vec2) -> egui::Vec2 {
-		let rect = self.response.rect;
-
-		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = self.viewport_state.zoom;
-		let scale_factor = widget_extent / viewport_extent;
-
-		(pos * scale_factor).to_egui_vec2()
-	}
-}
-
-
-impl Viewport<'_> {
 	fn paint_background(&self) {
 		let rect = self.response.rect;
 		let center = self.response.rect.center();
@@ -259,58 +222,77 @@ impl Viewport<'_> {
 	fn handle_hover(&mut self, hover_pos_world: Vec2) {
 		let mut min_distance = 0.3;
 
-		for &ViewportItem {shape, item, transform, ..} in self.items.iter() {
+		for &ViewportItem {shape, item, transform, interactive, ..} in self.items.iter() {
+			if !interactive {
+				continue
+			}
+
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
 				self.editor_state.hovered = Some(item);
-				self.editor_state.hovered_transform = Some(transform);
+				self.editor_state.hovered_transform = Some(transform); // TODO(pat.m): this maybe shouldn't be stored in editor state?
 				min_distance = distance;
 			}
 		}
 	}
 
 	fn handle_camera(&mut self) {
+		// Pan
 		if self.response.dragged_by(egui::PointerButton::Middle) {
-			self.viewport_state.camera_pivot -= self.widget_to_world_delta(self.response.drag_delta());
+			self.viewport_state.camera_pivot -= self.viewport_metrics.widget_to_world_delta(self.response.drag_delta());
+			self.viewport_metrics.update(&self.viewport_state);
 		}
 
+		// Zoom
 		if let Some(hover_pos) = self.response.hover_pos() {
 			let scroll_delta = self.response.ctx.input_mut(|input| std::mem::take(&mut input.smooth_scroll_delta.y));
-			let hover_world_pre = self.widget_to_world_position(hover_pos);
+			let hover_world_pre = self.viewport_metrics.widget_to_world_position(hover_pos);
 
-			let prev_zoom = self.viewport_state.zoom;
 			self.viewport_state.zoom *= (-scroll_delta / 100.0).exp2();
 			self.viewport_state.zoom = self.viewport_state.zoom.clamp(1.0/2.0, 128.0);
 
-			let hover_world_post = self.widget_to_world_position(hover_pos);
+			self.viewport_metrics.update(&self.viewport_state);
+			let hover_world_post = self.viewport_metrics.widget_to_world_position(hover_pos);
 
-			self.viewport_state.camera_pivot -= (hover_world_post - hover_world_pre);
+			self.viewport_state.camera_pivot -= hover_world_post - hover_world_pre;
+			self.viewport_metrics.update(&self.viewport_state);
 		}
 	}
 
 	fn handle_item_interaction(&mut self) {
+		if self.response.is_pointer_button_down_on() && self.editor_state.hovered.is_some() && self.editor_state.current_operation.is_none() {
+			self.editor_state.interaction_target = self.editor_state.hovered;
+		}
+
 		if self.response.drag_started_by(egui::PointerButton::Primary) {
-			self.editor_state.current_operation = self.editor_state.hovered.zip(self.editor_state.hovered_transform)
+			self.editor_state.current_operation = self.editor_state.interaction_target.zip(self.editor_state.hovered_transform)
 				.map(|(item, room_to_world)| Operation::Drag{item, room_to_world});
+		}
+
+		if self.response.drag_stopped_by(egui::PointerButton::Primary) {
+			self.editor_state.interaction_target = None;
+			self.editor_state.current_operation = None;
 		}
 
 		if self.response.clicked() {
 			self.editor_state.selection = self.editor_state.hovered;
 		}
 
-		if self.response.drag_stopped_by(egui::PointerButton::Primary) {
-			self.editor_state.current_operation = None;
-		}
-
-		if let Some(hovered_item) = self.editor_state.hovered {
+		if let Some(interaction_target) = self.editor_state.interaction_target {
 			self.response.context_menu(|ui| {
 				ui.set_min_width(200.0);
 
-				match hovered_item {
+				match interaction_target {
 					Item::Wall(wall_id) => {
-						let wall_target = self.world.wall_target(wall_id);
-
 						if ui.button("Add Vertex").clicked() {
+							// let mouse_pos = self.response.interact_pointer_pos().unwrap();
+							// let insert_pos = self.viewport_metrics.widget_to_world_position(mouse_pos);
+
+							let (start, end) = self.world.wall_vertices(wall_id);
+							let insert_pos = (start + end) / 2.0;
+
+							self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
+
 							ui.close_menu();
 						}
 
@@ -318,8 +300,10 @@ impl Viewport<'_> {
 							ui.close_menu();
 						}
 
+						let wall_target = self.world.wall_target(wall_id);
 						if wall_target.is_some() {
 							if ui.button("Remove Connection").clicked() {
+								self.message_bus.emit(EditorWorldEditCmd::DisconnectWall(wall_id));
 								ui.close_menu();
 							}
 						} else {
@@ -329,8 +313,14 @@ impl Viewport<'_> {
 						}
 					}
 
-					Item::Room(_room_index) => {
+					Item::Room(room_index) => {
+						if ui.button("Remove Connections").clicked() {
+							self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_index));
+							ui.close_menu();
+						}
+
 						if ui.button("Delete Room").clicked() {
+							self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_index));
 							ui.close_menu();
 						}
 					}
@@ -357,7 +347,7 @@ impl Viewport<'_> {
 			match shape {
 				ViewportItemShape::Vertex(vertex) => {
 					if let Item::Room(room_index) = item {
-						let vertex_px = self.world_to_widget_position(vertex);
+						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
 
 						self.painter.text(
 							vertex_px,
@@ -372,7 +362,7 @@ impl Viewport<'_> {
 						);
 
 					} else {
-						let vertex_px = self.world_to_widget_position(vertex);
+						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
 						let rect = egui::Rect::from_center_size(vertex_px, egui::vec2(12.0, 12.0));
 
 						if item_hovered {
@@ -389,8 +379,8 @@ impl Viewport<'_> {
 						true => 4.0,
 					};
 
-					let start = self.world_to_widget_position(start);
-					let end = self.world_to_widget_position(end);
+					let start = self.viewport_metrics.world_to_widget_position(start);
+					let end = self.viewport_metrics.world_to_widget_position(end);
 
 					self.painter.line_segment([start, end], (stroke_thickness, color));
 				}
@@ -401,14 +391,68 @@ impl Viewport<'_> {
 	fn handle_operation(&mut self) {
 		match self.editor_state.current_operation {
 			Some(Operation::Drag{item, room_to_world}) => {
-				let world_delta = self.widget_to_world_delta(self.response.drag_delta());
+				let world_delta = self.viewport_metrics.widget_to_world_delta(self.response.drag_delta());
 				let room_delta = room_to_world.inverse() * world_delta.extend(0.0);
 
-				self.message_bus.emit(EditorCmd::TranslateItem(item, room_delta));
+				self.message_bus.emit(EditorWorldEditCmd::TranslateItem(item, room_delta));
 				self.response.mark_changed();
 			}
 
 			_ => {}
 		}
+	}
+}
+
+
+
+
+struct ViewportMetrics {
+	widget_center: Vec2,
+	widget_extent: Vec2,
+
+	camera_pivot: Vec2,
+	zoom: f32,
+}
+
+
+impl ViewportMetrics {
+	fn new(rect: egui::Rect, viewport_state: &ViewportState) -> Self {
+		let widget_center = Vec2::from_compatible(rect.center());
+		let widget_extent = Vec2::from_compatible(rect.size() / 2.0);
+
+		ViewportMetrics {
+			widget_center,
+			widget_extent,
+
+			camera_pivot: viewport_state.camera_pivot,
+			zoom: viewport_state.zoom,
+		}
+	}
+
+	fn update(&mut self, viewport_state: &ViewportState) {
+		self.zoom = viewport_state.zoom;
+		self.camera_pivot = viewport_state.camera_pivot;
+	}
+
+	fn world_to_widget_scale_factor(&self) -> f32 {
+		self.widget_extent.x / self.zoom
+	}
+
+	fn widget_to_world_position(&self, pos: egui::Pos2) -> Vec2 {
+		let camera_pos = (Vec2::from_compatible(pos) - self.widget_center) / self.world_to_widget_scale_factor();
+		camera_pos + self.camera_pivot
+	}
+
+	fn widget_to_world_delta(&self, pos: egui::Vec2) -> Vec2 {
+		Vec2::from_compatible(pos) / self.world_to_widget_scale_factor()
+	}
+
+	fn world_to_widget_position(&self, pos: Vec2) -> egui::Pos2 {
+		let widget_relative_pos = (pos - self.camera_pivot) * self.world_to_widget_scale_factor();
+		(self.widget_center + widget_relative_pos).to_egui_pos2()
+	}
+
+	fn world_to_widget_delta(&self, pos: Vec2) -> egui::Vec2 {
+		(pos * self.world_to_widget_scale_factor()).to_egui_vec2()
 	}
 }

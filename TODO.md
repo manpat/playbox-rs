@@ -9,6 +9,15 @@ resource trashcan
 
 transient resources
 
+game ui
+	- health/blood bar
+	- interaction prompts
+	- dialogue popup
+
+stuff to interact with
+
+create rooms, edit connections
+
 
 TODO
 ====
