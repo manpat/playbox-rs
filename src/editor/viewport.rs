@@ -55,9 +55,10 @@ struct ViewportItem {
 }
 
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct ViewportState {
-
+	zoom: f32,
+	camera_pivot: Vec2,
 }
 
 
@@ -77,7 +78,11 @@ pub struct Viewport<'c> {
 impl<'c> Viewport<'c> {
 	pub fn new<'w: 'c>(ui: &mut egui::Ui, context: &'c mut Context<'w>) -> Self {
 		let (response, painter) = ui.allocate_painter(egui::vec2(ui.available_width(), ui.available_height()), egui::Sense::click_and_drag());
-		let viewport_state = ui.ctx().data_mut(|data| data.get_temp(egui::Id::NULL)).unwrap_or_default();
+		let viewport_state = ui.ctx().data_mut(|data| data.get_temp(response.id))
+			.unwrap_or_else(|| ViewportState {
+				zoom: 4.0,
+				camera_pivot: Vec2::zero(),
+			});
 
 		Self {
 			painter,
@@ -167,12 +172,14 @@ impl<'c> Viewport<'c> {
 	pub fn build(mut self) -> egui::Response {
 		self.paint_background();
 
+		self.handle_camera();
+
 		// Figure out what is hovered (if no operations are happening)
 		if self.editor_state.current_operation.is_none() && !self.response.context_menu_opened() {
 			self.editor_state.hovered = None;
 
 			if let Some(hover_pos) = self.response.hover_pos() {
-				self.handle_hover(self.widget_to_world_pos(hover_pos));
+				self.handle_hover(self.widget_to_world_position(hover_pos));
 			}
 		}
 
@@ -188,7 +195,7 @@ impl<'c> Viewport<'c> {
 
 		self.draw_items();
 
-		self.response.ctx.data_mut(|data| data.insert_temp(egui::Id::NULL, self.viewport_state));
+		self.response.ctx.data_mut(|data| data.insert_temp(self.response.id, self.viewport_state));
 
 		self.response
 	}
@@ -196,42 +203,42 @@ impl<'c> Viewport<'c> {
 
 
 impl Viewport<'_> {
-	fn widget_to_world_pos(&self, pos: egui::Pos2) -> Vec2 {
+	fn widget_to_world_position(&self, pos: egui::Pos2) -> Vec2 {
 		let rect = self.response.rect;
 
 		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = 4.0; // TODO(pat.m): should come from zoom
+		let viewport_extent = self.viewport_state.zoom;
 		let scale_factor = widget_extent / viewport_extent;
 		let local_pos = (pos - rect.center()) / scale_factor;
 
-		Vec2::from_compatible(local_pos)
+		Vec2::from_compatible(local_pos) + self.viewport_state.camera_pivot
 	}
 
 	fn widget_to_world_delta(&self, pos: egui::Vec2) -> Vec2 {
 		let rect = self.response.rect;
 
 		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = 4.0; // TODO(pat.m): should come from zoom
+		let viewport_extent = self.viewport_state.zoom;
 		let scale_factor = widget_extent / viewport_extent;
 
 		Vec2::from_compatible(pos / scale_factor)
 	}
 
-	fn world_to_widget_pos(&self, pos: Vec2) -> egui::Pos2 {
+	fn world_to_widget_position(&self, pos: Vec2) -> egui::Pos2 {
 		let rect = self.response.rect;
 
 		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = 4.0; // TODO(pat.m): should come from zoom
+		let viewport_extent = self.viewport_state.zoom;
 		let scale_factor = widget_extent / viewport_extent;
 
-		rect.center() + (pos * scale_factor).to_egui_vec2()
+		rect.center() + ((pos - self.viewport_state.camera_pivot) * scale_factor).to_egui_vec2()
 	}
 
 	fn world_to_widget_delta(&self, pos: Vec2) -> egui::Vec2 {
 		let rect = self.response.rect;
 
 		let widget_extent = rect.size().x / 2.0;
-		let viewport_extent = 4.0; // TODO(pat.m): should come from zoom
+		let viewport_extent = self.viewport_state.zoom;
 		let scale_factor = widget_extent / viewport_extent;
 
 		(pos * scale_factor).to_egui_vec2()
@@ -259,6 +266,25 @@ impl Viewport<'_> {
 				self.editor_state.hovered_transform = Some(transform);
 				min_distance = distance;
 			}
+		}
+	}
+
+	fn handle_camera(&mut self) {
+		if self.response.dragged_by(egui::PointerButton::Middle) {
+			self.viewport_state.camera_pivot -= self.widget_to_world_delta(self.response.drag_delta());
+		}
+
+		if let Some(hover_pos) = self.response.hover_pos() {
+			let scroll_delta = self.response.ctx.input_mut(|input| std::mem::take(&mut input.smooth_scroll_delta.y));
+			let hover_world_pre = self.widget_to_world_position(hover_pos);
+
+			let prev_zoom = self.viewport_state.zoom;
+			self.viewport_state.zoom *= (-scroll_delta / 100.0).exp2();
+			self.viewport_state.zoom = self.viewport_state.zoom.clamp(1.0/2.0, 128.0);
+
+			let hover_world_post = self.widget_to_world_position(hover_pos);
+
+			self.viewport_state.camera_pivot -= (hover_world_post - hover_world_pre);
 		}
 	}
 
@@ -331,7 +357,7 @@ impl Viewport<'_> {
 			match shape {
 				ViewportItemShape::Vertex(vertex) => {
 					if let Item::Room(room_index) = item {
-						let vertex_px = self.world_to_widget_pos(vertex);
+						let vertex_px = self.world_to_widget_position(vertex);
 
 						self.painter.text(
 							vertex_px,
@@ -346,7 +372,7 @@ impl Viewport<'_> {
 						);
 
 					} else {
-						let vertex_px = self.world_to_widget_pos(vertex);
+						let vertex_px = self.world_to_widget_position(vertex);
 						let rect = egui::Rect::from_center_size(vertex_px, egui::vec2(12.0, 12.0));
 
 						if item_hovered {
@@ -363,8 +389,8 @@ impl Viewport<'_> {
 						true => 4.0,
 					};
 
-					let start = self.world_to_widget_pos(start);
-					let end = self.world_to_widget_pos(end);
+					let start = self.world_to_widget_position(start);
+					let end = self.world_to_widget_position(end);
 
 					self.painter.line_segment([start, end], (stroke_thickness, color));
 				}

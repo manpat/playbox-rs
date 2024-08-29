@@ -293,15 +293,17 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 
 	let mut viewport = Viewport::new(ui, context);
 	let mut position_x = 0.0;
+	let margin = 1.0;
 
 	for (room_index, room) in world.rooms.iter().enumerate() {
 		let bounds = room.bounds();
-		let offset = Vec2::from_x(position_x) - bounds.center();
+		let room_width = bounds.width();
+		let offset = Vec2::from_x(position_x + room_width / 2.0) - bounds.center();
 
 		viewport.add_room(room_index, Mat2x3::translate(offset));
 		viewport.add_room_connections(room_index, Mat2x3::translate(offset));
 
-		position_x += bounds.width();
+		position_x += room_width + margin;
 	}
 
 	viewport.build()
