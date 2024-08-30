@@ -1,11 +1,13 @@
 use crate::prelude::*;
-use model::{World, GlobalVertexId, GlobalWallId};
-use super::{Item, Operation, State, Context, EditorWorldEditCmd};
+use model::{World, GlobalVertexId, GlobalWallId, WorldPosition};
+use super::{Item, State, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
 enum ViewportItemShape {
 	Vertex(Vec2),
 	Line(Vec2, Vec2),
+
+	PlayerIndicator(Mat2x3),
 }
 
 impl ViewportItemShape {
@@ -43,16 +45,35 @@ impl ViewportItemShape {
 
 				distance.min(dist_a).min(dist_b)
 			}
+
+			&ViewportItemShape::PlayerIndicator(_) => unimplemented!(),
 		}
+	}
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+	pub struct ViewportItemFlags: u32 {
+		const DRAGGABLE = 1 << 0;
+		const CLICKABLE = 1 << 1;
+		const HAS_CONTEXT_MENU = 1 << 2;
+
+		const BASIC_INTERACTIONS = 0b111;
+
+		// Can rooms themselves be dragged?
+		const RECENTERABLE = 1 << 3;
+
+		const ALL_INTERACTIONS = 0b1111;
+
 	}
 }
 
 struct ViewportItem {
 	shape: ViewportItemShape,
-	item: Item,
+	item: Option<Item>,
 	color: Color,
 	transform: Mat2x3,
-	interactive: bool,
+	flags: ViewportItemFlags,
 }
 
 
@@ -60,6 +81,13 @@ struct ViewportItem {
 struct ViewportState {
 	zoom: f32,
 	camera_pivot: Vec2,
+
+	context_menu_target: Option<Item>,
+
+	hovered_item_flags: ViewportItemFlags,
+	hovered_item_transform: Mat2x3,
+
+	current_operation: Option<Operation>,
 }
 
 
@@ -84,6 +112,12 @@ impl<'c> Viewport<'c> {
 			.unwrap_or_else(|| ViewportState {
 				zoom: 4.0,
 				camera_pivot: Vec2::zero(),
+
+				context_menu_target: None,
+				current_operation: None,
+
+				hovered_item_flags: ViewportItemFlags::empty(),
+				hovered_item_transform: Mat2x3::identity(),
 			});
 
 		let viewport_metrics = ViewportMetrics::new(response.rect, &viewport_state);
@@ -103,18 +137,25 @@ impl<'c> Viewport<'c> {
 		}
 	}
 
-	pub fn add_room(&mut self, room_index: usize, transform: Mat2x3) {
+	pub fn add_room(&mut self, room_index: usize, transform: Mat2x3, flags: ViewportItemFlags) {
 		let room = &self.world.rooms[room_index];
 		let num_walls = room.walls.len();
+
+		let interaction_flags = flags.intersection(ViewportItemFlags::BASIC_INTERACTIONS);
+
+		let mut room_interaction_flags = interaction_flags;
+		if !flags.contains(ViewportItemFlags::RECENTERABLE) {
+			room_interaction_flags.remove(ViewportItemFlags::DRAGGABLE);
+		}
 
 		// Add vertices
 		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Vertex(transform * *vertex),
-				item: Item::Vertex(GlobalVertexId {room_index, vertex_index}),
+				item: Some(Item::Vertex(GlobalVertexId {room_index, vertex_index})),
 				color: Color::grey(0.5),
 				transform,
-				interactive: true,
+				flags: interaction_flags,
 			});
 		}
 
@@ -124,10 +165,10 @@ impl<'c> Viewport<'c> {
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(transform * start, transform * end),
-				item: Item::Wall(GlobalWallId {room_index, wall_index}),
+				item: Some(Item::Wall(GlobalWallId {room_index, wall_index})),
 				color: room.walls[wall_index].color,
 				transform,
-				interactive: true,
+				flags: interaction_flags,
 			});
 		}
 
@@ -135,16 +176,18 @@ impl<'c> Viewport<'c> {
 		let room_center = room.wall_vertices.iter().sum::<Vec2>() / num_walls as f32;
 		self.items.push(ViewportItem {
 			shape: ViewportItemShape::Vertex(transform * room_center),
-			item: Item::Room(room_index),
+			item: Some(Item::Room(room_index)),
 			color: Color::grey(0.5),
 			transform,
-			interactive: true,
+			flags: room_interaction_flags,
 		});
 	}
 
-	pub fn add_room_connections(&mut self, room_index: usize, transform: Mat2x3) {
+	pub fn add_room_connections(&mut self, room_index: usize, transform: Mat2x3, flags: ViewportItemFlags) {
 		let room = &self.world.rooms[room_index];
 		let num_walls = room.walls.len();
+
+		let interaction_flags = flags.intersection(ViewportItemFlags::CLICKABLE);
 
 		for wall_index in 0..num_walls {
 			let src_wall_id = GlobalWallId{room_index, wall_index};
@@ -171,10 +214,29 @@ impl<'c> Viewport<'c> {
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(transform * apperture_start, transform * apperture_end),
-				item: Item::Wall(tgt_wall_id),
+				item: Some(Item::Wall(tgt_wall_id)),
 				color: Color::rgb(1.0, 0.6, 0.3),
 				transform,
-				interactive: false,
+				flags: interaction_flags,
+			});
+		}
+	}
+
+	pub fn add_player_indicator(&mut self, position: WorldPosition, yaw: f32) {
+		let transforms = self.items.iter()
+			.filter(|vpitem| vpitem.item == Some(Item::Room(position.room_index)))
+			.map(|vpitem| vpitem.transform)
+			.collect::<Vec<_>>();
+
+		let base_player_transform = Mat2x3::rotate_translate(yaw, position.local_position);
+
+		for room_transform in transforms {
+			self.items.push(ViewportItem {
+				shape: ViewportItemShape::PlayerIndicator(room_transform * base_player_transform),
+				item: None,
+				color: Color::grey(0.8),
+				transform: room_transform,
+				flags: ViewportItemFlags::empty(),
 			});
 		}
 	}
@@ -186,21 +248,30 @@ impl<'c> Viewport<'c> {
 
 		// Figure out what is hovered
 		if let Some(hover_pos) = self.response.hover_pos() {
-			self.editor_state.hovered = None;
 			self.handle_hover(self.viewport_metrics.widget_to_world_position(hover_pos));
-		}
-
-		if let Some(Operation::Drag{..}) = self.editor_state.current_operation {
-			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
-		} else if self.editor_state.hovered.is_some() {
-			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grab);
 		}
 
 		self.handle_item_interaction();
 
+		self.show_context_menu();
+
+		if let Some(selected_item) = self.editor_state.selection {
+			self.editor_state.focused_room_index = selected_item.room_index();
+		}
+
 		self.handle_operation();
 
 		self.draw_items();
+
+		// egui::Window::new("Viewport State")
+		// 	.id(self.response.id.with("state window"))
+		// 	.show(&self.response.ctx, |ui| {
+		// 		ui.label(format!("{:#?}", self.viewport_state));
+		// 	});
+
+		if self.response.hovered() {
+			self.set_cursor_state();
+		}
 
 		self.response.ctx.data_mut(|data| data.insert_temp(self.response.id, self.viewport_state));
 
@@ -220,17 +291,20 @@ impl Viewport<'_> {
 	}
 
 	fn handle_hover(&mut self, hover_pos_world: Vec2) {
+		self.editor_state.hovered = None;
+
 		let mut min_distance = 0.3;
 
-		for &ViewportItem {shape, item, transform, interactive, ..} in self.items.iter() {
-			if !interactive {
+		for &ViewportItem {shape, item, transform, flags, ..} in self.items.iter() {
+			if !flags.intersects(ViewportItemFlags::BASIC_INTERACTIONS) {
 				continue
 			}
 
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
-				self.editor_state.hovered = Some(item);
-				self.editor_state.hovered_transform = Some(transform); // TODO(pat.m): this maybe shouldn't be stored in editor state?
+				self.editor_state.hovered = item;
+				self.viewport_state.hovered_item_transform = transform;
+				self.viewport_state.hovered_item_flags = flags;
 				min_distance = distance;
 			}
 		}
@@ -260,93 +334,113 @@ impl Viewport<'_> {
 	}
 
 	fn handle_item_interaction(&mut self) {
-		if self.response.is_pointer_button_down_on() && self.editor_state.hovered.is_some() && self.editor_state.current_operation.is_none() {
-			self.editor_state.interaction_target = self.editor_state.hovered;
+		if !self.response.hovered() {
+			return
 		}
 
-		if self.response.drag_started_by(egui::PointerButton::Primary) {
-			self.editor_state.current_operation = self.editor_state.interaction_target.zip(self.editor_state.hovered_transform)
-				.map(|(item, room_to_world)| Operation::Drag{item, room_to_world});
+		let is_hovered_draggable = self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::DRAGGABLE);
+		let is_hovered_clickable = self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::CLICKABLE);
+		let is_hovered_has_context_menu = self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::HAS_CONTEXT_MENU);
+
+		let is_primary_pressed = self.response.ctx.input(|input| input.pointer.primary_pressed());
+
+		if let Some(item) = self.editor_state.hovered
+			&& is_primary_pressed
+			&& is_hovered_draggable
+		{
+			self.viewport_state.current_operation = Some(Operation::Drag{item, room_to_world: self.viewport_state.hovered_item_transform});
 		}
 
-		if self.response.drag_stopped_by(egui::PointerButton::Primary) {
-			self.editor_state.interaction_target = None;
-			self.editor_state.current_operation = None;
-		}
-
-		if self.response.clicked() {
+		if is_hovered_clickable && self.response.clicked() {
 			self.editor_state.selection = self.editor_state.hovered;
 		}
 
-		if let Some(interaction_target) = self.editor_state.interaction_target {
-			self.response.context_menu(|ui| {
-				ui.set_min_width(200.0);
+		if is_hovered_has_context_menu {
+			if self.response.secondary_clicked() {
+				self.viewport_state.context_menu_target = self.editor_state.hovered;
+			}
+		} else if self.response.secondary_clicked() {
+			self.viewport_state.context_menu_target = None;
+		}
+	}
 
-				match interaction_target {
-					Item::Wall(wall_id) => {
-						if ui.button("Add Vertex").clicked() {
-							// let mouse_pos = self.response.interact_pointer_pos().unwrap();
-							// let insert_pos = self.viewport_metrics.widget_to_world_position(mouse_pos);
+	fn show_context_menu(&mut self) {
+		let Some(item) = self.viewport_state.context_menu_target else {
+			return;
+		};
 
-							let (start, end) = self.world.wall_vertices(wall_id);
-							let insert_pos = (start + end) / 2.0;
+		self.response.context_menu(|ui| {
+			ui.set_min_width(200.0);
 
-							self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
+			match item {
+				Item::Wall(wall_id) => {
+					if ui.button("Add Vertex").clicked() {
+						// let mouse_pos = self.response.interact_pointer_pos().unwrap();
+						// let insert_pos = self.viewport_metrics.widget_to_world_position(mouse_pos);
 
-							ui.close_menu();
-						}
+						let (start, end) = self.world.wall_vertices(wall_id);
+						let insert_pos = (start + end) / 2.0;
 
-						if ui.button("Add Room").clicked() {
-							ui.close_menu();
-						}
+						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
-						let wall_target = self.world.wall_target(wall_id);
-						if wall_target.is_some() {
-							if ui.button("Remove Connection").clicked() {
-								self.message_bus.emit(EditorWorldEditCmd::DisconnectWall(wall_id));
-								ui.close_menu();
-							}
-						} else {
-							if ui.button("Add Connection").clicked() {
-								ui.close_menu();
-							}
-						}
+						ui.close_menu();
 					}
 
-					Item::Room(room_index) => {
-						if ui.button("Remove Connections").clicked() {
-							self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_index));
-							ui.close_menu();
-						}
-
-						if ui.button("Delete Room").clicked() {
-							self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_index));
-							ui.close_menu();
-						}
+					if ui.button("Add Room").clicked() {
+						ui.close_menu();
 					}
 
-					Item::Vertex(_) => {
-						if ui.button("Delete Vertex").clicked() {
+					let wall_target = self.world.wall_target(wall_id);
+					if wall_target.is_some() {
+						if ui.button("Remove Connection").clicked() {
+							self.message_bus.emit(EditorWorldEditCmd::DisconnectWall(wall_id));
+							ui.close_menu();
+						}
+					} else {
+						if ui.button("Add Connection").clicked() {
 							ui.close_menu();
 						}
 					}
 				}
-			});
-		}
 
-		if let Some(selected_item) = self.editor_state.selection {
-			self.editor_state.focused_room_index = selected_item.room_index();
+				Item::Room(room_index) => {
+					if ui.button("Remove Connections").clicked() {
+						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_index));
+						ui.close_menu();
+					}
+
+					if ui.button("Delete Room").clicked() {
+						self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_index));
+						ui.close_menu();
+					}
+				}
+
+				Item::Vertex(_) => {
+					if ui.button("Delete Vertex").clicked() {
+						ui.close_menu();
+					}
+				}
+			}
+		});
+	}
+
+	fn set_cursor_state(&self) {
+		if let Some(Operation::Drag{..}) = self.viewport_state.current_operation {
+			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+
+		} else if self.editor_state.hovered.is_some() && self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::DRAGGABLE) {
+			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grab);
 		}
 	}
 
 	fn draw_items(&self) {
 		for &ViewportItem{item, shape, color, ..} in self.items.iter() {
-			let item_hovered = self.editor_state.hovered == Some(item);
+			let item_hovered = self.editor_state.hovered == item && item.is_some();
 			let color = color.to_egui_rgba();
 
 			match shape {
 				ViewportItemShape::Vertex(vertex) => {
-					if let Item::Room(room_index) = item {
+					if let Some(Item::Room(room_index)) = item {
 						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
 
 						self.painter.text(
@@ -384,18 +478,36 @@ impl Viewport<'_> {
 
 					self.painter.line_segment([start, end], (stroke_thickness, color));
 				}
+
+				ViewportItemShape::PlayerIndicator(transform) => {
+					let forward = -transform.column_y();
+					let origin = transform.column_z();
+
+					let center_widget = self.viewport_metrics.world_to_widget_position(origin);
+					let forward_widget = self.viewport_metrics.world_to_widget_delta(forward);
+					let radius_widget = self.viewport_metrics.world_to_widget_scalar(0.1);
+
+					let point = center_widget + forward_widget * 0.3;
+
+					self.painter.circle_stroke(center_widget, radius_widget, (1.0, color));
+					self.painter.line_segment([center_widget, point], (1.0, color));
+				}
 			}
 		}
 	}
 
 	fn handle_operation(&mut self) {
-		match self.editor_state.current_operation {
+		match self.viewport_state.current_operation {
 			Some(Operation::Drag{item, room_to_world}) => {
 				let world_delta = self.viewport_metrics.widget_to_world_delta(self.response.drag_delta());
 				let room_delta = room_to_world.inverse() * world_delta.extend(0.0);
 
 				self.message_bus.emit(EditorWorldEditCmd::TranslateItem(item, room_delta));
 				self.response.mark_changed();
+
+				if self.response.drag_stopped() {
+					self.viewport_state.current_operation = None;
+				}
 			}
 
 			_ => {}
@@ -454,5 +566,27 @@ impl ViewportMetrics {
 
 	fn world_to_widget_delta(&self, pos: Vec2) -> egui::Vec2 {
 		(pos * self.world_to_widget_scale_factor()).to_egui_vec2()
+	}
+
+	fn world_to_widget_scalar(&self, scalar: f32) -> f32 {
+		scalar * self.world_to_widget_scale_factor()
+	}
+}
+
+
+
+#[derive(Copy, Clone, Debug)]
+enum Operation {
+	Drag {
+		item: Item,
+		room_to_world: Mat2x3,
+	},
+}
+
+impl Operation {
+	fn relevant_item(&self) -> Option<Item> {
+		match *self {
+			Self::Drag{item, ..} => Some(item),
+		}
 	}
 }

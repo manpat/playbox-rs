@@ -24,41 +24,44 @@ pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_b
 	let messages = message_bus.poll(&state.editor_world_edit_cmd_sub);
 
 	for cmd in messages.iter() {
-		if let Err(err) = handle_world_edit_cmd(model, cmd) {
+		if let Err(err) = handle_world_edit_cmd(state, model, cmd) {
 			log::error!("Editor command failed: {err}");
 		}
 	}
 
 	if !messages.is_empty() {
+		// TODO(pat.m): make this drop not necessary
 		drop(messages);
 		message_bus.emit(WorldChangedEvent);
 	}
 }
 
 
-fn handle_world_edit_cmd(model: &mut model::Model, cmd: &EditorWorldEditCmd) -> anyhow::Result<()> {
+fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: &EditorWorldEditCmd) -> anyhow::Result<()> {
 	if !matches!(cmd, EditorWorldEditCmd::TranslateItem(..)) {
 		log::info!("{cmd:?}");
 	}
 
 	match *cmd {
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
-			if let Some(room) = model.world.rooms.get_mut(item.room_index()) {
-				match item {
-					Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
-						room.wall_vertices[vertex_index] += delta;
-					}
+			let Some(room) = model.world.rooms.get_mut(item.room_index()) else {
+				anyhow::bail!("Trying to edit non-existent room #{}", item.room_index());
+			};
 
-					Item::Wall(GlobalWallId {wall_index, ..}) => {
-						let wall_count = room.wall_vertices.len();
-						room.wall_vertices[wall_index] += delta;
-						room.wall_vertices[(wall_index+1) % wall_count] += delta;
-					}
+			match item {
+				Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
+					room.wall_vertices[vertex_index] += delta;
+				}
 
-					Item::Room(_) => {
-						for vertex in room.wall_vertices.iter_mut() {
-							*vertex += delta;
-						}
+				Item::Wall(GlobalWallId {wall_index, ..}) => {
+					let wall_count = room.wall_vertices.len();
+					room.wall_vertices[wall_index] += delta;
+					room.wall_vertices[(wall_index+1) % wall_count] += delta;
+				}
+
+				Item::Room(_) => {
+					for vertex in room.wall_vertices.iter_mut() {
+						*vertex += delta;
 					}
 				}
 			}
@@ -67,12 +70,16 @@ fn handle_world_edit_cmd(model: &mut model::Model, cmd: &EditorWorldEditCmd) -> 
 		EditorWorldEditCmd::SetCeilingColor(room_index, color) => {
 			if let Some(room) = model.world.rooms.get_mut(room_index) {
 				room.ceiling_color = color;
+			} else {
+				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			}
 		}
 
 		EditorWorldEditCmd::SetFloorColor(room_index, color) => {
 			if let Some(room) = model.world.rooms.get_mut(room_index) {
 				room.floor_color = color;
+			} else {
+				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			}
 		}
 
@@ -81,6 +88,8 @@ fn handle_world_edit_cmd(model: &mut model::Model, cmd: &EditorWorldEditCmd) -> 
 				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
 			{
 				wall.color = color;
+			} else {
+				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
 			}
 		}
 
@@ -89,16 +98,38 @@ fn handle_world_edit_cmd(model: &mut model::Model, cmd: &EditorWorldEditCmd) -> 
 		}
 
 		EditorWorldEditCmd::RemoveRoom(room_index) => {
-			// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every WorldPosition in the model
-			model.world.rooms.remove(room_index);
+			if model.world.rooms.len() == 1 {
+				anyhow::bail!("Can't delete last room in world")
+			}
 
 			// Fix player position
 			if model.player.position.room_index >= room_index {
 				if model.player.position.room_index == room_index {
-					log::warn!("Player in room being deleted!");
+					anyhow::bail!("Can't delete room containing player");
 				}
 
 				model.player.position.room_index = model.player.position.room_index.saturating_sub(1);
+			}
+
+			// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every WorldPosition in the model
+			model.world.rooms.remove(room_index);
+
+			// Clear or adjust selection
+			if let Some(selected_item) = &mut state.selection {
+				let selected_room_index = selected_item.room_index();
+
+				if selected_room_index > room_index {
+					selected_item.set_room_index(selected_room_index.saturating_sub(1));
+				} else if selected_room_index == room_index {
+					state.selection = None;
+				}
+			}
+
+			// Update focused room
+			if state.focused_room_index > room_index {
+				state.focused_room_index = state.focused_room_index.saturating_sub(1);
+			} else if state.focused_room_index == room_index {
+				state.focused_room_index = 0;
 			}
 
 			// Remove connections to deleted room

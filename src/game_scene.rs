@@ -14,13 +14,14 @@ pub struct GameScene {
 	world_view: world_view::WorldView,
 
 	message_bus: MessageBus,
-	show_debug: bool,
 
 	model: model::Model,
 
 	time: f32,
 
 	editor_state: editor::State,
+	show_editor: bool,
+	force_game_controls: bool,
 }
 
 impl GameScene {
@@ -62,7 +63,6 @@ impl GameScene {
 			world_view: world_view::WorldView::new(&mut ctx.gfx, &world, ctx.message_bus.clone())?,
 
 			message_bus: ctx.message_bus.clone(),
-			show_debug: false,
 
 			model: model::Model {
 				player: model::Player {
@@ -79,20 +79,28 @@ impl GameScene {
 			time: 0.0,
 
 			editor_state: editor::State::new(ctx.message_bus),
+			show_editor: false,
+			force_game_controls: false,
 		})
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
-		if ctx.input.button_just_down(input::keys::F2) {
-			self.show_debug = !self.show_debug;
+		if ctx.input.button_just_down(input::keys::F1) {
+			self.force_game_controls = !self.force_game_controls;
 		}
 
-		ctx.input.set_capture_mouse(!self.show_debug);
+		if ctx.input.button_just_down(input::keys::F2) {
+			self.show_editor = !self.show_editor;
+		}
 
-		if self.show_debug {
+		ctx.input.set_capture_mouse(!self.show_editor || self.force_game_controls);
+
+		if self.show_editor {
 			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, &self.message_bus);
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
-			return;
+			if !self.force_game_controls {
+				return;
+			}
 		}
 
 		self.model.player.handle_input(ctx, &self.model.world);

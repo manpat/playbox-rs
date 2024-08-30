@@ -3,7 +3,7 @@ use crate::prelude::*;
 use model::{GlobalVertexId, GlobalWallId};
 
 mod viewport;
-use viewport::Viewport;
+use viewport::{Viewport, ViewportItemFlags};
 
 mod commands;
 use commands::*;
@@ -25,20 +25,12 @@ impl Item {
 			Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => room_index,
 		}
 	}
-}
 
-#[derive(Copy, Clone, Debug)]
-enum Operation {
-	Drag {
-		item: Item,
-		room_to_world: Mat2x3,
-	},
-}
-
-impl Operation {
-	fn relevant_item(&self) -> Option<Item> {
-		match *self {
-			Self::Drag{item, ..} => Some(item),
+	fn set_room_index(&mut self, new_room_index: usize) {
+		match self {
+			Item::Room(room_index) | Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => {
+				*room_index = new_room_index;
+			}
 		}
 	}
 }
@@ -47,14 +39,9 @@ impl Operation {
 #[derive(Debug)]
 pub struct State {
 	hovered: Option<Item>,
-	hovered_transform: Option<Mat2x3>,
-
-	interaction_target: Option<Item>,
 
 	selection: Option<Item>,
 	focused_room_index: usize,
-
-	current_operation: Option<Operation>,
 
 	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 }
@@ -63,14 +50,9 @@ impl State {
 	pub fn new(message_bus: &MessageBus) -> Self {
 		State {
 			hovered: None,
-			hovered_transform: None,
-
-			interaction_target: None,
 
 			selection: None,
 			focused_room_index: 0,
-
-			current_operation: None,
 
 			editor_world_edit_cmd_sub: message_bus.subscribe(),
 		}
@@ -114,6 +96,11 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 		.show(ctx, |ui| {
 			draw_item_inspector(ui, &mut context);
 		});
+
+	// egui::Window::new("Internal State")
+	// 	.show(ctx, |ui| {
+	// 		ui.label(format!("{state:#?}"));
+	// 	});
 }
 
 
@@ -221,13 +208,17 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		neighbouring_rooms.push((tgt_wall_id.room_index, offset_transform));
 	}
 
+	let player = &context.model.player;
+
 	let mut viewport = Viewport::new(ui, context);
-	viewport.add_room(focused_room_index, Mat2x3::identity());
-	viewport.add_room_connections(focused_room_index, Mat2x3::identity());
+	viewport.add_room(focused_room_index, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
+	viewport.add_room_connections(focused_room_index, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS);
 
 	for (room_index, transform) in neighbouring_rooms {
-		viewport.add_room(room_index, transform);
+		viewport.add_room(room_index, transform, ViewportItemFlags::BASIC_INTERACTIONS);
 	}
+
+	viewport.add_player_indicator(player.position, player.yaw);
 
 	viewport.build()
 }
@@ -235,9 +226,8 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 
 fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
-	// let focused_room_index = context.state.selection.as_ref().map_or(context.state.focused_room_index, Item::room_index);
-
 	let world = &context.model.world;
+	let player = &context.model.player;
 
 	let mut viewport = Viewport::new(ui, context);
 	let mut position_x = 0.0;
@@ -248,11 +238,13 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 		let room_width = bounds.width();
 		let offset = Vec2::from_x(position_x + room_width / 2.0) - bounds.center();
 
-		viewport.add_room(room_index, Mat2x3::translate(offset));
-		viewport.add_room_connections(room_index, Mat2x3::translate(offset));
+		viewport.add_room(room_index, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
+		viewport.add_room_connections(room_index, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
 
 		position_x += room_width + margin;
 	}
+
+	viewport.add_player_indicator(player.position, player.yaw);
 
 	viewport.build()
 }

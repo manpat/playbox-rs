@@ -9,6 +9,7 @@ slotmap = "1.0.6"
 fontdue = "0.8"
 serde = "1.0"
 serde_json = "1.0"
+bitflags = "2.6"
 
 
 [dependencies.tokio]
