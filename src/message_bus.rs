@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::cell::{Cell, RefCell, Ref, RefMut};
+use std::cell::{Cell, RefCell, Ref};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::marker::PhantomData;
