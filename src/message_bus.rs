@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::cell::{Cell, RefCell, Ref};
+use std::cell::{Cell, RefCell, Ref, RefMut};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::marker::PhantomData;
@@ -25,7 +25,7 @@ impl MessageBus {
 
 		let subscription_inner = Rc::new(SubscriptionInner {
 			// Make sure this subscription doesn't see any messages already in the queue
-			seen_message_seq: Cell::new(current_message_count),
+			next_unread_message_index: Cell::new(current_message_count),
 		});
 
 		let mut subscription_lists = self.inner.subscription_lists.borrow_mut();
@@ -41,19 +41,53 @@ impl MessageBus {
 		}
 	}
 
+	pub fn messages_available<T: 'static>(&self, subscription: &Subscription<T>) -> bool {
+		let type_id = TypeId::of::<T>();
+		let next_unread_message_index = subscription.inner.next_unread_message_index.get();
+
+		self.inner.message_queues.borrow()
+			.get(&type_id)
+			.map_or(false, |queue| next_unread_message_index < queue.current_message_count())
+	}
+
 	pub fn poll<T: 'static>(&self, subscription: &Subscription<T>) -> Ref<'_, [T]> {
 		let type_id = TypeId::of::<T>();
-		let last_seen_message_seq = subscription.inner.seen_message_seq.get() as usize;
+		let next_unread_message_index = subscription.inner.next_unread_message_index.get();
 
 		Ref::map(self.inner.message_queues.borrow(), move |message_queues| {
 			message_queues.get(&type_id)
 				.map(|queue| {
 					let queue = queue.to_concrete();
 
-					subscription.inner.seen_message_seq.set(queue.messages.len() as u32);
-					&queue.messages[last_seen_message_seq..]
+					subscription.inner.next_unread_message_index.set(queue.messages.len());
+					&queue.messages[next_unread_message_index..]
 				})
 				.unwrap_or(&[])
+		})
+	}
+
+	pub fn poll_consume<T: 'static>(&self, subscription: &Subscription<T>) -> impl Iterator<Item=T> + '_ {
+		let type_id = TypeId::of::<T>();
+
+		let mut message_queues = self.inner.message_queues.borrow_mut();
+
+		let subscription_inner = subscription.inner.clone();
+
+		std::iter::from_fn(move || {
+			let next_unread_message_index = subscription_inner.next_unread_message_index.get();
+
+			let messages = message_queues.get_mut(&type_id)
+				.map(|queue| &mut queue.to_concrete_mut().messages);
+
+			if let Some(messages) = messages
+				&& next_unread_message_index < messages.len()
+			{
+				// No need to adjust next_unread_message_index since `remove` will shift every later message down.
+				Some(messages.remove(next_unread_message_index))
+			}
+			else {
+				None
+			}
 		})
 	}
 
@@ -91,7 +125,7 @@ trait MessageQueue {
 	fn as_any(&self) -> &dyn Any;
 	fn as_any_mut(&mut self) -> &mut dyn Any;
 
-	fn current_message_count(&self) -> u32;
+	fn current_message_count(&self) -> usize;
 
 	fn garbage_collect(&mut self, subscription_list: Option<&mut SubscriptionList>);
 }
@@ -114,8 +148,8 @@ impl<T: Any> MessageQueue for TypedMessageQueue<T> {
 	fn as_any(&self) -> &dyn Any { self as &dyn Any }
 	fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 
-	fn current_message_count(&self) -> u32 {
-		self.messages.len() as u32
+	fn current_message_count(&self) -> usize {
+		self.messages.len()
 	}
 
 	fn garbage_collect(&mut self, subscription_list: Option<&mut SubscriptionList>) {
@@ -130,19 +164,19 @@ impl<T: Any> MessageQueue for TypedMessageQueue<T> {
 			return;
 		}
 
-		let minimum_message_seq = subscription_list.subscribers.iter()
-			.flat_map(|subscriber| subscriber.upgrade().map(|inner| inner.seen_message_seq.get()))
+		let minimum_unread_index = subscription_list.subscribers.iter()
+			.flat_map(|subscriber| subscriber.upgrade().map(|inner| inner.next_unread_message_index.get()))
 			.min()
 			.unwrap_or(0);
 
-		if minimum_message_seq != 0 {
-			let to_drop = minimum_message_seq as usize;
+		if minimum_unread_index != 0 {
+			let to_drop = minimum_unread_index;
 			self.messages.drain(..to_drop);
 
 			for sub in subscription_list.subscribers.iter() {
 				let Some(sub) = sub.upgrade() else { continue };
-				let new_seq = sub.seen_message_seq.get() - minimum_message_seq;
-				sub.seen_message_seq.set(new_seq);
+				let new_seq = sub.next_unread_message_index.get() - minimum_unread_index;
+				sub.next_unread_message_index.set(new_seq);
 			}
 		}
 	}
@@ -167,7 +201,7 @@ pub struct Subscription<T: 'static> {
 }
 
 struct SubscriptionInner {
-	seen_message_seq: Cell<u32>,
+	next_unread_message_index: Cell<usize>,
 }
 
 #[derive(Default)]
