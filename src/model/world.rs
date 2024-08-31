@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{WorldPosition, GlobalWallId};
+use model::{WorldPosition, GlobalVertexId, GlobalWallId};
 
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
@@ -143,9 +143,28 @@ impl World {
 		position.local_position = desired_position;
 	}
 
+	pub fn vertex(&self, vertex_id: GlobalVertexId) -> Vec2 {
+		self.rooms[vertex_id.room_index]
+			.wall_vertices[vertex_id.vertex_index]
+	}
+
 	pub fn wall_vertices(&self, wall_id: GlobalWallId) -> (Vec2, Vec2) {
 		self.rooms[wall_id.room_index]
 			.wall_vertices(wall_id.wall_index)
+	}
+
+	pub fn wall_center(&self, wall_id: GlobalWallId) -> Vec2 {
+		let (start, end) = self.wall_vertices(wall_id);
+		(start + end) / 2.0
+	}
+
+	pub fn wall_vector(&self, wall_id: GlobalWallId) -> Vec2 {
+		let (start, end) = self.wall_vertices(wall_id);
+		end - start
+	}
+
+	pub fn wall_length(&self, wall_id: GlobalWallId) -> f32 {
+		self.wall_vector(wall_id).length()
 	}
 
 	pub fn wall_target(&self, wall_id: GlobalWallId) -> Option<GlobalWallId> {
@@ -160,10 +179,26 @@ impl World {
 				}
 			})
 	}
+
+	pub fn next_wall(&self, wall_id: GlobalWallId) -> GlobalWallId {
+		let num_walls = self.rooms[wall_id.room_index].walls.len();
+		GlobalWallId {
+			room_index: wall_id.room_index,
+			wall_index: (wall_id.wall_index + 1) % num_walls,
+		}
+	}
+
+	pub fn prev_wall(&self, wall_id: GlobalWallId) -> GlobalWallId {
+		let num_walls = self.rooms[wall_id.room_index].walls.len();
+		GlobalWallId {
+			room_index: wall_id.room_index,
+			wall_index: (wall_id.wall_index + num_walls - 1) % num_walls,
+		}
+	}
 }
 
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Room {
 	pub walls: Vec<Wall>,
 	pub wall_vertices: Vec<Vec2>,
@@ -172,6 +207,23 @@ pub struct Room {
 }
 
 impl Room {
+	pub fn new_square(wall_length: f32) -> Room {
+		let wall_extent = wall_length / 2.0;
+
+		Room {
+			wall_vertices: vec![
+				Vec2::new( wall_extent, -wall_extent),
+				Vec2::new(-wall_extent, -wall_extent),
+				Vec2::new(-wall_extent,  wall_extent),
+				Vec2::new( wall_extent,  wall_extent),
+			],
+
+			walls: vec![Wall{ color: Color::grey(0.5) }; 4],
+			floor_color: Color::grey(0.5),
+			ceiling_color: Color::grey(0.5),
+		}
+	}
+
 	pub fn wall_vertices(&self, wall_index: usize) -> (Vec2, Vec2) {
 		let end_vertex_idx = (wall_index+1) % self.wall_vertices.len();
 		(self.wall_vertices[wall_index], self.wall_vertices[end_vertex_idx])

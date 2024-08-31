@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, GlobalVertexId, GlobalWallId, WorldPosition};
+use model::{World, Room, GlobalVertexId, GlobalWallId, WorldPosition};
 use super::{Item, State, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -51,6 +51,10 @@ impl ViewportItemShape {
 	}
 }
 
+const WALL_CONNECTION_COLOR: Color = Color::rgb(1.0, 0.6, 0.3);
+
+
+
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 	pub struct ViewportItemFlags: u32 {
@@ -72,7 +76,7 @@ struct ViewportItem {
 	shape: ViewportItemShape,
 	item: Option<Item>,
 	color: Color,
-	transform: Mat2x3,
+	room_to_world: Mat2x3,
 	flags: ViewportItemFlags,
 }
 
@@ -137,7 +141,7 @@ impl<'c> Viewport<'c> {
 		}
 	}
 
-	pub fn add_room(&mut self, room_index: usize, transform: Mat2x3, flags: ViewportItemFlags) {
+	pub fn add_room(&mut self, room_index: usize, room_to_world: Mat2x3, flags: ViewportItemFlags) {
 		let room = &self.world.rooms[room_index];
 		let num_walls = room.walls.len();
 
@@ -151,10 +155,10 @@ impl<'c> Viewport<'c> {
 		// Add vertices
 		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Vertex(transform * *vertex),
+				shape: ViewportItemShape::Vertex(room_to_world * *vertex),
 				item: Some(Item::Vertex(GlobalVertexId {room_index, vertex_index})),
 				color: Color::grey(0.5),
-				transform,
+				room_to_world,
 				flags: interaction_flags,
 			});
 		}
@@ -164,10 +168,10 @@ impl<'c> Viewport<'c> {
 			let (start, end) = room.wall_vertices(wall_index);
 
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Line(transform * start, transform * end),
+				shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
 				item: Some(Item::Wall(GlobalWallId {room_index, wall_index})),
 				color: room.walls[wall_index].color,
-				transform,
+				room_to_world,
 				flags: interaction_flags,
 			});
 		}
@@ -175,15 +179,15 @@ impl<'c> Viewport<'c> {
 		// Pick room
 		let room_center = room.wall_vertices.iter().sum::<Vec2>() / num_walls as f32;
 		self.items.push(ViewportItem {
-			shape: ViewportItemShape::Vertex(transform * room_center),
+			shape: ViewportItemShape::Vertex(room_to_world * room_center),
 			item: Some(Item::Room(room_index)),
 			color: Color::grey(0.5),
-			transform,
+			room_to_world,
 			flags: room_interaction_flags,
 		});
 	}
 
-	pub fn add_room_connections(&mut self, room_index: usize, transform: Mat2x3, flags: ViewportItemFlags) {
+	pub fn add_room_connections(&mut self, room_index: usize, room_to_world: Mat2x3, flags: ViewportItemFlags) {
 		let room = &self.world.rooms[room_index];
 		let num_walls = room.walls.len();
 
@@ -213,10 +217,10 @@ impl<'c> Viewport<'c> {
 			let apperture_end = apperture_center + src_dir * apperture_half_size;
 
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Line(transform * apperture_start, transform * apperture_end),
+				shape: ViewportItemShape::Line(room_to_world * apperture_start, room_to_world * apperture_end),
 				item: Some(Item::Wall(tgt_wall_id)),
-				color: Color::rgb(1.0, 0.6, 0.3),
-				transform,
+				color: WALL_CONNECTION_COLOR,
+				room_to_world,
 				flags: interaction_flags,
 			});
 		}
@@ -225,17 +229,17 @@ impl<'c> Viewport<'c> {
 	pub fn add_player_indicator(&mut self, position: WorldPosition, yaw: f32) {
 		let transforms = self.items.iter()
 			.filter(|vpitem| vpitem.item == Some(Item::Room(position.room_index)))
-			.map(|vpitem| vpitem.transform)
+			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
 		let base_player_transform = Mat2x3::rotate_translate(yaw, position.local_position);
 
-		for room_transform in transforms {
+		for room_to_world in transforms {
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::PlayerIndicator(room_transform * base_player_transform),
+				shape: ViewportItemShape::PlayerIndicator(room_to_world * base_player_transform),
 				item: None,
 				color: Color::grey(0.8),
-				transform: room_transform,
+				room_to_world,
 				flags: ViewportItemFlags::empty(),
 			});
 		}
@@ -251,7 +255,9 @@ impl<'c> Viewport<'c> {
 			self.handle_hover(self.viewport_metrics.widget_to_world_position(hover_pos));
 		}
 
-		self.handle_item_interaction();
+		self.handle_item_mouse_interaction();
+
+		self.handle_operation();
 
 		self.show_context_menu();
 
@@ -259,9 +265,11 @@ impl<'c> Viewport<'c> {
 			self.editor_state.focused_room_index = selected_item.room_index();
 		}
 
-		self.handle_operation();
-
 		self.draw_items();
+
+		if let Some(operation) = &self.viewport_state.current_operation {
+			self.draw_operation(operation);
+		}
 
 		// egui::Window::new("Viewport State")
 		// 	.id(self.response.id.with("state window"))
@@ -295,7 +303,7 @@ impl Viewport<'_> {
 
 		let mut min_distance = 0.3;
 
-		for &ViewportItem {shape, item, transform, flags, ..} in self.items.iter() {
+		for &ViewportItem {shape, item, room_to_world, flags, ..} in self.items.iter() {
 			if !flags.intersects(ViewportItemFlags::BASIC_INTERACTIONS) {
 				continue
 			}
@@ -303,7 +311,7 @@ impl Viewport<'_> {
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
 				self.editor_state.hovered = item;
-				self.viewport_state.hovered_item_transform = transform;
+				self.viewport_state.hovered_item_transform = room_to_world;
 				self.viewport_state.hovered_item_flags = flags;
 				min_distance = distance;
 			}
@@ -333,8 +341,13 @@ impl Viewport<'_> {
 		}
 	}
 
-	fn handle_item_interaction(&mut self) {
+	fn handle_item_mouse_interaction(&mut self) {
 		if !self.response.hovered() {
+			return
+		}
+
+		let are_clicks_consumed = self.viewport_state.current_operation.as_ref().map_or(false, Operation::consumes_clicks);
+		if are_clicks_consumed {
 			return
 		}
 
@@ -348,7 +361,10 @@ impl Viewport<'_> {
 			&& is_primary_pressed
 			&& is_hovered_draggable
 		{
-			self.viewport_state.current_operation = Some(Operation::Drag{item, room_to_world: self.viewport_state.hovered_item_transform});
+			self.viewport_state.current_operation = Some(Operation::Drag {
+				item,
+				room_to_world: self.viewport_state.hovered_item_transform
+			});
 		}
 
 		if is_hovered_clickable && self.response.clicked() {
@@ -375,18 +391,20 @@ impl Viewport<'_> {
 			match item {
 				Item::Wall(wall_id) => {
 					if ui.button("Add Vertex").clicked() {
-						// let mouse_pos = self.response.interact_pointer_pos().unwrap();
-						// let insert_pos = self.viewport_metrics.widget_to_world_position(mouse_pos);
-
-						let (start, end) = self.world.wall_vertices(wall_id);
-						let insert_pos = (start + end) / 2.0;
-
+						let insert_pos = self.world.wall_center(wall_id);
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
 						ui.close_menu();
 					}
 
-					if ui.button("Add Room").clicked() {
+					if ui.button("New Connected Room").clicked() {
+						let wall_length = self.world.wall_length(wall_id);
+
+						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
+							room: Room::new_square(wall_length),
+							connection: Some((0, wall_id)),
+						});
+
 						ui.close_menu();
 					}
 
@@ -398,12 +416,24 @@ impl Viewport<'_> {
 						}
 					} else {
 						if ui.button("Add Connection").clicked() {
+							self.viewport_state.current_operation = Some(Operation::ConnectWall{
+								source_wall: wall_id,
+								room_to_world: self.viewport_state.hovered_item_transform,
+							});
 							ui.close_menu();
 						}
 					}
 				}
 
 				Item::Room(room_index) => {
+					if ui.button("Duplicate Room").clicked() {
+						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
+							room: self.world.rooms[room_index].clone(),
+							connection: None,
+						});
+						ui.close_menu();
+					}
+
 					if ui.button("Remove Connections").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_index));
 						ui.close_menu();
@@ -415,8 +445,34 @@ impl Viewport<'_> {
 					}
 				}
 
-				Item::Vertex(_) => {
+				Item::Vertex(vertex_id) => {
+					if ui.button("Bevel").clicked() {
+						let outgoing_wall = vertex_id.to_wall_id();
+						let incoming_wall = self.world.prev_wall(outgoing_wall);
+
+						let incoming_start = self.world.vertex(incoming_wall.to_vertex_id());
+						let (original_vertex, outgoing_end) = self.world.wall_vertices(outgoing_wall);
+
+						let incoming_direction = incoming_start - original_vertex;
+						let outgoing_direction = outgoing_end - original_vertex;
+
+						// Bevel to half way along the shortest wall
+						let bevel_dist = incoming_direction.length().min(outgoing_direction.length()) / 2.0;
+
+						let start_vertex = original_vertex + incoming_direction.normalize() * bevel_dist;
+						let end_vertex_delta = outgoing_direction.normalize() * bevel_dist;
+
+						// Translate the original vertex along the _incoming_ wall
+						self.message_bus.emit(EditorWorldEditCmd::TranslateItem(Item::Vertex(vertex_id), end_vertex_delta));
+
+						// Split the _outgoing_ wall and place the new vertex at the end pos.
+						self.message_bus.emit(EditorWorldEditCmd::SplitWall(incoming_wall, start_vertex));
+
+						ui.close_menu();
+					}
+
 					if ui.button("Delete Vertex").clicked() {
+						self.message_bus.emit(EditorWorldEditCmd::DeleteVertex(vertex_id));
 						ui.close_menu();
 					}
 				}
@@ -496,6 +552,32 @@ impl Viewport<'_> {
 		}
 	}
 
+	fn draw_operation(&self, operation: &Operation) {
+		match operation {
+			&Operation::ConnectWall{source_wall, room_to_world} => {
+				let center_room = self.world.wall_center(source_wall);
+				let center_widget = self.viewport_metrics.world_to_widget_position(room_to_world * center_room);
+
+				let target_pos = match self.editor_state.hovered {
+					Some(Item::Wall(wall_id)) if wall_id != source_wall => {
+						let center_room = self.world.wall_center(wall_id);
+						let center_world = self.viewport_state.hovered_item_transform * center_room;
+						self.viewport_metrics.world_to_widget_position(center_world)
+					}
+
+					_ => {
+						self.response.ctx.input(|input| input.pointer.latest_pos())
+							.unwrap_or(egui::pos2(0.0, 0.0))
+					}
+				};
+
+				self.painter.line_segment([center_widget, target_pos], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+			}
+
+			_ => {}
+		}
+	}
+
 	fn handle_operation(&mut self) {
 		match self.viewport_state.current_operation {
 			Some(Operation::Drag{item, room_to_world}) => {
@@ -505,7 +587,28 @@ impl Viewport<'_> {
 				self.message_bus.emit(EditorWorldEditCmd::TranslateItem(item, room_delta));
 				self.response.mark_changed();
 
-				if self.response.drag_stopped() {
+				if self.response.ctx.input(|input| input.pointer.primary_released()) {
+					self.viewport_state.current_operation = None;
+				}
+			}
+
+			Some(Operation::ConnectWall{source_wall, ..}) => {
+				let is_primary_pressed = self.response.ctx.input(|input| input.pointer.primary_pressed());
+				let is_secondary_pressed = self.response.ctx.input(|input| input.pointer.secondary_pressed());
+
+				// If left clicked either commit if hovering a wall or cancel
+				if is_primary_pressed {
+					if let Some(Item::Wall(target_wall)) = self.editor_state.hovered
+						&& target_wall != source_wall
+					{
+						self.message_bus.emit(EditorWorldEditCmd::ConnectWall(source_wall, target_wall));
+					}
+
+					self.viewport_state.current_operation = None;
+				}
+
+				// Cancel if clicked outside the widget or right clicked
+				if self.response.clicked_elsewhere() || is_secondary_pressed {
 					self.viewport_state.current_operation = None;
 				}
 			}
@@ -581,12 +684,21 @@ enum Operation {
 		item: Item,
 		room_to_world: Mat2x3,
 	},
+
+	ConnectWall {
+		source_wall: GlobalWallId,
+		room_to_world: Mat2x3,
+	},
 }
 
 impl Operation {
-	fn relevant_item(&self) -> Option<Item> {
-		match *self {
-			Self::Drag{item, ..} => Some(item),
-		}
+	// fn relevant_item(&self) -> Option<Item> {
+	// 	match *self {
+	// 		Self::Drag{item, ..} => Some(item),
+	// 	}
+	// }
+
+	fn consumes_clicks(&self) -> bool {
+		matches!(self, Self::ConnectWall{..})
 	}
 }
