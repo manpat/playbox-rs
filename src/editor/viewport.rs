@@ -67,7 +67,10 @@ bitflags::bitflags! {
 		// Can rooms themselves be dragged?
 		const RECENTERABLE = 1 << 3;
 
-		const ALL_INTERACTIONS = 0b1111;
+		// Can be a target for wall connections?
+		const CONNECTABLE = 1 << 4;
+
+		const ALL_INTERACTIONS = 0b11111;
 
 	}
 }
@@ -152,6 +155,8 @@ impl<'c> Viewport<'c> {
 			room_interaction_flags.remove(ViewportItemFlags::DRAGGABLE);
 		}
 
+		let wall_interaction_flags = interaction_flags | ViewportItemFlags::CONNECTABLE;
+
 		// Add vertices
 		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
 			self.items.push(ViewportItem {
@@ -172,7 +177,7 @@ impl<'c> Viewport<'c> {
 				item: Some(Item::Wall(GlobalWallId {room_index, wall_index})),
 				color: room.walls[wall_index].color,
 				room_to_world,
-				flags: interaction_flags,
+				flags: wall_interaction_flags,
 			});
 		}
 
@@ -191,7 +196,8 @@ impl<'c> Viewport<'c> {
 		let room = &self.world.rooms[room_index];
 		let num_walls = room.walls.len();
 
-		let interaction_flags = flags.intersection(ViewportItemFlags::CLICKABLE);
+		// Connections are only clickable
+		let interaction_flags = flags.intersection(ViewportItemFlags::CLICKABLE) & !ViewportItemFlags::CONNECTABLE;
 
 		for wall_index in 0..num_walls {
 			let src_wall_id = GlobalWallId{room_index, wall_index};
@@ -390,14 +396,40 @@ impl Viewport<'_> {
 
 			match item {
 				Item::Wall(wall_id) => {
-					if ui.button("Add Vertex").clicked() {
+					let wall_target = self.world.wall_target(wall_id);
+					if wall_target.is_some() {
+						if ui.button("Reconnect").clicked() {
+							self.viewport_state.current_operation = Some(Operation::ConnectWall{
+								source_wall: wall_id,
+								room_to_world: self.viewport_state.hovered_item_transform,
+							});
+							ui.close_menu();
+						}
+
+						if ui.button("Disconnect").clicked() {
+							self.message_bus.emit(EditorWorldEditCmd::DisconnectWall(wall_id));
+							ui.close_menu();
+						}
+					} else {
+						if ui.button("Connect").clicked() {
+							self.viewport_state.current_operation = Some(Operation::ConnectWall{
+								source_wall: wall_id,
+								room_to_world: self.viewport_state.hovered_item_transform,
+							});
+							ui.close_menu();
+						}
+					}
+
+					ui.separator();
+
+					if ui.button("Split").clicked() {
 						let insert_pos = self.world.wall_center(wall_id);
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
 						ui.close_menu();
 					}
 
-					if ui.button("New Connected Room").clicked() {
+					if ui.button("Add Room").clicked() {
 						let wall_length = self.world.wall_length(wall_id);
 
 						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
@@ -407,26 +439,10 @@ impl Viewport<'_> {
 
 						ui.close_menu();
 					}
-
-					let wall_target = self.world.wall_target(wall_id);
-					if wall_target.is_some() {
-						if ui.button("Remove Connection").clicked() {
-							self.message_bus.emit(EditorWorldEditCmd::DisconnectWall(wall_id));
-							ui.close_menu();
-						}
-					} else {
-						if ui.button("Add Connection").clicked() {
-							self.viewport_state.current_operation = Some(Operation::ConnectWall{
-								source_wall: wall_id,
-								room_to_world: self.viewport_state.hovered_item_transform,
-							});
-							ui.close_menu();
-						}
-					}
 				}
 
 				Item::Room(room_index) => {
-					if ui.button("Duplicate Room").clicked() {
+					if ui.button("Duplicate").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
 							room: self.world.rooms[room_index].clone(),
 							connection: None,
@@ -434,12 +450,14 @@ impl Viewport<'_> {
 						ui.close_menu();
 					}
 
-					if ui.button("Remove Connections").clicked() {
+					ui.separator();
+
+					if ui.button("Disconnect All").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_index));
 						ui.close_menu();
 					}
 
-					if ui.button("Delete Room").clicked() {
+					if ui.button("Delete").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_index));
 						ui.close_menu();
 					}
@@ -471,6 +489,8 @@ impl Viewport<'_> {
 						ui.close_menu();
 					}
 
+					ui.separator();
+
 					if ui.button("Delete Vertex").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::DeleteVertex(vertex_id));
 						ui.close_menu();
@@ -481,8 +501,11 @@ impl Viewport<'_> {
 	}
 
 	fn set_cursor_state(&self) {
-		if let Some(Operation::Drag{..}) = self.viewport_state.current_operation {
-			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+		if let Some(operation) = self.viewport_state.current_operation {
+			// If we have an operation active - _only_ use whatever cursor the operation requests
+			if let Some(cursor) = self.operation_cursor_icon(&operation) {
+				self.response.ctx.set_cursor_icon(cursor);
+			}
 
 		} else if self.editor_state.hovered.is_some() && self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::DRAGGABLE) {
 			self.response.ctx.set_cursor_icon(egui::CursorIcon::Grab);
@@ -558,23 +581,55 @@ impl Viewport<'_> {
 				let center_room = self.world.wall_center(source_wall);
 				let center_widget = self.viewport_metrics.world_to_widget_position(room_to_world * center_room);
 
-				let target_pos = match self.editor_state.hovered {
-					Some(Item::Wall(wall_id)) if wall_id != source_wall => {
+				let is_hovered_connectable = self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::CONNECTABLE);
+
+				match self.editor_state.hovered {
+					Some(Item::Wall(wall_id)) if wall_id != source_wall && is_hovered_connectable => {
 						let center_room = self.world.wall_center(wall_id);
-						let center_world = self.viewport_state.hovered_item_transform * center_room;
-						self.viewport_metrics.world_to_widget_position(center_world)
+
+						// Draw a line to each instance of the room in the viewport
+						let transforms = self.items.iter()
+							.filter(|vpitem| {
+								vpitem.item == Some(Item::Wall(wall_id))
+								&& vpitem.flags.contains(ViewportItemFlags::CONNECTABLE)
+							})
+							.map(|vpitem| vpitem.room_to_world);
+
+						for transform in transforms {
+							let target_widget = self.viewport_metrics.world_to_widget_position(transform * center_room);
+							self.painter.line_segment([center_widget, target_widget], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+						}
 					}
 
 					_ => {
-						self.response.ctx.input(|input| input.pointer.latest_pos())
-							.unwrap_or(egui::pos2(0.0, 0.0))
-					}
-				};
+						let target_widget = self.response.ctx.input(|input| input.pointer.latest_pos())
+							.unwrap_or(egui::pos2(0.0, 0.0));
 
-				self.painter.line_segment([center_widget, target_pos], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+						self.painter.line_segment([center_widget, target_widget], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+					}
+				}
 			}
 
 			_ => {}
+		}
+	}
+
+	fn operation_cursor_icon(&self, operation: &Operation) -> Option<egui::CursorIcon> {
+		match operation {
+			Operation::Drag{..} => Some(egui::CursorIcon::Grabbing),
+			Operation::ConnectWall{source_wall, ..} => {
+				let is_hovered_connectable = self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::CONNECTABLE);
+
+				if let Some(Item::Wall(target_wall)) = self.editor_state.hovered
+					&& target_wall != *source_wall
+					&& is_hovered_connectable
+				{
+					Some(egui::CursorIcon::PointingHand)
+				}
+				else {
+					None
+				}
+			}
 		}
 	}
 
@@ -600,6 +655,7 @@ impl Viewport<'_> {
 				if is_primary_pressed {
 					if let Some(Item::Wall(target_wall)) = self.editor_state.hovered
 						&& target_wall != source_wall
+						&& self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::CONNECTABLE)
 					{
 						self.message_bus.emit(EditorWorldEditCmd::ConnectWall(source_wall, target_wall));
 					}

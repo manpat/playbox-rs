@@ -230,18 +230,28 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 	let player = &context.model.player;
 
 	let mut viewport = Viewport::new(ui, context);
-	let mut position_x = 0.0;
+	let mut position = Vec2::zero();
+	let mut max_height = 0.0f32;
+
 	let margin = 1.0;
+	let per_row = 5;
 
 	for (room_index, room) in world.rooms.iter().enumerate() {
 		let bounds = room.bounds();
-		let room_width = bounds.width();
-		let offset = Vec2::from_x(position_x + room_width / 2.0) - bounds.center();
+		let room_size = bounds.size();
+		let offset = position + room_size / 2.0 - bounds.center();
 
 		viewport.add_room(room_index, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
 		viewport.add_room_connections(room_index, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
 
-		position_x += room_width + margin;
+		max_height = max_height.max(room_size.y);
+
+		position.x += room_size.x + margin;
+		if room_index % per_row == per_row - 1 {
+			position.x = 0.0;
+			position.y += max_height + margin;
+			max_height = 0.0;
+		}
 	}
 
 	viewport.add_player_indicator(player.position, player.yaw);
