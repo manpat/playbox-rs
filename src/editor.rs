@@ -16,6 +16,8 @@ enum Item {
 	Vertex(GlobalVertexId),
 	Wall(GlobalWallId),
 	Room(usize),
+
+	// TODO(pat.m): PlayerSpawn
 }
 
 impl Item {
@@ -72,7 +74,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 		message_bus,
 	};
 
-	egui::Window::new("World")
+	egui::Window::new("World Settings")
 		.show(ctx, |ui| {
 			ui.horizontal(|ui| {
 				ui.label("Fog Color");
@@ -83,12 +85,40 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 				}
 			});
 
+			// TODO(pat.m): player spawn location
+		});
+
+	egui::Window::new("All Rooms")
+		.show(ctx, |ui| {
+			ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
+				ui.menu_button("...", |ui| {
+					if ui.button("Center Player").clicked() {
+						// context.state.focused_room_index = model.player.position.room_index;
+						// TODO(pat.m): some viewport shit
+						ui.close_menu();
+					}
+				});
+			});
+
 			draw_all_room_viewport(ui, &mut context);
 		});
 
 	egui::Window::new("Focused Room")
 		.show(ctx, |ui| {
-			draw_room_selector(ui, &mut context);
+			ui.horizontal(|ui| {
+				draw_room_selector(ui, &mut context);
+
+				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
+					ui.menu_button("...", |ui| {
+						if ui.button("Focus Player").clicked() {
+							context.state.focused_room_index = model.player.position.room_index;
+							// TODO(pat.m): recenter viewport
+							ui.close_menu();
+						}
+					});
+				});
+			});
+
 			draw_focused_room_viewport(ui, &mut context);
 		});
 

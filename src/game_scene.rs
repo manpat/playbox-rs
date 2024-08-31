@@ -66,8 +66,8 @@ impl GameScene {
 
 			model: model::Model {
 				player: model::Player {
-					position: model::WorldPosition::default(),
-					yaw: 0.0,
+					position: world.player_spawn_position,
+					yaw: world.player_spawn_yaw,
 					pitch: 0.0,
 
 					free_pos: Vec3::zero(),
@@ -159,13 +159,14 @@ impl GameScene {
 
 		// TODO(pat.m): bloom
 
+		// Tonemap, gamma correct and dither.
 		group.compute(self.hdr_to_ldr_shader)
 			.image(0, self.hdr_color_rt)
 			.image_rw(1, self.ldr_color_image)
 			.ssbo(0, &[self.time])
 			.groups_from_image_size(self.hdr_color_rt);
 
-		// TODO(pat.m): blit
+		// Scale and blit to screen
 		group.draw_fullscreen(None)
 			.sampled_image(0, self.ldr_color_image, gfx::CommonSampler::Nearest);
 	}

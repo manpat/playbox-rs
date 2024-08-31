@@ -12,27 +12,27 @@ pub struct World {
 	pub rooms: Vec<Room>,
 	pub connections: Vec<(GlobalWallId, GlobalWallId)>,
 
+	#[serde(default)]
+	pub player_spawn_position: WorldPosition,
+	
+	#[serde(default)]
+	pub player_spawn_yaw: f32,
+
 	pub fog_color: Color,
 }
 
 impl World {
 	pub fn new() -> World {
 		World {
-			rooms: vec![
-				Room {
-					walls: [Wall{color: Color::grey(0.4)}; 4].into(),
-					wall_vertices: vec![
-						Vec2::new(-1.0, -1.0),
-						Vec2::new(-1.0,  1.0),
-						Vec2::new( 1.0,  1.0),
-						Vec2::new( 1.0, -1.0),
-					],
-					floor_color: Color::grey(0.2),
-					ceiling_color: Color::grey(0.7),
-				},
-			],
-
+			rooms: vec![Room::new_square(2.0)],
 			connections: vec![],
+
+			player_spawn_position: WorldPosition {
+				room_index: 0,
+				local_position: Vec2::zero(),
+			},
+
+			player_spawn_yaw: 0.0,
 
 			fog_color: Color::white(),
 		}
@@ -270,6 +270,7 @@ pub fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalW
 }
 
 
+// TODO(pat.m): these should use the resource manager
 impl World {
 	pub fn save(&self, path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
 		let path = path.as_ref();
