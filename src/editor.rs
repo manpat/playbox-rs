@@ -191,6 +191,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
 	let focused_room_index = context.state.selection.as_ref().map_or(context.state.focused_room_index, Item::room_index);
+	let neighbouring_room_margin = 0.3;
 
 	let mut neighbouring_rooms = Vec::new();
 
@@ -203,7 +204,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		let wall_normal = (end - start).normalize().perp();
 
 		let transform = model::calculate_portal_transform(&context.model.world, src_wall_id, tgt_wall_id);
-		let offset_transform = Mat2x3::translate(wall_normal * 0.3) * transform;
+		let offset_transform = Mat2x3::translate(wall_normal * neighbouring_room_margin) * transform;
 
 		neighbouring_rooms.push((tgt_wall_id.room_index, offset_transform));
 	}
@@ -216,6 +217,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 	for (room_index, transform) in neighbouring_rooms {
 		viewport.add_room(room_index, transform, ViewportItemFlags::BASIC_INTERACTIONS);
+		viewport.add_room_connections(room_index, transform, ViewportItemFlags::empty());
 	}
 
 	viewport.add_player_indicator(player.position, player.yaw);

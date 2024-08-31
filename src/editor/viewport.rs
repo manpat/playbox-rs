@@ -216,7 +216,7 @@ impl<'c> Viewport<'c> {
 			let src_center = (src_start + src_end) / 2.0;
 
 			let apperture_half_size = src_wall_length.min(tgt_wall_length) / 2.0;
-			let apperture_offset = src_dir.perp() * 0.25;
+			let apperture_offset = src_dir.perp() * 0.1;
 
 			let apperture_center = src_center + apperture_offset;
 			let apperture_start = apperture_center - src_dir * apperture_half_size;
@@ -515,6 +515,7 @@ impl Viewport<'_> {
 	fn draw_items(&self) {
 		for &ViewportItem{item, shape, color, ..} in self.items.iter() {
 			let item_hovered = self.editor_state.hovered == item && item.is_some();
+			let item_selected = self.editor_state.selection == item && item.is_some();
 			let color = color.to_egui_rgba();
 
 			match shape {
@@ -527,7 +528,7 @@ impl Viewport<'_> {
 							egui::Align2::CENTER_CENTER,
 							format!("#{room_index}"),
 							egui::FontId::proportional(12.0),
-							if item_hovered {
+							if item_hovered || item_selected {
 								egui::Color32::WHITE
 							} else {
 								egui::Color32::GRAY
@@ -538,7 +539,7 @@ impl Viewport<'_> {
 						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
 						let rect = egui::Rect::from_center_size(vertex_px, egui::vec2(12.0, 12.0));
 
-						if item_hovered {
+						if item_hovered || item_selected {
 							self.painter.rect_filled(rect, 0.0, color);
 						} else {
 							self.painter.rect_stroke(rect, 0.0, (1.0, color));
@@ -547,7 +548,7 @@ impl Viewport<'_> {
 				}
 
 				ViewportItemShape::Line(start, end) => {
-					let stroke_thickness = match item_hovered {
+					let stroke_thickness = match item_hovered || item_selected {
 						false => 1.0,
 						true => 4.0,
 					};
@@ -597,7 +598,7 @@ impl Viewport<'_> {
 
 						for transform in transforms {
 							let target_widget = self.viewport_metrics.world_to_widget_position(transform * center_room);
-							self.painter.line_segment([center_widget, target_widget], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+							self.painter.arrow(center_widget, target_widget-center_widget, (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
 						}
 					}
 
@@ -605,7 +606,7 @@ impl Viewport<'_> {
 						let target_widget = self.response.ctx.input(|input| input.pointer.latest_pos())
 							.unwrap_or(egui::pos2(0.0, 0.0));
 
-						self.painter.line_segment([center_widget, target_widget], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+						self.painter.arrow(center_widget, target_widget-center_widget, (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
 					}
 				}
 			}
@@ -748,12 +749,6 @@ enum Operation {
 }
 
 impl Operation {
-	// fn relevant_item(&self) -> Option<Item> {
-	// 	match *self {
-	// 		Self::Drag{item, ..} => Some(item),
-	// 	}
-	// }
-
 	fn consumes_clicks(&self) -> bool {
 		matches!(self, Self::ConnectWall{..})
 	}
