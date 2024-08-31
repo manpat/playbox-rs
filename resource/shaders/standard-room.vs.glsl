@@ -15,6 +15,7 @@ layout(binding=1) uniform M {
 	mat4x3 u_model;
 	vec4 u_plane_0;
 	vec4 u_plane_1;
+	vec4 u_plane_2;
 };
 
 layout(binding=0) readonly buffer V {
@@ -35,7 +36,7 @@ void main() {
 
 	gl_ClipDistance[0] = dot(u_plane_0.xyz, vertex.pos) - u_plane_0.w;
 	gl_ClipDistance[1] = dot(u_plane_1.xyz, vertex.pos) - u_plane_1.w;
-	gl_ClipDistance[2] = 1.0;
+	gl_ClipDistance[2] = dot(u_plane_2.xyz, vertex.pos) - u_plane_2.w;
 	gl_ClipDistance[3] = 1.0;
 
 	v_color = vec4(

@@ -115,18 +115,17 @@ impl WorldView {
 					w.to_x0y()
 				]);
 
-				// sprites.billboard(w.to_x0y() + Vec3::from_y(0.3), Vec2::splat(0.1), Color::white());
-
 				#[derive(Copy, Clone)]
 				#[repr(C)]
 				struct RoomUniforms {
 					transform: Mat3x4,
 					plane_0: Vec4,
 					plane_1: Vec4,
+					plane_2: Vec4,
 				}
 
-				let (plane_0, plane_1) = match clip_by {
-					Some(ClipState{left_apperture, right_apperture, local_position, ..}) => {
+				let (plane_0, plane_1, plane_2) = match clip_by {
+					Some(ClipState{left_apperture, right_apperture, local_position, apperture_plane, ..}) => {
 						let pos_to_left = left_apperture - local_position;
 						let pos_to_right = right_apperture - local_position;
 
@@ -136,10 +135,16 @@ impl WorldView {
 						let normal_b = -pos_to_left.perp().normalize();
 						let dist_b = local_position.dot(normal_b);
 
-						(normal_a.to_x0y().extend(dist_a), normal_b.to_x0y().extend(dist_b))
+						let plane_0 = normal_a.to_x0y().extend(dist_a);
+						let plane_1 = normal_b.to_x0y().extend(dist_b);
+
+						let [x, y, w] = apperture_plane.into();
+						let plane_2 = Vec4::new(x, 0.0, y, w);
+
+						(plane_0, plane_1, plane_2)
 					}
 
-					None => (Vec4::from_w(-1.0), Vec4::from_w(-1.0)),
+					None => (Vec4::from_w(-1.0), Vec4::from_w(-1.0), Vec4::from_w(-1.0)),
 				};
 
 				group.draw(self.v_shader, gfx::CommonShader::FlatTexturedFragment)
@@ -149,6 +154,7 @@ impl WorldView {
 						transform,
 						plane_0,
 						plane_1,
+						plane_2,
 					}])
 					.indexed(self.ebo.with_offset_size(
 						room_info.base_index * index_size,
@@ -178,7 +184,7 @@ impl WorldView {
 			{
 				let local_position = clip_by.map_or(local_position, |c| c.local_position);
 
-				let (left_apperture, right_apperture) = {
+				let (left_apperture, right_apperture, apperture_normal, unclipped_left_apperture) = {
 					let (start_vertex, end_vertex) = world.wall_vertices(current_wall_id);
 
 					// If the apperture we're considering isn't CCW from our perspective then cull it and the room it connects to.
@@ -197,14 +203,16 @@ impl WorldView {
 					let left_vertex = start_vertex + wall_dir * (wall_length/2.0 - apperture_half_size);
 					let right_vertex = start_vertex + wall_dir * (wall_length/2.0 + apperture_half_size);
 
+					let normal = (right_vertex - left_vertex).normalize().perp();
+
 					if let Some(clip_state) = &clip_by {
 						match clip_wall_segment((left_vertex, right_vertex), clip_state) {
-							Some(wall) => wall,
+							Some((left, right)) => (left, right, normal, left_vertex),
 							None => return,
 						}
 
 					} else {
-						(left_vertex, right_vertex)
+						(left_vertex, right_vertex, normal, left_vertex)
 					}
 
 				};
@@ -212,6 +220,14 @@ impl WorldView {
 				let portal_transform = calculate_portal_transform(world, current_wall_id, target_wall_id);
 				let inv_portal_transform = portal_transform.inverse();
 				let total_transform = *transform * portal_transform;
+
+				let left_apperture = inv_portal_transform * left_apperture;
+				let right_apperture = inv_portal_transform * right_apperture;
+
+				// TODO(pat.m): this is kind of a mess, and wouldn't really be necessary if clip_wall_segment actually clipped things.
+				// but it works
+				let apperture_normal = inv_portal_transform * apperture_normal.extend(0.0);
+				let apperture_plane = apperture_normal.extend(apperture_normal.dot(inv_portal_transform * unclipped_left_apperture));
 
 				room_stack.push(Entry {
 					room_index: target_wall_id.room_index,
@@ -221,8 +237,10 @@ impl WorldView {
 
 						// All of these should be in the space of the target room
 						local_position: inv_portal_transform * local_position,
-						left_apperture: inv_portal_transform * left_apperture,
-						right_apperture: inv_portal_transform * right_apperture,
+						left_apperture,
+						right_apperture,
+
+						apperture_plane,
 					})
 				});
 			}
@@ -370,6 +388,7 @@ struct ClipState {
 	local_position: Vec2,
 	left_apperture: Vec2,
 	right_apperture: Vec2,
+	apperture_plane: Vec3,
 }
 
 fn clip_wall_segment((mut left_vertex, mut right_vertex): (Vec2, Vec2), clip_by: &ClipState) -> Option<(Vec2, Vec2)> {
@@ -377,6 +396,7 @@ fn clip_wall_segment((mut left_vertex, mut right_vertex): (Vec2, Vec2), clip_by:
 
 	let pos_to_left_clip = left_apperture - local_position;
 	let pos_to_right_clip = right_apperture - local_position;
+
 	let pos_to_left_vert = left_vertex - local_position;
 	let pos_to_right_vert = right_vertex - local_position;
 
@@ -390,11 +410,15 @@ fn clip_wall_segment((mut left_vertex, mut right_vertex): (Vec2, Vec2), clip_by:
 	}
 
 	// Clip
-	if pos_to_left_vert.wedge(pos_to_left_clip) < 0.0 {
+	let wedge_product = pos_to_left_vert.wedge(pos_to_left_clip);
+	if wedge_product < 0.0 {
+		// TODO(pat.m): actually clip here - will help later
 		left_vertex = left_apperture;
 	}
 
-	if pos_to_right_vert.wedge(pos_to_right_clip) > 0.0 {
+	let wedge_product = pos_to_right_vert.wedge(pos_to_right_clip);
+	if wedge_product > 0.0 {
+		// TODO(pat.m): actually clip here - will help later
 		right_vertex = right_apperture;
 	}
 
