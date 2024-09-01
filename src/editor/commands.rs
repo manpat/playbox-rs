@@ -51,8 +51,10 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 	match cmd {
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
-			let Some(room) = model.world.rooms.get_mut(item.room_index()) else {
-				anyhow::bail!("Trying to edit non-existent room #{}", item.room_index());
+			// TODO(pat.m): this doesn't make sense for player spawn
+			let room_index = item.room_index(&model.world);
+			let Some(room) = model.world.rooms.get_mut(room_index) else {
+				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			};
 
 			match item {
@@ -70,6 +72,10 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					for vertex in room.wall_vertices.iter_mut() {
 						*vertex += delta;
 					}
+				}
+
+				Item::PlayerSpawn => {
+					todo!()
 				}
 			}
 		}
@@ -128,25 +134,31 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 		}
 
 		EditorWorldEditCmd::RemoveRoom(room_index) => {
+			// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every WorldPosition in the model
+
 			if model.world.rooms.len() == 1 {
 				anyhow::bail!("Can't delete last room in world")
 			}
 
-			// Fix player position
-			if model.player.position.room_index >= room_index {
-				if model.player.position.room_index == room_index {
-					anyhow::bail!("Can't delete room containing player");
-				}
+			if model.player.position.room_index == room_index {
+				anyhow::bail!("Can't delete room containing player");
+			}
 
+
+			// Fix player position
+			if model.player.position.room_index > room_index {
 				model.player.position.room_index = model.player.position.room_index.saturating_sub(1);
 			}
 
-			// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every WorldPosition in the model
-			model.world.rooms.remove(room_index);
+			// Fix player spawn
+			if model.world.player_spawn_position.room_index > room_index {
+				model.world.player_spawn_position.room_index = model.world.player_spawn_position.room_index.saturating_sub(1);
+			}
 
 			// Clear or adjust selection
 			if let Some(selected_item) = &mut state.selection {
-				let selected_room_index = selected_item.room_index();
+				// TODO(pat.m): this doesn't really make sense for player spawn
+				let selected_room_index = selected_item.room_index(&model.world);
 
 				if selected_room_index > room_index {
 					selected_item.set_room_index(selected_room_index.saturating_sub(1));
@@ -156,10 +168,8 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			}
 
 			// Update focused room
-			if state.focused_room_index > room_index {
+			if state.focused_room_index >= room_index {
 				state.focused_room_index = state.focused_room_index.saturating_sub(1);
-			} else if state.focused_room_index == room_index {
-				state.focused_room_index = 0;
 			}
 
 			// Remove connections to deleted room
@@ -177,6 +187,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					wall_b.room_index -= 1;
 				}
 			}
+
+			// Actually remove room
+			model.world.rooms.remove(room_index);
 		}
 
 		EditorWorldEditCmd::DisconnectRoom(room_index) => {

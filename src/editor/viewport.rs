@@ -232,21 +232,23 @@ impl<'c> Viewport<'c> {
 		}
 	}
 
-	pub fn add_player_indicator(&mut self, position: WorldPosition, yaw: f32) {
+	pub fn add_player_indicator(&mut self, position: WorldPosition, yaw: f32, item: impl Into<Option<Item>>, color: impl Into<Color>, flags: ViewportItemFlags) {
 		let transforms = self.items.iter()
 			.filter(|vpitem| vpitem.item == Some(Item::Room(position.room_index)))
 			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
 		let base_player_transform = Mat2x3::rotate_translate(yaw, position.local_position);
+		let item = item.into();
+		let color = color.into();
 
 		for room_to_world in transforms {
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::PlayerIndicator(room_to_world * base_player_transform),
-				item: None,
-				color: Color::grey(0.8),
+				item,
+				color,
 				room_to_world,
-				flags: ViewportItemFlags::empty(),
+				flags: flags,
 			});
 		}
 	}
@@ -268,7 +270,7 @@ impl<'c> Viewport<'c> {
 		self.show_context_menu();
 
 		if let Some(selected_item) = self.editor_state.selection {
-			self.editor_state.focused_room_index = selected_item.room_index();
+			self.editor_state.focused_room_index = selected_item.room_index(self.world);
 		}
 
 		self.draw_items();
@@ -496,6 +498,8 @@ impl Viewport<'_> {
 						ui.close_menu();
 					}
 				}
+
+				_ => todo!(),
 			}
 		});
 	}

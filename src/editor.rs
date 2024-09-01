@@ -17,14 +17,15 @@ enum Item {
 	Wall(GlobalWallId),
 	Room(usize),
 
-	// TODO(pat.m): PlayerSpawn
+	PlayerSpawn,
 }
 
 impl Item {
-	fn room_index(&self) -> usize {
+	fn room_index(&self, world: &model::World) -> usize {
 		match *self {
 			Item::Room(room_index) => room_index,
 			Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => room_index,
+			Item::PlayerSpawn => world.player_spawn_position.room_index,
 		}
 	}
 
@@ -33,6 +34,8 @@ impl Item {
 			Item::Room(room_index) | Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => {
 				*room_index = new_room_index;
 			}
+
+			_ => {}
 		}
 	}
 }
@@ -90,15 +93,15 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 
 	egui::Window::new("All Rooms")
 		.show(ctx, |ui| {
-			ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
-				ui.menu_button("...", |ui| {
-					if ui.button("Center Player").clicked() {
-						// context.state.focused_room_index = model.player.position.room_index;
-						// TODO(pat.m): some viewport shit
-						ui.close_menu();
-					}
-				});
-			});
+			// ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
+			// 	ui.menu_button("...", |ui| {
+			// 		if ui.button("Center Player").clicked() {
+			// 			// context.state.focused_room_index = model.player.position.room_index;
+			// 			// TODO(pat.m): some viewport shit
+			// 			ui.close_menu();
+			// 		}
+			// 	});
+			// });
 
 			draw_all_room_viewport(ui, &mut context);
 		});
@@ -135,7 +138,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 
 
 fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context) {
-	let selected_room_index = state.selection.as_ref().map_or(state.focused_room_index, Item::room_index);
+	let selected_room_index = state.selection.as_ref().map_or(state.focused_room_index, |item| item.room_index(&model.world));
 
 	ui.horizontal(|ui| {
 		for (room_index, _room) in model.world.rooms.iter().enumerate() {
@@ -165,6 +168,10 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 
 		Some(Item::Room(room_index)) => {
 			draw_room_inspector(ui, ctx, room_index);
+		}
+
+		_ => {
+			ui.label("<unimplemented>");
 		}
 	}
 
@@ -219,8 +226,14 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 
 
+
+const PLAYER_SPAWN_COLOR: Color = Color::rgb(1.0, 0.3, 0.1);
+
+
 fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
-	let focused_room_index = context.state.selection.as_ref().map_or(context.state.focused_room_index, Item::room_index);
+	let focused_room_index = context.state.selection.as_ref()
+		.map_or(context.state.focused_room_index, |item| item.room_index(&context.model.world));
+
 	let neighbouring_room_margin = 0.3;
 
 	let mut neighbouring_rooms = Vec::new();
@@ -240,6 +253,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 	}
 
 	let player = &context.model.player;
+	let world = &context.model.world;
 
 	let mut viewport = Viewport::new(ui, context);
 	viewport.add_room(focused_room_index, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
@@ -250,7 +264,8 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		viewport.add_room_connections(room_index, transform, ViewportItemFlags::empty());
 	}
 
-	viewport.add_player_indicator(player.position, player.yaw);
+	viewport.add_player_indicator(world.player_spawn_position, world.player_spawn_yaw, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
+	viewport.add_player_indicator(player.position, player.yaw, None, Color::grey(0.8), ViewportItemFlags::empty());
 
 	viewport.build()
 }
@@ -286,7 +301,8 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 		}
 	}
 
-	viewport.add_player_indicator(player.position, player.yaw);
+	viewport.add_player_indicator(world.player_spawn_position, world.player_spawn_yaw, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
+	viewport.add_player_indicator(player.position, player.yaw, None, Color::grey(0.8), ViewportItemFlags::empty());
 
 	viewport.build()
 }
