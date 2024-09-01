@@ -220,6 +220,7 @@ impl GameScene {
 
 			if ui.button("Set Player Spawn").clicked() {
 				self.message_bus.emit(editor::EditorWorldEditCmd::SetPlayerSpawn);
+				ui.close_menu();
 			}
 		});
 	}

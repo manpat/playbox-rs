@@ -44,8 +44,8 @@ impl Item {
 #[derive(Debug)]
 pub struct State {
 	hovered: Option<Item>,
-
 	selection: Option<Item>,
+
 	focused_room_index: usize,
 
 	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
@@ -55,8 +55,8 @@ impl State {
 	pub fn new(message_bus: &MessageBus) -> Self {
 		State {
 			hovered: None,
-
 			selection: None,
+
 			focused_room_index: 0,
 
 			editor_world_edit_cmd_sub: message_bus.subscribe(),
