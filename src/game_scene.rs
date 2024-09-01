@@ -215,6 +215,12 @@ impl GameScene {
 
 				ui.close_menu();
 			}
+
+			ui.separator();
+
+			if ui.button("Set Player Spawn").clicked() {
+				self.message_bus.emit(editor::EditorWorldEditCmd::SetPlayerSpawn);
+			}
 		});
 	}
 }

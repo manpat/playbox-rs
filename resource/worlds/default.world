@@ -921,6 +921,14 @@
       }
     ]
   ],
+  "player_spawn_position": {
+    "room_index": 7,
+    "local_position": [
+      -0.17576034,
+      0.6487671
+    ]
+  },
+  "player_spawn_yaw": -1.982289,
   "fog_color": {
     "r": 0.052714825,
     "g": 0.026146568,

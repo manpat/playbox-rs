@@ -13,6 +13,9 @@ pub enum EditorWorldEditCmd {
 
 	SetFogParams(Color),
 
+	SetPlayerSpawn,
+
+
 	AddRoom {
 		room: Room,
 		connection: Option<(usize, GlobalWallId)>,
@@ -108,6 +111,11 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 		EditorWorldEditCmd::SetFogParams(color) => {
 			model.world.fog_color = color;
+		}
+
+		EditorWorldEditCmd::SetPlayerSpawn => {
+			model.world.player_spawn_position = model.player.position;
+			model.world.player_spawn_yaw = model.player.yaw;
 		}
 
 		EditorWorldEditCmd::AddRoom { room, connection } => {

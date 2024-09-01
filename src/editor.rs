@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use model::{GlobalVertexId, GlobalWallId};
+use model::{WorldPosition, GlobalVertexId, GlobalWallId};
 
 mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
@@ -8,11 +8,11 @@ use viewport::{Viewport, ViewportItemFlags};
 mod commands;
 use commands::*;
 
-pub use commands::handle_editor_cmds;
+pub use commands::{handle_editor_cmds, EditorWorldEditCmd};
 
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum Item {
+pub enum Item {
 	Vertex(GlobalVertexId),
 	Wall(GlobalWallId),
 	Room(usize),
@@ -85,6 +85,19 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 				let mut fog_color = model.world.fog_color;
 				if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
 					message_bus.emit(EditorWorldEditCmd::SetFogParams(fog_color));
+				}
+			});
+
+			ui.horizontal(|ui| {
+				ui.label("Spawn");
+
+				let WorldPosition{ room_index, local_position: Vec2{x, y} } = model.world.player_spawn_position;
+				let yaw = model.world.player_spawn_yaw;
+
+				ui.label(format!("Room #{room_index} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
+
+				if ui.button("Set Here").clicked() {
+					message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn);
 				}
 			});
 
