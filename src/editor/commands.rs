@@ -10,7 +10,10 @@ pub enum EditorWorldEditCmd {
 	SetCeilingColor(usize, Color),
 	SetCeilingHeight(usize, f32),
 	SetFloorColor(usize, Color),
+
 	SetWallColor(GlobalWallId, Color),
+	SetHorizontalWallOffset(GlobalWallId, f32),
+	SetVerticalWallOffset(GlobalWallId, f32),
 
 	SetFogParams(Color),
 
@@ -113,6 +116,26 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
 			{
 				wall.color = color;
+			} else {
+				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
+			}
+		}
+
+		EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset) => {
+			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
+				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
+			{
+				wall.horizontal_offset = offset;
+			} else {
+				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
+			}
+		}
+
+		EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset) => {
+			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
+				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
+			{
+				wall.vertical_offset = offset;
 			} else {
 				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
 			}

@@ -241,11 +241,35 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 	ui.label(format!("Wall #{wall_index}"));
 
 	ui.horizontal(|ui| {
-		ui.label("Wall");
+		ui.label("Color");
 		
 		let mut wall_color = wall.color;
 		if ui.color_edit_button_rgb(wall_color.as_mut()).changed() {
 			message_bus.emit(EditorWorldEditCmd::SetWallColor(wall_id, wall_color));
+		}
+	});
+
+	ui.horizontal(|ui| {
+		ui.label("horizontal Offset");
+		
+		ui.set_enabled(false);
+
+		let mut offset = wall.horizontal_offset;
+		if ui.add(egui::widgets::Slider::new(&mut offset, -4.0..=4.0).step_by(0.025).clamp_to_range(false))
+			.changed()
+		{
+			message_bus.emit(EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset));
+		}
+	});
+
+	ui.horizontal(|ui| {
+		ui.label("Vertical Offset");
+		
+		let mut offset = wall.vertical_offset;
+		if ui.add(egui::widgets::Slider::new(&mut offset, -2.0..=2.0).step_by(0.025).clamp_to_range(false))
+			.changed()
+		{
+			message_bus.emit(EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset));
 		}
 	});
 }

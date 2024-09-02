@@ -219,7 +219,7 @@ impl Room {
 				Vec2::new( wall_extent,  wall_extent),
 			],
 
-			walls: vec![Wall{ color: Color::grey(0.5) }; 4],
+			walls: vec![Wall::new(); 4],
 			floor_color: Color::grey(0.5),
 			ceiling_color: Color::grey(0.5),
 
@@ -240,6 +240,25 @@ impl Room {
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Wall {
 	pub color: Color,
+
+	// How much to offset the height of the target room.
+	#[serde(default)]
+	pub vertical_offset: f32,
+
+	// How much to offset the aperture horizontally in units from the center of the wall.
+	// Clamped to half the length of the wall
+	#[serde(default)]
+	pub horizontal_offset: f32,
+}
+
+impl Wall {
+	pub fn new() -> Wall {
+		Wall {
+			color: Color::white(),
+			vertical_offset: 0.0,
+			horizontal_offset: 0.0,
+		}
+	}
 }
 
 
