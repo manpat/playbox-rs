@@ -8,6 +8,7 @@ pub enum EditorWorldEditCmd {
 	TranslateItem(Item, Vec2),
 
 	SetCeilingColor(usize, Color),
+	SetCeilingHeight(usize, f32),
 	SetFloorColor(usize, Color),
 	SetWallColor(GlobalWallId, Color),
 
@@ -86,6 +87,14 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 		EditorWorldEditCmd::SetCeilingColor(room_index, color) => {
 			if let Some(room) = model.world.rooms.get_mut(room_index) {
 				room.ceiling_color = color;
+			} else {
+				anyhow::bail!("Trying to edit non-existent room #{room_index}");
+			}
+		}
+
+		EditorWorldEditCmd::SetCeilingHeight(room_index, height) => {
+			if let Some(room) = model.world.rooms.get_mut(room_index) {
+				room.height = height;
 			} else {
 				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			}

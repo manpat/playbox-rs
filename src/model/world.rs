@@ -204,6 +204,7 @@ pub struct Room {
 	pub wall_vertices: Vec<Vec2>,
 	pub floor_color: Color,
 	pub ceiling_color: Color,
+	pub height: f32,
 }
 
 impl Room {
@@ -221,6 +222,8 @@ impl Room {
 			walls: vec![Wall{ color: Color::grey(0.5) }; 4],
 			floor_color: Color::grey(0.5),
 			ceiling_color: Color::grey(0.5),
+
+			height: 1.0,
 		}
 	}
 

@@ -198,7 +198,7 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 	ui.label(format!("Room #{room_index}"));
 
 	ui.horizontal(|ui| {
-		ui.label("Ceiling");
+		ui.label("Ceiling Color");
 
 		let mut ceiling_color = room.ceiling_color;
 		if ui.color_edit_button_rgb(ceiling_color.as_mut()).changed() {
@@ -207,7 +207,20 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 	});
 
 	ui.horizontal(|ui| {
-		ui.label("Floor");
+		ui.label("Ceiling Height");
+
+		let mut height = room.height;
+		if ui.add(egui::widgets::Slider::new(&mut height, 0.6..=5.0).step_by(0.1).logarithmic(true))
+			.changed()
+		{
+			message_bus.emit(EditorWorldEditCmd::SetCeilingHeight(room_index, height));
+		}
+	});
+
+	ui.separator();
+
+	ui.horizontal(|ui| {
+		ui.label("Floor Color");
 
 		let mut floor_color = room.floor_color;
 		if ui.color_edit_button_rgb(floor_color.as_mut()).changed() {

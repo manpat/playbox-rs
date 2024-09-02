@@ -20,8 +20,6 @@ impl WorldView {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 			base_vertex: 0,
-
-			ceiling_height: 1.0,
 		};
 
 		let mut room_mesh_infos = Vec::new();
@@ -60,8 +58,6 @@ impl WorldView {
 				vertices: Vec::new(),
 				indices: Vec::new(),
 				base_vertex: 0,
-
-				ceiling_height: 1.0,
 			};
 
 			self.room_mesh_infos.clear();
@@ -269,8 +265,6 @@ struct RoomMeshBuilder<'a> {
 	vertices: Vec<gfx::StandardVertex>,
 	indices: Vec<u32>,
 	base_vertex: u32,
-
-	ceiling_height: f32,
 }
 
 impl RoomMeshBuilder<'_> {
@@ -294,7 +288,7 @@ impl RoomMeshBuilder<'_> {
 		let base_index = self.indices.len() as u32;
 
 		let room = &self.world.rooms[room_index];
-		let up = Vec3::from_y(self.ceiling_height);
+		let up = Vec3::from_y(room.height);
 
 		let floor_verts = room.wall_vertices.iter().map(|&v| v.to_x0y());
 		let ceiling_verts = floor_verts.clone().rev().map(|v| v + up);
@@ -325,14 +319,16 @@ impl RoomMeshBuilder<'_> {
 		let start_vertex_3d = start_vertex.to_x0y();
 		let end_vertex_3d = end_vertex.to_x0y();
 
-		let up = Vec3::from_y(self.ceiling_height);
+		let up = Vec3::from_y(room.height);
 
 		if let Some(opposing_wall_id) = opposing_wall_id {
 			// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 			// pass through.
-			let opposing_wall_length = {
-				let (wall_start, wall_end) = self.world.wall_vertices(opposing_wall_id);
-				(wall_end - wall_start).length()
+			let (opposing_wall_length, opposing_room_height) = {
+				let opposing_room = &self.world.rooms[opposing_wall_id.room_index];
+				let (wall_start, wall_end) = opposing_room.wall_vertices(opposing_wall_id.wall_index);
+
+				((wall_end - wall_start).length(), opposing_room.height)
 			};
 
 			let wall_length = (end_vertex - start_vertex).length();
@@ -362,6 +358,20 @@ impl RoomMeshBuilder<'_> {
 			];
 
 			self.add_convex(verts, wall_color);
+
+			if room.height > opposing_room_height {
+				let opposing_up = Vec3::from_y(opposing_room_height);
+
+				let verts = [
+					left_vertex_3d + opposing_up,
+					left_vertex_3d + up,
+					right_vertex_3d + up,
+					right_vertex_3d + opposing_up,
+				];
+
+				self.add_convex(verts, wall_color);
+			}
+
 
 		} else {
 			let verts = [

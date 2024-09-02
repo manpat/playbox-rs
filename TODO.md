@@ -16,7 +16,9 @@ game ui
 
 stuff to interact with
 
-create rooms, edit connections
+editor
+	- undo/redo
+	- make saving/loading a dialog, don't just always save over default
 
 
 TODO

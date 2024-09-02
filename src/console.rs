@@ -51,7 +51,7 @@ impl Console {
 
 impl Console {
 	fn process_string(&mut self, command_str: &str) -> anyhow::Result<()> {
-		let (verb, arguments_str) = command_str.split_once(&[' ', '\t']).unwrap_or((command_str, ""));
+		let (verb, _arguments_str) = command_str.split_once(&[' ', '\t']).unwrap_or((command_str, ""));
 
 		match verb {
 			"quit" => self.message_bus.emit(MenuCmd::QuitToDesktop),
