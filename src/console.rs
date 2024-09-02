@@ -70,6 +70,7 @@ fn show_command_line(ui: &mut egui::Ui, text_buffer: &mut String) -> Option<Stri
 		.lock_focus(true)
 		.clip_text(true)
 		.frame(false)
+		.desired_width(f32::INFINITY)
 		.hint_text("Command time...");
 
 	let response = ui.add(command_line);
