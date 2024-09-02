@@ -11,6 +11,7 @@ pub mod main_menu;
 pub mod glyph_cache;
 pub mod message_bus;
 
+pub mod console;
 pub mod editor;
 
 pub mod prelude {
@@ -58,6 +59,8 @@ struct App {
 	pause_menu: PauseMenuScene,
 	game_scene: Option<GameScene>,
 
+	console: console::Console,
+
 	message_bus: MessageBus,
 	menu_cmd_subscription: Subscription<MenuCmd>,
 
@@ -66,8 +69,6 @@ struct App {
 
 impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
-		ctx.show_debug_menu = cfg!(debug_assertions);
-
 		let message_bus = MessageBus::new();
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
 		let ctx = &mut Context::new(ctx, &audio, &message_bus);
@@ -75,7 +76,7 @@ impl App {
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
 
-		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
+		if true /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
 			let world = Self::load_world_or_default(ctx.vfs.resource_root().join("worlds/default.world"));
 			game_scene = Some(GameScene::new(ctx, world)?);
@@ -86,6 +87,8 @@ impl App {
 			main_menu: MainMenuScene::new(ctx)?,
 			pause_menu: PauseMenuScene::new(ctx)?,
 			game_scene,
+
+			console: console::Console::new(message_bus.clone()),
 
 			menu_cmd_subscription: message_bus.subscribe(),
 			message_bus,
@@ -111,6 +114,7 @@ impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
 		self.message_bus.garbage_collect();
 
+		self.console.update(ctx);
 
 		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
 			&& self.game_scene.is_none()
@@ -131,7 +135,10 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
+				if !self.console.is_visible() {
+					game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
+				}
+
 				game_scene.draw(&mut ctx.gfx);
 			}
 
