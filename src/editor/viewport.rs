@@ -215,15 +215,16 @@ impl<'c> Viewport<'c> {
 			let src_dir = (src_end - src_start).normalize();
 			let src_center = (src_start + src_end) / 2.0;
 
-			let apperture_half_size = src_wall_length.min(tgt_wall_length) / 2.0;
-			let apperture_offset = src_dir.perp() * 0.1;
+			let aperture_extent = src_wall_length.min(tgt_wall_length) / 2.0;
+			let aperture_horizontal_offset = room.walls[wall_index].horizontal_offset.clamp(aperture_extent-src_wall_length/2.0, src_wall_length/2.0-aperture_extent);
+			let aperture_offset = src_dir.perp() * 0.1;
 
-			let apperture_center = src_center + apperture_offset;
-			let apperture_start = apperture_center - src_dir * apperture_half_size;
-			let apperture_end = apperture_center + src_dir * apperture_half_size;
+			let aperture_center = src_center + aperture_offset + aperture_horizontal_offset * src_dir;
+			let aperture_start = aperture_center - src_dir * aperture_extent;
+			let aperture_end = aperture_center + src_dir * aperture_extent;
 
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Line(room_to_world * apperture_start, room_to_world * apperture_end),
+				shape: ViewportItemShape::Line(room_to_world * aperture_start, room_to_world * aperture_end),
 				item: Some(Item::Wall(tgt_wall_id)),
 				color: WALL_CONNECTION_COLOR,
 				room_to_world,

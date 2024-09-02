@@ -182,6 +182,9 @@ impl WorldView {
 			{
 				let local_position = clip_by.map_or(local_position, |c| c.local_position);
 
+				let current_wall = &world.rooms[current_wall_id.room_index].walls[current_wall_id.wall_index];
+				let target_wall = &world.rooms[target_wall_id.room_index].walls[target_wall_id.wall_index];
+
 				let (left_aperture, right_aperture, aperture_normal, unclipped_left_aperture) = {
 					let (start_vertex, end_vertex) = world.wall_vertices(current_wall_id);
 
@@ -197,11 +200,14 @@ impl WorldView {
 						(wall_end - wall_start).length()
 					};
 
-					// TODO(pat.m): take wall horizontal offset into account
 
-					let aperture_half_size = wall_length.min(opposing_wall_length) / 2.0;
-					let left_vertex = start_vertex + wall_dir * (wall_length/2.0 - aperture_half_size);
-					let right_vertex = start_vertex + wall_dir * (wall_length/2.0 + aperture_half_size);
+					let aperture_extent = wall_length.min(opposing_wall_length) / 2.0;
+					let aperture_offset = current_wall.horizontal_offset.clamp(aperture_extent-wall_length/2.0, wall_length/2.0-aperture_extent);
+
+					let wall_center = wall_length/2.0 + aperture_offset;
+
+					let left_vertex = start_vertex + wall_dir * (wall_center - aperture_extent);
+					let right_vertex = start_vertex + wall_dir * (wall_center + aperture_extent);
 
 					let normal = (right_vertex - left_vertex).normalize().perp();
 
@@ -227,9 +233,6 @@ impl WorldView {
 				// but it works
 				let aperture_normal = inv_portal_transform * aperture_normal.extend(0.0);
 				let aperture_plane = aperture_normal.extend(aperture_normal.dot(inv_portal_transform * unclipped_left_aperture));
-
-				let current_wall = &world.rooms[current_wall_id.room_index].walls[current_wall_id.wall_index];
-				let target_wall = &world.rooms[target_wall_id.room_index].walls[target_wall_id.wall_index];
 
 				let height_difference = current_wall.vertical_offset - target_wall.vertical_offset;
 
@@ -345,13 +348,13 @@ impl RoomMeshBuilder<'_> {
 			let wall_length = (end_vertex - start_vertex).length();
 			let wall_dir = (end_vertex - start_vertex) / wall_length;
 
-			let aperture_half_size = wall_length.min(opposing_wall_length) / 2.0;
+			let aperture_extent = wall_length.min(opposing_wall_length) / 2.0;
 			let wall_half_size = wall_length/2.0;
 
-			let aperture_center = wall_half_size; // + wall.horizontal_offset.clamp(aperture_half_size-wall_half_size, wall_half_size-aperture_half_size);
+			let aperture_center = wall_half_size + wall.horizontal_offset.clamp(aperture_extent-wall_half_size, wall_half_size-aperture_extent);
 
-			let left_vertex = start_vertex + wall_dir * (aperture_center - aperture_half_size);
-			let right_vertex = start_vertex + wall_dir * (aperture_center + aperture_half_size);
+			let left_vertex = start_vertex + wall_dir * (aperture_center - aperture_extent);
+			let right_vertex = start_vertex + wall_dir * (aperture_center + aperture_extent);
 
 			let left_vertex_3d = left_vertex.to_x0y();
 			let right_vertex_3d = right_vertex.to_x0y();

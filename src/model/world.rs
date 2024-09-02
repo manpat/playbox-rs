@@ -68,6 +68,7 @@ impl World {
 		// Collide with walls
 		for wall_index in 0..current_room.walls.len() {
 			let (wall_start, wall_end) = current_room.wall_vertices(wall_index);
+			let wall = &current_room.walls[wall_index];
 
 			let wall_direction = (wall_end - wall_start).normalize();
 			let wall_length = (wall_end - wall_start).length();
@@ -100,20 +101,22 @@ impl World {
 					(wall_end - wall_start).length()
 				};
 
-				let apperture_extent = wall_length.min(opposing_wall_length) / 2.0;
+				let aperture_extent = wall_length.min(opposing_wall_length) / 2.0;
+				let aperture_offset = wall.horizontal_offset.clamp(aperture_extent-wall_length/2.0, wall_length/2.0-aperture_extent);
 
-				let wall_center = wall_length/2.0;
-				let apperture_a = wall_start + (wall_center - apperture_extent) * wall_direction;
-				let apperture_b = wall_start + (wall_center + apperture_extent) * wall_direction;
+
+				let wall_center = wall_length/2.0 + aperture_offset;
+				let aperture_a = wall_start + (wall_center - aperture_extent) * wall_direction;
+				let aperture_b = wall_start + (wall_center + aperture_extent) * wall_direction;
 				let intersection_dist_from_center = (wall_center - distance_along_wall).abs();
 
-				// Collide with the virtual apperture verts
-				collide_vertex(&mut desired_position, apperture_a, mover_radius);
-				collide_vertex(&mut desired_position, apperture_b, mover_radius);
+				// Collide with the virtual aperture verts
+				collide_vertex(&mut desired_position, aperture_a, mover_radius);
+				collide_vertex(&mut desired_position, aperture_b, mover_radius);
 
 				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
-				if intersection_dist_from_center < apperture_extent {
+				if intersection_dist_from_center < aperture_extent {
 					if wall_penetration < 0.0 {
 						continue
 					}
@@ -268,19 +271,32 @@ pub fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalW
 	let from_room = &world.rooms[from.room_index];
 	let to_room = &world.rooms[to.room_index];
 
+	let from_wall = &from_room.walls[from.wall_index];
+	let to_wall = &to_room.walls[to.wall_index];
+
 	let (from_wall_start, from_wall_end) = from_room.wall_vertices(from.wall_index);
 	let (to_wall_start, to_wall_end) = to_room.wall_vertices(to.wall_index);
 
-	let from_wall_dir = (from_wall_end - from_wall_start).normalize();
-	let to_wall_dir = (to_wall_end - to_wall_start).normalize();
+	let from_wall_length = (from_wall_end - from_wall_start).length();
+	let to_wall_length = (to_wall_end - to_wall_start).length();
+	
+	let from_wall_dir = (from_wall_end - from_wall_start) / from_wall_length;
+	let to_wall_dir = (to_wall_end - to_wall_start) / to_wall_length;
+
+
+	let aperture_extent = from_wall_length.min(to_wall_length) / 2.0;
+
+	let from_wall_offset = from_wall.horizontal_offset.clamp(aperture_extent-from_wall_length/2.0, from_wall_length/2.0-aperture_extent);
+	let to_wall_offset = to_wall.horizontal_offset.clamp(aperture_extent-to_wall_length/2.0, to_wall_length/2.0-aperture_extent);
+
 
 	let s = from_wall_dir.wedge(-to_wall_dir);
 	let c = from_wall_dir.dot(-to_wall_dir);
 	let new_x = Vec2::new(c, -s);
 	let new_y = Vec2::new(s, c);
 
-	let from_wall_center = (from_wall_start + from_wall_end) / 2.0;
-	let to_wall_center = (to_wall_start + to_wall_end) / 2.0;
+	let from_wall_center = (from_wall_start + from_wall_end) / 2.0 + from_wall_dir * from_wall_offset;
+	let to_wall_center = (to_wall_start + to_wall_end) / 2.0 + to_wall_dir * to_wall_offset;
 	let rotated_to_wall_center = to_wall_center.x * new_x + to_wall_center.y * new_y;
 	let translation = from_wall_center - rotated_to_wall_center;
 
