@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{WorldPosition, GlobalWallId};
+use model::{Placement, GlobalWallId};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
@@ -7,8 +7,7 @@ pub const PLAYER_RADIUS: f32 = 0.1;
 
 #[derive(Debug)]
 pub struct Player {
-	pub position: WorldPosition,
-	pub yaw: f32,
+	pub placement: Placement,
 	pub pitch: f32,
 
 	pub height: f32,
@@ -34,8 +33,8 @@ impl Player {
 
 		{
 			let (dx, dy) = ctx.input.mouse_delta().map_or((0.0, 0.0), Vec2::to_tuple);
-			self.yaw += dx * TAU;
-			self.yaw %= TAU;
+			self.placement.yaw += dx * TAU;
+			self.placement.yaw %= TAU;
 
 			let pitch_limit = PI/2.0;
 			self.pitch = (self.pitch - 3.0*dy).clamp(-pitch_limit, pitch_limit);
@@ -50,7 +49,7 @@ impl Player {
 		if self.free_cam {
 			// TODO(pat.m): figure out why these need to be negated :(
 			// yaw at least I think is because I'm using Vec2::to_x0y, but pitch??
-			let yaw_orientation = Quat::from_yaw(-self.yaw);
+			let yaw_orientation = Quat::from_yaw(-self.placement.yaw);
 			let orientation = yaw_orientation * Quat::from_pitch(-self.pitch);
 
 			let right = yaw_orientation.right();
@@ -73,7 +72,7 @@ impl Player {
 			}
 
 		} else {
-			let right = Vec2::from_angle(self.yaw);
+			let right = Vec2::from_angle(self.placement.yaw);
 			let forward = -right.perp();
 
 			let mut delta = Vec2::zero();
@@ -110,8 +109,8 @@ impl Player {
 
 		// TODO(pat.m): limit movement by delta length to avoid teleporting
 
-		let current_room = &world.rooms[self.position.room_index];
-		let mut desired_position = self.position.local_position + delta;
+		let current_room = &world.rooms[self.placement.room_index];
+		let mut desired_position = self.placement.position + delta;
 
 		fn collide_vertex(desired_position: &mut Vec2, vertex: Vec2, radius: f32) {
 			let desired_delta = *desired_position - vertex;
@@ -156,7 +155,7 @@ impl Player {
 
 			// We have some kind of intersection here - figure out if we need to transition to another room
 			// or if we need to slide against the wall
-			let wall_id = GlobalWallId{room_index: self.position.room_index, wall_index};
+			let wall_id = GlobalWallId{room_index: self.placement.room_index, wall_index};
 			if let Some(opposing_wall_id) = world.wall_target(wall_id) {
 				// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 				// pass through.
@@ -196,13 +195,13 @@ impl Player {
 
 					let transform = model::calculate_portal_transform(world, opposing_wall_id, wall_id);
 
-					self.position.room_index = opposing_wall_id.room_index;
-					self.position.local_position = transform * desired_position;
+					self.placement.room_index = opposing_wall_id.room_index;
+					self.placement.position = transform * desired_position;
 
 					// Apply yaw offset
 					let row = transform.rows[0];
 					let angle_delta = row.y.atan2(row.x);
-					self.yaw -= angle_delta;
+					self.placement.yaw -= angle_delta;
 
 					// TODO(pat.m): figure out another way to do this
 					self.hack_height_change = Some(vertical_offset);
@@ -217,6 +216,6 @@ impl Player {
 		}
 
 		// If we get here, no transitions have happened and desired_position has been adjusted to remove wall collisions
-		self.position.local_position = desired_position;
+		self.placement.position = desired_position;
 	}
 }

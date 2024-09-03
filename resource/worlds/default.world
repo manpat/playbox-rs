@@ -877,6 +877,16 @@
           },
           "vertical_offset": 0.0,
           "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 0.5,
+            "g": 0.5,
+            "b": 0.5,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
         }
       ],
       "wall_vertices": [
@@ -899,6 +909,10 @@
         [
           -2.050526,
           -2.983043
+        ],
+        [
+          -1.999644,
+          -1.7384702
         ],
         [
           -1.9487622,
@@ -926,6 +940,156 @@
         "a": 1.0
       },
       "height": 0.8
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": -0.37,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": -0.37,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          -0.004546427,
+          -0.47152558
+        ],
+        [
+          -0.468437,
+          -0.468437
+        ],
+        [
+          -0.46440253,
+          -0.39010054
+        ],
+        [
+          -0.0005119392,
+          -0.39318913
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 0.25
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          1.1146325,
+          -0.22303446
+        ],
+        [
+          -0.23195043,
+          -0.23195043
+        ],
+        [
+          0.15104222,
+          0.6148913
+        ],
+        [
+          1.1057162,
+          1.0968003
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.0
     }
   ],
   "connections": [
@@ -1048,16 +1212,46 @@
         "room_index": 6,
         "wall_index": 1
       }
+    ],
+    [
+      {
+        "room_index": 9,
+        "wall_index": 0
+      },
+      {
+        "room_index": 8,
+        "wall_index": 3
+      }
+    ],
+    [
+      {
+        "room_index": 10,
+        "wall_index": 0
+      },
+      {
+        "room_index": 9,
+        "wall_index": 2
+      }
+    ],
+    [
+      {
+        "room_index": 8,
+        "wall_index": 4
+      },
+      {
+        "room_index": 10,
+        "wall_index": 3
+      }
     ]
   ],
-  "player_spawn_position": {
+  "player_spawn": {
     "room_index": 7,
-    "local_position": [
+    "position": [
       -0.17576034,
       0.6487671
-    ]
+    ],
+    "yaw": -1.982289
   },
-  "player_spawn_yaw": -1.982289,
   "fog_color": {
     "r": 0.052714825,
     "g": 0.026146568,

@@ -50,7 +50,7 @@ impl WorldView {
 		})
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System, _sprites: &mut super::Sprites, world: &World, world_position: WorldPosition, height_change: Option<f32>) {
+	pub fn draw(&mut self, gfx: &mut gfx::System, _sprites: &mut super::Sprites, world: &World, viewer_placement: Placement, height_change: Option<f32>) {
 		// Draw room you're in
 		// then for each wall,
 		// 	check if it has a neighbouring room, and if so
@@ -94,7 +94,7 @@ impl WorldView {
 		}
 
 
-		let initial_transform = Mat2x3::rotate_translate(0.0, -world_position.local_position);
+		let initial_transform = Mat2x3::rotate_translate(0.0, -viewer_placement.position);
 
 		const MAX_DEPTH: i32 = 50;
 
@@ -107,7 +107,7 @@ impl WorldView {
 
 		let mut room_stack = vec![
 			Entry {
-				room_index: world_position.room_index,
+				room_index: viewer_placement.room_index,
 				transform: initial_transform,
 				height_offset: self.height_offset,
 				clip_by: None,
@@ -272,11 +272,11 @@ impl WorldView {
 			}
 
 			for (current_wall_id, target_wall_id) in connections {
-				try_add_connection(&mut room_stack, world, current_wall_id, target_wall_id, &transform, &clip_by, world_position.local_position, height_offset, depth);
+				try_add_connection(&mut room_stack, world, current_wall_id, target_wall_id, &transform, &clip_by, viewer_placement.position, height_offset, depth);
 
 				// If we connect to the same room then we need to draw again with the inverse transform to make sure both walls get recursed through
 				if current_wall_id.room_index == target_wall_id.room_index {
-					try_add_connection(&mut room_stack, world, target_wall_id, current_wall_id, &transform, &clip_by, world_position.local_position, height_offset, depth);
+					try_add_connection(&mut room_stack, world, target_wall_id, current_wall_id, &transform, &clip_by, viewer_placement.position, height_offset, depth);
 				}
 			}
 		}

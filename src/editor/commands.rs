@@ -146,8 +146,7 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 		}
 
 		EditorWorldEditCmd::SetPlayerSpawn => {
-			model.world.player_spawn_position = model.player.position;
-			model.world.player_spawn_yaw = model.player.yaw;
+			model.world.player_spawn = model.player.placement;
 		}
 
 		EditorWorldEditCmd::AddRoom { room, connection } => {
@@ -174,25 +173,25 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 		}
 
 		EditorWorldEditCmd::RemoveRoom(room_index) => {
-			// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every WorldPosition in the model
+			// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every Location in the model
 
 			if model.world.rooms.len() == 1 {
 				anyhow::bail!("Can't delete last room in world")
 			}
 
-			if model.player.position.room_index == room_index {
+			if model.player.placement.room_index == room_index {
 				anyhow::bail!("Can't delete room containing player");
 			}
 
 
 			// Fix player position
-			if model.player.position.room_index > room_index {
-				model.player.position.room_index = model.player.position.room_index.saturating_sub(1);
+			if model.player.placement.room_index > room_index {
+				model.player.placement.room_index = model.player.placement.room_index.saturating_sub(1);
 			}
 
 			// Fix player spawn
-			if model.world.player_spawn_position.room_index > room_index {
-				model.world.player_spawn_position.room_index = model.world.player_spawn_position.room_index.saturating_sub(1);
+			if model.world.player_spawn.room_index > room_index {
+				model.world.player_spawn.room_index = model.world.player_spawn.room_index.saturating_sub(1);
 			}
 
 			// Clear or adjust selection

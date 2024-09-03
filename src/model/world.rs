@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{WorldPosition, GlobalVertexId, GlobalWallId};
+use model::{Placement, GlobalVertexId, GlobalWallId};
 
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
@@ -13,11 +13,8 @@ pub struct World {
 	pub connections: Vec<(GlobalWallId, GlobalWallId)>,
 
 	#[serde(default)]
-	pub player_spawn_position: WorldPosition,
+	pub player_spawn: Placement,
 	
-	#[serde(default)]
-	pub player_spawn_yaw: f32,
-
 	pub fog_color: Color,
 }
 
@@ -27,12 +24,11 @@ impl World {
 			rooms: vec![Room::new_square(2.0)],
 			connections: vec![],
 
-			player_spawn_position: WorldPosition {
+			player_spawn: Placement {
 				room_index: 0,
-				local_position: Vec2::zero(),
+				position: Vec2::zero(),
+				yaw: 0.0,
 			},
-
-			player_spawn_yaw: 0.0,
 
 			fog_color: Color::white(),
 		}

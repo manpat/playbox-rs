@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use model::{WorldPosition, GlobalVertexId, GlobalWallId};
+use model::{Placement, GlobalVertexId, GlobalWallId};
 
 mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
@@ -25,7 +25,7 @@ impl Item {
 		match *self {
 			Item::Room(room_index) => room_index,
 			Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => room_index,
-			Item::PlayerSpawn => world.player_spawn_position.room_index,
+			Item::PlayerSpawn => world.player_spawn.room_index,
 		}
 	}
 
@@ -91,17 +91,13 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 			ui.horizontal(|ui| {
 				ui.label("Spawn");
 
-				let WorldPosition{ room_index, local_position: Vec2{x, y} } = model.world.player_spawn_position;
-				let yaw = model.world.player_spawn_yaw;
-
+				let Placement{ room_index, position: Vec2{x, y}, yaw } = model.world.player_spawn;
 				ui.label(format!("Room #{room_index} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
 
 				if ui.button("Set Here").clicked() {
 					message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn);
 				}
 			});
-
-			// TODO(pat.m): player spawn location
 		});
 
 	egui::Window::new("All Rooms")
@@ -109,7 +105,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 			// ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
 			// 	ui.menu_button("...", |ui| {
 			// 		if ui.button("Center Player").clicked() {
-			// 			// context.state.focused_room_index = model.player.position.room_index;
+			// 			// context.state.focused_room_index = model.player.placement.room_index;
 			// 			// TODO(pat.m): some viewport shit
 			// 			ui.close_menu();
 			// 		}
@@ -127,7 +123,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
 					ui.menu_button("...", |ui| {
 						if ui.button("Focus Player").clicked() {
-							context.state.selection = Some(Item::Room(model.player.position.room_index));
+							context.state.selection = Some(Item::Room(model.player.placement.room_index));
 							// TODO(pat.m): recenter viewport
 							ui.close_menu();
 						}
@@ -314,8 +310,8 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		viewport.add_room_connections(room_index, transform, ViewportItemFlags::empty());
 	}
 
-	viewport.add_player_indicator(world.player_spawn_position, world.player_spawn_yaw, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
-	viewport.add_player_indicator(player.position, player.yaw, None, Color::grey(0.8), ViewportItemFlags::empty());
+	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
+	viewport.add_player_indicator(player.placement, None, Color::grey(0.8), ViewportItemFlags::empty());
 
 	viewport.build()
 }
@@ -351,8 +347,8 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 		}
 	}
 
-	viewport.add_player_indicator(world.player_spawn_position, world.player_spawn_yaw, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
-	viewport.add_player_indicator(player.position, player.yaw, None, Color::grey(0.8), ViewportItemFlags::empty());
+	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
+	viewport.add_player_indicator(player.placement, None, Color::grey(0.8), ViewportItemFlags::empty());
 
 	viewport.build()
 }

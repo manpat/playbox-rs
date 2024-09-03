@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, Room, GlobalVertexId, GlobalWallId, WorldPosition};
+use model::{World, Room, GlobalVertexId, GlobalWallId, Placement};
 use super::{Item, State, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -233,13 +233,13 @@ impl<'c> Viewport<'c> {
 		}
 	}
 
-	pub fn add_player_indicator(&mut self, position: WorldPosition, yaw: f32, item: impl Into<Option<Item>>, color: impl Into<Color>, flags: ViewportItemFlags) {
+	pub fn add_player_indicator(&mut self, placement: Placement, item: impl Into<Option<Item>>, color: impl Into<Color>, flags: ViewportItemFlags) {
 		let transforms = self.items.iter()
-			.filter(|vpitem| vpitem.item == Some(Item::Room(position.room_index)))
+			.filter(|vpitem| vpitem.item == Some(Item::Room(placement.room_index)))
 			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
-		let base_player_transform = Mat2x3::rotate_translate(yaw, position.local_position);
+		let base_player_transform = Mat2x3::rotate_translate(placement.yaw, placement.position);
 		let item = item.into();
 		let color = color.into();
 

@@ -66,8 +66,7 @@ impl GameScene {
 
 			model: model::Model {
 				player: model::Player {
-					position: world.player_spawn_position,
-					yaw: world.player_spawn_yaw,
+					placement: world.player_spawn,
 					pitch: 0.0,
 
 					height: 0.5,
@@ -109,7 +108,7 @@ impl GameScene {
 
 		self.model.player.handle_input(ctx, &self.model.world);
 
-		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.model.player.yaw));
+		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.model.player.placement.yaw));
 		// self.update_interactive_objects(ctx);
 	}
 
@@ -122,7 +121,7 @@ impl GameScene {
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);
 		let projection_view = projection
 			* Mat4::rotate_x(player.pitch)
-			* Mat4::rotate_y(player.yaw)
+			* Mat4::rotate_y(player.placement.yaw)
 			* Mat4::translate(-player.free_pos-Vec3::from_y(player.height));
 
 		let inverse_projection = projection.inverse();
@@ -134,7 +133,7 @@ impl GameScene {
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 		main_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
-		self.world_view.draw(gfx, &mut self.sprites, &self.model.world, player.position, player.hack_height_change);
+		self.world_view.draw(gfx, &mut self.sprites, &self.model.world, player.placement, player.hack_height_change);
 
 		// self.toy_renderer.draw(gfx);
 		self.sprites.draw(gfx);

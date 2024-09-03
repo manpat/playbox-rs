@@ -13,11 +13,30 @@ pub struct Model {
 }
 
 
+
 #[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct WorldPosition {
+pub struct Location {
 	pub room_index: usize,
-	pub local_position: Vec2,
+	pub position: Vec2,
 }
+
+
+#[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct Placement {
+	pub room_index: usize,
+	pub position: Vec2,
+	pub yaw: f32,
+}
+
+impl Placement {
+	pub fn location(&self) -> Location {
+		Location {
+			room_index: self.room_index,
+			position: self.position,
+		}
+	}
+}
+
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GlobalWallId {
