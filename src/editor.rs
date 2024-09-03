@@ -238,6 +238,8 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		return
 	};
 
+	ui.spacing_mut().slider_width = 200.0;
+
 	ui.label(format!("Wall #{wall_index}"));
 
 	ui.horizontal(|ui| {

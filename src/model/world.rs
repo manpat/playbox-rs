@@ -180,7 +180,7 @@ impl World {
 
 
 // TODO(pat.m): would be good to move some of the below into a higher level model that can cache transforms, since
-// transforms between connected rooms will always be the same
+// transforms between connected rooms will always be the same.
 
 pub fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalWallId) -> Mat2x3 {
 	let from_room = &world.rooms[from.room_index];
@@ -220,115 +220,4 @@ pub fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalW
 		new_y,
 		translation,
 	])
-}
-
-
-pub fn try_move_by(world: &World, position: &mut WorldPosition, yaw: Option<&mut f32>, delta: Vec2) {
-	if delta.dot(delta) <= 0.00001 {
-		return;
-	}
-
-	// TODO(pat.m): limit movement by delta length to avoid teleporting
-
-	let mover_radius = 0.1;
-
-	let current_room = &world.rooms[position.room_index];
-	let mut desired_position = position.local_position + delta;
-
-	fn collide_vertex(desired_position: &mut Vec2, vertex: Vec2, radius: f32) {
-		let desired_delta = *desired_position - vertex;
-		let penetration = radius - desired_delta.length();
-		// TODO(pat.m): this should involve the incoming direction so that a large
-		// enough delta can't just pass through the vertex
-
-		if penetration > 0.0 {
-			let direction = desired_delta.normalize();
-			*desired_position += direction * penetration;
-		}
-	}
-
-	// Collide with room verts
-	for vertex in current_room.wall_vertices.iter() {
-		collide_vertex(&mut desired_position, *vertex, mover_radius);
-	}
-
-	// Collide with walls
-	for wall_index in 0..current_room.walls.len() {
-		let (wall_start, wall_end) = current_room.wall_vertices(wall_index);
-		let wall = &current_room.walls[wall_index];
-
-		let wall_direction = (wall_end - wall_start).normalize();
-		let wall_length = (wall_end - wall_start).length();
-
-		let desired_delta_wall_space = desired_position - wall_start;
-		let wall_penetration = wall_direction.wedge(desired_delta_wall_space);
-
-		// ASSUME: rooms are convex, and walls are specified in CCW order.
-
-		// Clockwise wedge product means desired position is on the 'inside'
-		if wall_penetration + mover_radius < 0.0 {
-			continue
-		}
-
-		// If the wall ends a long way away then don't continue
-		let distance_along_wall = wall_direction.dot(desired_delta_wall_space);
-		if distance_along_wall < 0.0 || distance_along_wall >= wall_length {
-			continue
-		}
-
-		// We have some kind of intersection here - figure out if we need to transition to another room
-		// or if we need to slide against the wall
-		let wall_id = GlobalWallId{room_index: position.room_index, wall_index};
-		if let Some(opposing_wall_id) = world.wall_target(wall_id) {
-			// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
-			// pass through.
-			let opposing_wall_length = {
-				let opposing_room = &world.rooms[opposing_wall_id.room_index];
-				let (wall_start, wall_end) = opposing_room.wall_vertices(opposing_wall_id.wall_index);
-				(wall_end - wall_start).length()
-			};
-
-			let aperture_extent = wall_length.min(opposing_wall_length) / 2.0;
-			let aperture_offset = wall.horizontal_offset.clamp(aperture_extent-wall_length/2.0, wall_length/2.0-aperture_extent);
-
-
-			let wall_center = wall_length/2.0 + aperture_offset;
-			let aperture_a = wall_start + (wall_center - aperture_extent) * wall_direction;
-			let aperture_b = wall_start + (wall_center + aperture_extent) * wall_direction;
-			let intersection_dist_from_center = (wall_center - distance_along_wall).abs();
-
-			// Collide with the virtual aperture verts
-			collide_vertex(&mut desired_position, aperture_a, mover_radius);
-			collide_vertex(&mut desired_position, aperture_b, mover_radius);
-
-			// If we're transitioning through the aperture then we need to transition to the opposing room.
-			// Otherwise just slide as normal.
-			if intersection_dist_from_center < aperture_extent {
-				if wall_penetration < 0.0 {
-					continue
-				}
-
-				let transform = calculate_portal_transform(world, opposing_wall_id, wall_id);
-
-				position.room_index = opposing_wall_id.room_index;
-				position.local_position = transform * desired_position;
-
-				// Apply yaw offset
-				if let Some(yaw) = yaw {
-					let row = transform.rows[0];
-					let angle_delta = row.y.atan2(row.x);
-					*yaw -= angle_delta;
-				}
-
-				// TODO(pat.m): collide with walls in opposing wall as well
-				return;
-			}
-		}
-
-		// Slide along wall
-		desired_position -= wall_direction.perp() * (wall_penetration + mover_radius);
-	}
-
-	// If we get here, no transitions have happened and desired_position has been adjusted to remove wall collisions
-	position.local_position = desired_position;
 }
