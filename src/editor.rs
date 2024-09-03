@@ -164,6 +164,8 @@ fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context
 }
 
 fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
+	ui.spacing_mut().slider_width = 200.0;
+
 	match ctx.state.selection {
 		None => {
 			ui.label("<select an item>");
@@ -210,7 +212,7 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Ceiling Height");
 
 		let mut height = room.height;
-		if ui.add(egui::widgets::Slider::new(&mut height, 0.6..=5.0).step_by(0.1).logarithmic(true))
+		if ui.add(egui::widgets::Slider::new(&mut height, 0.1..=5.0).step_by(0.01).logarithmic(true))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetCeilingHeight(room_index, height));
@@ -237,8 +239,6 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 	else {
 		return
 	};
-
-	ui.spacing_mut().slider_width = 200.0;
 
 	ui.label(format!("Wall #{wall_index}"));
 

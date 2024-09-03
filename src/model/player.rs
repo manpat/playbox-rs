@@ -176,9 +176,10 @@ fn try_move_by(world: &model::World, position: &mut WorldPosition, yaw: Option<&
 			collide_vertex(&mut desired_position, aperture_b, mover_radius);
 
 			let vertical_offset = wall.vertical_offset - opposing_wall.vertical_offset;
+			let aperture_height = (current_room.height - vertical_offset).min(opposing_room.height + vertical_offset);
 
 			// Target room must be tall enough and the step must not be too steep
-			let can_transition_to_opposing_room = mover_height < opposing_room.height
+			let can_transition_to_opposing_room = mover_height < aperture_height
 				&& vertical_offset.abs() < mover_height * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
 
 			// If we're transitioning through the aperture then we need to transition to the opposing room.
