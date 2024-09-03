@@ -127,7 +127,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
 					ui.menu_button("...", |ui| {
 						if ui.button("Focus Player").clicked() {
-							context.state.focused_room_index = model.player.position.room_index;
+							context.state.selection = Some(Item::Room(model.player.position.room_index));
 							// TODO(pat.m): recenter viewport
 							ui.close_menu();
 						}

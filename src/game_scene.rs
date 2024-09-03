@@ -74,6 +74,8 @@ impl GameScene {
 
 					free_pos: Vec3::zero(),
 					free_cam: false,
+
+					hack_height_change: None,
 				},
 				world,
 			},
@@ -132,7 +134,7 @@ impl GameScene {
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 		main_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
-		self.world_view.draw(gfx, &mut self.sprites, &self.model.world, player.position);
+		self.world_view.draw(gfx, &mut self.sprites, &self.model.world, player.position, player.hack_height_change);
 
 		// self.toy_renderer.draw(gfx);
 		self.sprites.draw(gfx);

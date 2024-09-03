@@ -11,6 +11,8 @@ pub struct WorldView {
 
 	message_bus: MessageBus,
 	change_subscription: Subscription<WorldChangedEvent>,
+
+	height_offset: f32,
 }
 
 impl WorldView {
@@ -43,10 +45,12 @@ impl WorldView {
 
 			change_subscription: message_bus.subscribe(),
 			message_bus,
+
+			height_offset: 0.0,
 		})
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System, _sprites: &mut super::Sprites, world: &World, world_position: WorldPosition) {
+	pub fn draw(&mut self, gfx: &mut gfx::System, _sprites: &mut super::Sprites, world: &World, world_position: WorldPosition, height_change: Option<f32>) {
 		// Draw room you're in
 		// then for each wall,
 		// 	check if it has a neighbouring room, and if so
@@ -77,6 +81,19 @@ impl WorldView {
 			gfx.core.upload_immutable_buffer_immediate(self.ebo, &room_builder.indices);
 		}
 
+		// TODO(pat.m): find another way to do this
+		if let Some(height_change) = height_change {
+			self.height_offset += height_change;
+		}
+
+		if self.height_offset.abs() > 0.02 {
+			self.height_offset -= self.height_offset.signum() * 0.02;
+
+		} else {
+			self.height_offset = 0.0;
+		}
+
+
 		let initial_transform = Mat2x3::rotate_translate(0.0, -world_position.local_position);
 
 		const MAX_DEPTH: i32 = 50;
@@ -92,7 +109,7 @@ impl WorldView {
 			Entry {
 				room_index: world_position.room_index,
 				transform: initial_transform,
-				height_offset: 0.0,
+				height_offset: self.height_offset,
 				clip_by: None,
 			}
 		];
