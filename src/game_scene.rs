@@ -70,6 +70,8 @@ impl GameScene {
 					yaw: world.player_spawn_yaw,
 					pitch: 0.0,
 
+					height: 0.5,
+
 					free_pos: Vec3::zero(),
 					free_cam: false,
 				},
@@ -119,7 +121,7 @@ impl GameScene {
 		let projection_view = projection
 			* Mat4::rotate_x(player.pitch)
 			* Mat4::rotate_y(player.yaw)
-			* Mat4::translate(-player.free_pos-Vec3::from_y(0.5));
+			* Mat4::translate(-player.free_pos-Vec3::from_y(player.height));
 
 		let inverse_projection = projection.inverse();
 

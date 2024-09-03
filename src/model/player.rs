@@ -6,6 +6,8 @@ pub struct Player {
 	pub yaw: f32,
 	pub pitch: f32,
 
+	pub height: f32,
+
 	pub free_pos: Vec3,
 	pub free_cam: bool,
 }
@@ -82,7 +84,7 @@ impl Player {
 				delta -= right * speed;
 			}
 
-			world.try_move_by(&mut self.position, Some(&mut self.yaw), delta);
+			model::try_move_by(world, &mut self.position, Some(&mut self.yaw), delta);
 		}
 	}
 }
