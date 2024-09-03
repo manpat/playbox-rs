@@ -42,7 +42,9 @@ struct MyAudioProvider {
 }
 
 impl audio::Provider for MyAudioProvider {
-	fn on_configuration_changed(&mut self, config: audio::Configuration) {
+	fn on_configuration_changed(&mut self, config: Option<audio::Configuration>) {
+		let Some(config) = config else { return };
+		
 		self.sample_dt = 1.0/config.sample_rate as f64;
 		assert!(config.channels == 2);
 	}
