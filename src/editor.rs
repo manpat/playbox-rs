@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use model::{Placement, GlobalVertexId, GlobalWallId};
+use model::{Placement, VertexId, WallId};
 
 mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
@@ -13,8 +13,8 @@ pub use commands::{handle_editor_cmds, EditorWorldEditCmd};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Item {
-	Vertex(GlobalVertexId),
-	Wall(GlobalWallId),
+	Vertex(VertexId),
+	Wall(WallId),
 	Room(usize),
 
 	PlayerSpawn,
@@ -24,14 +24,14 @@ impl Item {
 	fn room_index(&self, world: &model::World) -> usize {
 		match *self {
 			Item::Room(room_index) => room_index,
-			Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => room_index,
+			Item::Vertex(VertexId{room_index, ..}) | Item::Wall(WallId{room_index, ..}) => room_index,
 			Item::PlayerSpawn => world.player_spawn.room_index,
 		}
 	}
 
 	fn set_room_index(&mut self, new_room_index: usize) {
 		match self {
-			Item::Room(room_index) | Item::Vertex(GlobalVertexId{room_index, ..}) | Item::Wall(GlobalWallId{room_index, ..}) => {
+			Item::Room(room_index) | Item::Vertex(VertexId{room_index, ..}) | Item::Wall(WallId{room_index, ..}) => {
 				*room_index = new_room_index;
 			}
 
@@ -227,8 +227,8 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 	});
 }
 
-fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, wall_id: GlobalWallId) {
-	let GlobalWallId{room_index, wall_index} = wall_id;
+fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, wall_id: WallId) {
+	let WallId{room_index, wall_index} = wall_id;
 
 	let Some(wall) = model.world.rooms.get(room_index)
 		.and_then(|room| room.walls.get(wall_index))
@@ -285,7 +285,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 	let mut neighbouring_rooms = Vec::new();
 
 	for wall_index in 0..context.model.world.rooms[focused_room_index].walls.len() {
-		let src_wall_id = GlobalWallId{room_index: focused_room_index, wall_index};
+		let src_wall_id = WallId{room_index: focused_room_index, wall_index};
 		let Some(tgt_wall_id) = context.model.world.wall_target(src_wall_id)
 			else { continue };
 

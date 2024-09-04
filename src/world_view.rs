@@ -194,7 +194,7 @@ impl WorldView {
 					}
 				});
 
-			fn try_add_connection(room_stack: &mut Vec<Entry>, world: &World, current_wall_id: GlobalWallId, target_wall_id: GlobalWallId,
+			fn try_add_connection(room_stack: &mut Vec<Entry>, world: &World, current_wall_id: WallId, target_wall_id: WallId,
 				transform: &Mat2x3, clip_by: &Option<ClipState>, local_position: Vec2, height_offset: f32, depth: i32)
 			{
 				let local_position = clip_by.map_or(local_position, |c| c.local_position);
@@ -329,7 +329,7 @@ impl RoomMeshBuilder<'_> {
 
 		// Walls
 		for wall_index in 0..room.walls.len() {
-			let wall_id = GlobalWallId{room_index, wall_index};
+			let wall_id = WallId{room_index, wall_index};
 			let connection = self.world.wall_target(wall_id);
 
 			self.build_wall(wall_id, connection);
@@ -340,7 +340,7 @@ impl RoomMeshBuilder<'_> {
 		RoomMeshInfo {base_vertex: self.base_vertex, base_index, num_elements}
 	}
 
-	fn build_wall(&mut self, GlobalWallId{room_index, wall_index}: GlobalWallId, opposing_wall_id: Option<GlobalWallId>) {
+	fn build_wall(&mut self, WallId{room_index, wall_index}: WallId, opposing_wall_id: Option<WallId>) {
 		let room = &self.world.rooms[room_index];
 
 		let wall = &room.walls[wall_index];

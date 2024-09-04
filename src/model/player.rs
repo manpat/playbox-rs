@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, GlobalWallId};
+use model::{Placement, WallId};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
@@ -155,7 +155,7 @@ impl Player {
 
 			// We have some kind of intersection here - figure out if we need to transition to another room
 			// or if we need to slide against the wall
-			let wall_id = GlobalWallId{room_index: self.placement.room_index, wall_index};
+			let wall_id = WallId{room_index: self.placement.room_index, wall_index};
 			if let Some(opposing_wall_id) = world.wall_target(wall_id) {
 				// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
 				// pass through.

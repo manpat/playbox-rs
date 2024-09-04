@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{WorldChangedEvent, Room, GlobalVertexId, GlobalWallId};
+use model::{WorldChangedEvent, Room, VertexId, WallId};
 use super::*;
 
 
@@ -11,9 +11,9 @@ pub enum EditorWorldEditCmd {
 	SetCeilingHeight(usize, f32),
 	SetFloorColor(usize, Color),
 
-	SetWallColor(GlobalWallId, Color),
-	SetHorizontalWallOffset(GlobalWallId, f32),
-	SetVerticalWallOffset(GlobalWallId, f32),
+	SetWallColor(WallId, Color),
+	SetHorizontalWallOffset(WallId, f32),
+	SetVerticalWallOffset(WallId, f32),
 
 	SetFogParams(Color),
 
@@ -22,17 +22,17 @@ pub enum EditorWorldEditCmd {
 
 	AddRoom {
 		room: Room,
-		connection: Option<(usize, GlobalWallId)>,
+		connection: Option<(usize, WallId)>,
 	},
 
 	RemoveRoom(usize),
 	DisconnectRoom(usize),
 
-	ConnectWall(GlobalWallId, GlobalWallId),
-	DisconnectWall(GlobalWallId),
+	ConnectWall(WallId, WallId),
+	DisconnectWall(WallId),
 
-	SplitWall(GlobalWallId, Vec2),
-	DeleteVertex(GlobalVertexId),
+	SplitWall(WallId, Vec2),
+	DeleteVertex(VertexId),
 }
 
 
@@ -65,11 +65,11 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			};
 
 			match item {
-				Item::Vertex(GlobalVertexId {vertex_index, ..}) => {
+				Item::Vertex(VertexId {vertex_index, ..}) => {
 					room.wall_vertices[vertex_index] += delta;
 				}
 
-				Item::Wall(GlobalWallId {wall_index, ..}) => {
+				Item::Wall(WallId {wall_index, ..}) => {
 					let wall_count = room.wall_vertices.len();
 					room.wall_vertices[wall_index] += delta;
 					room.wall_vertices[(wall_index+1) % wall_count] += delta;
@@ -162,7 +162,7 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					wall_a != target_wall_id && wall_b != target_wall_id
 				});
 
-				let source_wall_id = GlobalWallId {
+				let source_wall_id = WallId {
 					room_index: new_room_index,
 					wall_index: source_wall_index,
 				};

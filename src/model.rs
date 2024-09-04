@@ -39,15 +39,15 @@ impl Placement {
 
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct GlobalWallId {
+pub struct WallId {
 	pub room_index: usize,
 	pub wall_index: usize,
 }
 
-impl GlobalWallId {
+impl WallId {
 	// Each vertex represents the start of a wall, so we can map between their Ids
-	pub fn to_vertex_id(&self) -> GlobalVertexId {
-		GlobalVertexId {
+	pub fn to_vertex_id(&self) -> VertexId {
+		VertexId {
 			room_index: self.room_index,
 			vertex_index: self.wall_index,
 		}
@@ -57,15 +57,15 @@ impl GlobalWallId {
 
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct GlobalVertexId {
+pub struct VertexId {
 	pub room_index: usize,
 	pub vertex_index: usize,
 }
 
-impl GlobalVertexId {
+impl VertexId {
 	// Each vertex represents the start of a wall, so we can map between their Ids
-	pub fn to_wall_id(&self) -> GlobalWallId {
-		GlobalWallId {
+	pub fn to_wall_id(&self) -> WallId {
+		WallId {
 			room_index: self.room_index,
 			wall_index: self.vertex_index,
 		}

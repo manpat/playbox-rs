@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, Room, GlobalVertexId, GlobalWallId, Placement};
+use model::{World, Room, VertexId, WallId, Placement};
 use super::{Item, State, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -161,7 +161,7 @@ impl<'c> Viewport<'c> {
 		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Vertex(room_to_world * *vertex),
-				item: Some(Item::Vertex(GlobalVertexId {room_index, vertex_index})),
+				item: Some(Item::Vertex(VertexId {room_index, vertex_index})),
 				color: Color::grey(0.5),
 				room_to_world,
 				flags: interaction_flags,
@@ -174,7 +174,7 @@ impl<'c> Viewport<'c> {
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
-				item: Some(Item::Wall(GlobalWallId {room_index, wall_index})),
+				item: Some(Item::Wall(WallId {room_index, wall_index})),
 				color: room.walls[wall_index].color,
 				room_to_world,
 				flags: wall_interaction_flags,
@@ -200,7 +200,7 @@ impl<'c> Viewport<'c> {
 		let interaction_flags = flags.intersection(ViewportItemFlags::CLICKABLE) & !ViewportItemFlags::CONNECTABLE;
 
 		for wall_index in 0..num_walls {
-			let src_wall_id = GlobalWallId{room_index, wall_index};
+			let src_wall_id = WallId{room_index, wall_index};
 
 			let Some(tgt_wall_id) = self.world.wall_target(src_wall_id) else {
 				continue
@@ -748,7 +748,7 @@ enum Operation {
 	},
 
 	ConnectWall {
-		source_wall: GlobalWallId,
+		source_wall: WallId,
 		room_to_world: Mat2x3,
 	},
 }

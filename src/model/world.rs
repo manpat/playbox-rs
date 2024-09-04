@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, GlobalVertexId, GlobalWallId};
+use model::{Placement, VertexId, WallId};
 
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
@@ -10,9 +10,8 @@ pub struct WorldChangedEvent;
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
 	pub rooms: Vec<Room>,
-	pub connections: Vec<(GlobalWallId, GlobalWallId)>,
+	pub connections: Vec<(WallId, WallId)>,
 
-	#[serde(default)]
 	pub player_spawn: Placement,
 	
 	pub fog_color: Color,
@@ -34,31 +33,31 @@ impl World {
 		}
 	}
 
-	pub fn vertex(&self, vertex_id: GlobalVertexId) -> Vec2 {
+	pub fn vertex(&self, vertex_id: VertexId) -> Vec2 {
 		self.rooms[vertex_id.room_index]
 			.wall_vertices[vertex_id.vertex_index]
 	}
 
-	pub fn wall_vertices(&self, wall_id: GlobalWallId) -> (Vec2, Vec2) {
+	pub fn wall_vertices(&self, wall_id: WallId) -> (Vec2, Vec2) {
 		self.rooms[wall_id.room_index]
 			.wall_vertices(wall_id.wall_index)
 	}
 
-	pub fn wall_center(&self, wall_id: GlobalWallId) -> Vec2 {
+	pub fn wall_center(&self, wall_id: WallId) -> Vec2 {
 		let (start, end) = self.wall_vertices(wall_id);
 		(start + end) / 2.0
 	}
 
-	pub fn wall_vector(&self, wall_id: GlobalWallId) -> Vec2 {
+	pub fn wall_vector(&self, wall_id: WallId) -> Vec2 {
 		let (start, end) = self.wall_vertices(wall_id);
 		end - start
 	}
 
-	pub fn wall_length(&self, wall_id: GlobalWallId) -> f32 {
+	pub fn wall_length(&self, wall_id: WallId) -> f32 {
 		self.wall_vector(wall_id).length()
 	}
 
-	pub fn wall_target(&self, wall_id: GlobalWallId) -> Option<GlobalWallId> {
+	pub fn wall_target(&self, wall_id: WallId) -> Option<WallId> {
 		self.connections.iter()
 			.find_map(|&(a, b)| {
 				if a == wall_id {
@@ -71,17 +70,17 @@ impl World {
 			})
 	}
 
-	pub fn next_wall(&self, wall_id: GlobalWallId) -> GlobalWallId {
+	pub fn next_wall(&self, wall_id: WallId) -> WallId {
 		let num_walls = self.rooms[wall_id.room_index].walls.len();
-		GlobalWallId {
+		WallId {
 			room_index: wall_id.room_index,
 			wall_index: (wall_id.wall_index + 1) % num_walls,
 		}
 	}
 
-	pub fn prev_wall(&self, wall_id: GlobalWallId) -> GlobalWallId {
+	pub fn prev_wall(&self, wall_id: WallId) -> WallId {
 		let num_walls = self.rooms[wall_id.room_index].walls.len();
-		GlobalWallId {
+		WallId {
 			room_index: wall_id.room_index,
 			wall_index: (wall_id.wall_index + num_walls - 1) % num_walls,
 		}
@@ -178,7 +177,7 @@ impl World {
 // TODO(pat.m): would be good to move some of the below into a higher level model that can cache transforms, since
 // transforms between connected rooms will always be the same.
 
-pub fn calculate_portal_transform(world: &World, from: GlobalWallId, to: GlobalWallId) -> Mat2x3 {
+pub fn calculate_portal_transform(world: &World, from: WallId, to: WallId) -> Mat2x3 {
 	let from_room = &world.rooms[from.room_index];
 	let to_room = &world.rooms[to.room_index];
 
