@@ -1244,6 +1244,7 @@
       }
     ]
   ],
+  "objects": [],
   "player_spawn": {
     "room_index": 7,
     "position": [

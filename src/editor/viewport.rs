@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, Room, VertexId, WallId, Placement};
+use model::{World, Room, VertexId, WallId, Placement, Location};
 use super::{Item, State, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -106,6 +106,8 @@ pub struct Viewport<'c> {
 	viewport_state: ViewportState,
 	viewport_metrics: ViewportMetrics,
 
+	tracked_location: Option<Location>,
+
 	world: &'c World,
 	message_bus: &'c MessageBus,
 
@@ -127,6 +129,12 @@ impl<'c> Viewport<'c> {
 				hovered_item_transform: Mat2x3::identity(),
 			});
 
+		let mut tracked_location = None;
+
+		if context.state.track_player {
+			tracked_location = Some(context.model.player.placement.location());
+		}
+
 		let viewport_metrics = ViewportMetrics::new(response.rect, &viewport_state);
 
 		Self {
@@ -138,8 +146,11 @@ impl<'c> Viewport<'c> {
 			viewport_state,
 			viewport_metrics,
 
+			tracked_location,
+
 			world: &context.model.world,
 			message_bus: context.message_bus,
+
 			items: Vec::new(),
 		}
 	}
@@ -328,8 +339,17 @@ impl Viewport<'_> {
 	}
 
 	fn handle_camera(&mut self) {
+		// Pan to tracked location
+		if let Some(Location{room_index, position}) = self.tracked_location
+			&& let Some(vpitem) = self.items.iter()
+				.find(|vpitem| vpitem.item == Some(Item::Room(room_index)))
+		{
+			self.viewport_state.camera_pivot = vpitem.room_to_world * position;
+			self.viewport_metrics.update(&self.viewport_state);
+		}
+
 		// Pan
-		if self.response.dragged_by(egui::PointerButton::Middle) {
+		if self.tracked_location.is_none() && self.response.dragged_by(egui::PointerButton::Middle) {
 			self.viewport_state.camera_pivot -= self.viewport_metrics.widget_to_world_delta(self.response.drag_delta());
 			self.viewport_metrics.update(&self.viewport_state);
 		}

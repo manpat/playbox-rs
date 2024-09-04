@@ -8,8 +8,42 @@ pub use player::*;
 
 #[derive(Debug)]
 pub struct Model {
+	// Immutable - loaded from resources
 	pub world: World,
+
+	// TODO(pat.m): dialog model?
+
+	// Mutable - save game state
+
 	pub player: Player,
+	pub inventory: Inventory,
+
+	// TODO(pat.m): active effects/stats/equipment
+	// TODO(pat.m): general behaviours - spell casting/attacks/etc
+
+
+	// Keeps track of progression. what doors unlocked, items gathered, etc
+	pub progress: ProgressModel,
+
+	// Mutable - runtime state, generated from above on load
+
+	// Caches info about World in faster to access way.
+	// 	- graph of connections for path finding, traversal
+	//  	- + easy distance calculations
+	//  - active state of objects - e.g., collected items removed, doors opened/closed
+	// 	- active state of rooms/walls - if they can ever be enabled/disabled, heights changed, etc
+	//  - fast enumeration of items in a room for rendering
+	pub processed_world: ProcessedWorld,
+
+	// Keeps track of what kind of interactions are available, where, and responsible for triggering effects.
+	// Derived from ProcessedWorld - interacts with Hud and Player
+	pub interactions: InteractionModel,
+
+	// Keeps track of state of environmental effects - fog settings, reverb settings, active particle effects etc
+	pub environment: EnvironmentModel,
+
+	// Everything to do with hud ui - active dialog info, stats display, interactability feedback.
+	pub hud: HudModel,
 }
 
 
@@ -71,3 +105,11 @@ impl VertexId {
 		}
 	}
 }
+
+
+#[derive(Debug)] pub struct Inventory;
+#[derive(Debug)] pub struct ProgressModel;
+#[derive(Debug)] pub struct ProcessedWorld;
+#[derive(Debug)] pub struct InteractionModel;
+#[derive(Debug)] pub struct EnvironmentModel;
+#[derive(Debug)] pub struct HudModel;

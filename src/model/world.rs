@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use model::{Placement, VertexId, WallId};
 
+mod object;
+pub use object::*;
+
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
 
@@ -9,11 +12,18 @@ pub struct WorldChangedEvent;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
+	// TODO(pat.m): name
+
+	// Describes world layout
 	pub rooms: Vec<Room>,
 	pub connections: Vec<(WallId, WallId)>,
 
+	pub objects: Vec<Object>,
+
 	pub player_spawn: Placement,
 	
+	// TODO(pat.m): split out into 'environment settings'
+	// TODO(pat.m): can this be specified per room?
 	pub fog_color: Color,
 }
 
@@ -22,6 +32,8 @@ impl World {
 		World {
 			rooms: vec![Room::new_square(2.0)],
 			connections: vec![],
+
+			objects: vec![],
 
 			player_spawn: Placement {
 				room_index: 0,

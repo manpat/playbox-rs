@@ -47,6 +47,7 @@ pub struct State {
 	selection: Option<Item>,
 
 	focused_room_index: usize,
+	track_player: bool,
 
 	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 }
@@ -58,6 +59,7 @@ impl State {
 			selection: None,
 
 			focused_room_index: 0,
+			track_player: true,
 
 			editor_world_edit_cmd_sub: message_bus.subscribe(),
 		}
@@ -77,40 +79,11 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 		message_bus,
 	};
 
-	egui::Window::new("World Settings")
-		.show(ctx, |ui| {
-			ui.horizontal(|ui| {
-				ui.label("Fog Color");
-
-				let mut fog_color = model.world.fog_color;
-				if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
-					message_bus.emit(EditorWorldEditCmd::SetFogParams(fog_color));
-				}
-			});
-
-			ui.horizontal(|ui| {
-				ui.label("Spawn");
-
-				let Placement{ room_index, position: Vec2{x, y}, yaw } = model.world.player_spawn;
-				ui.label(format!("Room #{room_index} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
-
-				if ui.button("Set Here").clicked() {
-					message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn);
-				}
-			});
-		});
-
 	egui::Window::new("All Rooms")
 		.show(ctx, |ui| {
-			// ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
-			// 	ui.menu_button("...", |ui| {
-			// 		if ui.button("Center Player").clicked() {
-			// 			// context.state.focused_room_index = model.player.placement.room_index;
-			// 			// TODO(pat.m): some viewport shit
-			// 			ui.close_menu();
-			// 		}
-			// 	});
-			// });
+			ui.horizontal(|ui| {
+				ui.checkbox(&mut context.state.track_player, "Track Player");
+			});
 
 			draw_all_room_viewport(ui, &mut context);
 		});
@@ -134,8 +107,14 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 			draw_focused_room_viewport(ui, &mut context);
 		});
 
-	egui::Window::new("Inspector")
+	egui::SidePanel::right("Inspector")
 		.show(ctx, |ui| {
+			ui.heading("World Settings");
+			draw_world_settings(ui, &mut context);
+
+			ui.separator();
+
+			ui.heading("Inspector");
 			draw_item_inspector(ui, &mut context);
 		});
 
@@ -145,16 +124,24 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 	// 	});
 }
 
+fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
+	ui.horizontal(|ui| {
+		ui.label("Player Spawn");
 
-fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context) {
-	let selected_room_index = state.selection.as_ref().map_or(state.focused_room_index, |item| item.room_index(&model.world));
+		let Placement{ room_index, position: Vec2{x, y}, yaw } = ctx.model.world.player_spawn;
+		ui.label(format!("Room #{room_index} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
+
+		if ui.button("Set Here").clicked() {
+			ctx.message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn);
+		}
+	});
 
 	ui.horizontal(|ui| {
-		for (room_index, _room) in model.world.rooms.iter().enumerate() {
-			let selected = room_index == selected_room_index;
-			if ui.selectable_label(selected, format!("{room_index}")).clicked() {
-				state.selection = Some(Item::Room(room_index));
-			}
+		ui.label("Fog Color");
+
+		let mut fog_color = ctx.model.world.fog_color;
+		if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
+			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog_color));
 		}
 	});
 }
@@ -276,9 +263,26 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 const PLAYER_SPAWN_COLOR: Color = Color::rgb(1.0, 0.3, 0.1);
 
 
+fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context) {
+	let selected_room_index = state.selection.as_ref().map_or(state.focused_room_index, |item| item.room_index(&model.world));
+
+	ui.horizontal(|ui| {
+		for (room_index, _room) in model.world.rooms.iter().enumerate() {
+			let selected = room_index == selected_room_index;
+			if ui.selectable_label(selected, format!("{room_index}")).clicked() {
+				state.selection = Some(Item::Room(room_index));
+			}
+		}
+	});
+}
+
+
 fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
-	let focused_room_index = context.state.selection.as_ref()
-		.map_or(context.state.focused_room_index, |item| item.room_index(&context.model.world));
+	let focused_room_index = match (context.state.track_player, &context.state.selection) {
+		(true, _) => context.model.player.placement.room_index,
+		(false, Some(item)) => item.room_index(&context.model.world),
+		(false, None) => context.state.focused_room_index,
+	};
 
 	let neighbouring_room_margin = 0.3;
 

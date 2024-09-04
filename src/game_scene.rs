@@ -77,6 +77,13 @@ impl GameScene {
 					hack_height_change: None,
 				},
 				world,
+
+				inventory: model::Inventory,
+				progress: model::ProgressModel,
+				processed_world: model::ProcessedWorld,
+				interactions: model::InteractionModel,
+				environment: model::EnvironmentModel,
+				hud: model::HudModel,
 			},
 
 			time: 0.0,

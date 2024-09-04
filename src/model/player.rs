@@ -5,6 +5,7 @@ use model::{Placement, WallId};
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
 pub const PLAYER_RADIUS: f32 = 0.1;
 
+// TODO(pat.m): maybe this should just be 'camera'? only some of this should be serialized
 #[derive(Debug)]
 pub struct Player {
 	pub placement: Placement,
@@ -12,6 +13,7 @@ pub struct Player {
 
 	pub height: f32,
 
+	// TODO(pat.m): these should be separate to player
 	pub free_pos: Vec3,
 	pub free_cam: bool,
 
