@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{WorldChangedEvent, Room, VertexId, WallId};
+use model::{WorldChangedEvent, Room, Object, VertexId, WallId};
 use super::*;
 
 
@@ -33,6 +33,10 @@ pub enum EditorWorldEditCmd {
 
 	SplitWall(WallId, Vec2),
 	DeleteVertex(VertexId),
+
+
+	AddObject(Object),
+	RemoveObject(usize),
 }
 
 
@@ -79,6 +83,10 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					for vertex in room.wall_vertices.iter_mut() {
 						*vertex += delta;
 					}
+				}
+
+				Item::Object(_) => {
+					todo!()
 				}
 
 				Item::PlayerSpawn => {
@@ -308,6 +316,15 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					wall_b.wall_index -= 1;
 				}
 			}
+		}
+
+
+		EditorWorldEditCmd::AddObject(object) => {
+			model.world.objects.push(object);
+		}
+
+		EditorWorldEditCmd::RemoveObject(_object_index) => {
+			todo!()
 		}
 	}
 

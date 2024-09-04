@@ -1244,7 +1244,20 @@
       }
     ]
   ],
-  "objects": [],
+  "objects": [
+    {
+      "name": "Debug Object",
+      "room_index": 7,
+      "position": [
+        -0.17372485,
+        -0.13001843
+      ],
+      "yaw": 2.6829772,
+      "info": {
+        "kind": "Debug"
+      }
+    }
+  ],
   "player_spawn": {
     "room_index": 7,
     "position": [

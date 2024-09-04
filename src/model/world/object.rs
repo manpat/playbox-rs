@@ -10,8 +10,7 @@ pub struct Object {
 	#[serde(flatten)]
 	pub placement: Placement,
 
-	#[serde(flatten)]
-	pub kind: ObjectInfo,
+	pub info: ObjectInfo,
 
 	// appearance
 	// interactions
@@ -28,7 +27,10 @@ pub struct Object {
 
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind")]
 pub enum ObjectInfo {
+	Debug,
+
 	Ladder {
 		target_world: String,
 		target_object: String,

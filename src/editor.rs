@@ -18,6 +18,7 @@ pub enum Item {
 	Room(usize),
 
 	PlayerSpawn,
+	Object(usize),
 }
 
 impl Item {
@@ -26,6 +27,8 @@ impl Item {
 			Item::Room(room_index) => room_index,
 			Item::Vertex(VertexId{room_index, ..}) | Item::Wall(WallId{room_index, ..}) => room_index,
 			Item::PlayerSpawn => world.player_spawn.room_index,
+			Item::Object(object_index) => world.objects.get(object_index)
+				.map_or(0, |obj| obj.placement.room_index),
 		}
 	}
 
@@ -114,6 +117,11 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 
 			ui.separator();
 
+			ui.heading("Objects");
+			draw_object_list(ui, &mut context);
+
+			ui.separator();
+
 			ui.heading("Inspector");
 			draw_item_inspector(ui, &mut context);
 		});
@@ -144,6 +152,35 @@ fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
 			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog_color));
 		}
 	});
+}
+
+fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
+	ui.horizontal(|ui| {
+		if ui.button("Debug").clicked() {
+			let object = model::Object {
+				name: "Debug Object".to_string(),
+				placement: ctx.model.player.placement,
+				info: model::ObjectInfo::Debug,
+			};
+
+			ctx.message_bus.emit(EditorWorldEditCmd::AddObject(object));
+		}
+	});
+
+	egui::ScrollArea::vertical()
+		.show(ui, |ui| {
+			for (object_index, object) in ctx.model.world.objects.iter().enumerate() {
+				let is_selected = ctx.state.selection == Some(Item::Object(object_index));
+				let response = ui.selectable_label(is_selected, match object.name.is_empty() {
+					true => "<no name>",
+					false => object.name.as_str(),
+				});
+
+				if response.clicked() {
+					ctx.state.selection = Some(Item::Object(object_index));
+				}
+			}
+		});
 }
 
 fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
