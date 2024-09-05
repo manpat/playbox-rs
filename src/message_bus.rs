@@ -4,6 +4,10 @@ use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::marker::PhantomData;
 
+#[cfg(test)]
+mod test;
+
+
 #[derive(Clone)]
 pub struct MessageBus {
 	inner: Rc<MessageBusInner>,
