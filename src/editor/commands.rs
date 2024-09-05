@@ -17,8 +17,6 @@ pub enum EditorWorldEditCmd {
 
 	SetFogParams(Color),
 
-	SetPlayerSpawn,
-
 
 	AddRoom {
 		room: Room,
@@ -35,25 +33,59 @@ pub enum EditorWorldEditCmd {
 	DeleteVertex(VertexId),
 
 
+	// TODO(pat.m): could be an object
+	SetPlayerSpawn,
+
 	AddObject(Object),
 	RemoveObject(usize),
 }
 
 
+#[derive(Copy, Clone, Debug)]
+pub enum UndoCmd {
+	Undo,
+	Redo,
+	SetIndex(usize),
+}
+
+
 pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_bus: &MessageBus) {
+	// Handle undo/redo
+	for cmd in message_bus.poll_consume(&state.undo_cmd_sub) {
+		if let Err(err) = handle_undo_cmd(&mut state.undo_stack, model, cmd) {
+			log::error!("{cmd:?} failed: {err}");
+		}
+	}
+
+	// Handle editor commands
 	let messages_available = message_bus.messages_available(&state.editor_world_edit_cmd_sub);
 
 	for cmd in message_bus.poll_consume(&state.editor_world_edit_cmd_sub) {
 		if let Err(err) = handle_world_edit_cmd(state, model, cmd) {
 			log::error!("Editor command failed: {err}");
 		}
+
+		// Enable after the first command, so that all commands within a frame that can be merged are merged
+		state.undo_stack.set_merging_enabled(true);
 	}
+
+	// state.undo_stack.set_merging_enabled(false);
 
 	if messages_available {
 		message_bus.emit(WorldChangedEvent);
 	}
 }
 
+
+fn handle_undo_cmd(undo_stack: &mut UndoStack, model: &mut model::Model, cmd: UndoCmd) -> anyhow::Result<()> {
+	match cmd {
+		UndoCmd::Undo => undo_stack.undo(model),
+		UndoCmd::Redo => undo_stack.redo(model),
+		UndoCmd::SetIndex(index) => undo_stack.set_index(model, index),
+	}
+
+	Ok(())
+}
 
 fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: EditorWorldEditCmd) -> anyhow::Result<()> {
 	if !matches!(cmd, EditorWorldEditCmd::TranslateItem(..)) {
@@ -70,19 +102,28 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 			match item {
 				Item::Vertex(VertexId {vertex_index, ..}) => {
+					let before = room.clone();
 					room.wall_vertices[vertex_index] += delta;
+
+					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 				}
 
 				Item::Wall(WallId {wall_index, ..}) => {
+					let before = room.clone();
 					let wall_count = room.wall_vertices.len();
 					room.wall_vertices[wall_index] += delta;
 					room.wall_vertices[(wall_index+1) % wall_count] += delta;
+
+					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 				}
 
 				Item::Room(_) => {
+					let before = room.clone();
 					for vertex in room.wall_vertices.iter_mut() {
 						*vertex += delta;
 					}
+
+					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 				}
 
 				Item::Object(_) => {
@@ -97,7 +138,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 		EditorWorldEditCmd::SetCeilingColor(room_index, color) => {
 			if let Some(room) = model.world.rooms.get_mut(room_index) {
+				let before = room.clone();
 				room.ceiling_color = color;
+				state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 			} else {
 				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			}
@@ -105,7 +148,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 		EditorWorldEditCmd::SetCeilingHeight(room_index, height) => {
 			if let Some(room) = model.world.rooms.get_mut(room_index) {
+				let before = room.clone();
 				room.height = height;
+				state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 			} else {
 				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			}
@@ -113,7 +158,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 		EditorWorldEditCmd::SetFloorColor(room_index, color) => {
 			if let Some(room) = model.world.rooms.get_mut(room_index) {
+				let before = room.clone();
 				room.floor_color = color;
+				state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 			} else {
 				anyhow::bail!("Trying to edit non-existent room #{room_index}");
 			}
@@ -123,7 +170,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
 				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
 			{
+				let before = wall.clone();
 				wall.color = color;
+				state.undo_stack.push(UndoEntry::UpdateWall {wall_id, before, after: wall.clone()});
 			} else {
 				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
 			}
@@ -133,7 +182,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
 				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
 			{
+				let before = wall.clone();
 				wall.horizontal_offset = offset;
+				state.undo_stack.push(UndoEntry::UpdateWall {wall_id, before, after: wall.clone()});
 			} else {
 				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
 			}
@@ -143,7 +194,9 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
 				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
 			{
+				let before = wall.clone();
 				wall.vertical_offset = offset;
+				state.undo_stack.push(UndoEntry::UpdateWall {wall_id, before, after: wall.clone()});
 			} else {
 				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
 			}
@@ -203,20 +256,20 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			}
 
 			// Clear or adjust selection
-			if let Some(selected_item) = &mut state.selection {
+			if let Some(selected_item) = &mut state.inner.selection {
 				// TODO(pat.m): this doesn't really make sense for player spawn
 				let selected_room_index = selected_item.room_index(&model.world);
 
 				if selected_room_index > room_index {
 					selected_item.set_room_index(selected_room_index.saturating_sub(1));
 				} else if selected_room_index == room_index {
-					state.selection = None;
+					state.inner.selection = None;
 				}
 			}
 
 			// Update focused room
-			if state.focused_room_index >= room_index {
-				state.focused_room_index = state.focused_room_index.saturating_sub(1);
+			if state.inner.focused_room_index >= room_index {
+				state.inner.focused_room_index = state.inner.focused_room_index.saturating_sub(1);
 			}
 
 			// Remove connections to deleted room

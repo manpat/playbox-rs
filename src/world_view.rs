@@ -52,7 +52,7 @@ impl WorldView {
 		// 	check if it has a neighbouring room, and if so
 		// 	calculate transform between connected walls, and build that room,
 		// 	using wall intersection to calculate a frustum to cull by
-		if !self.message_bus.poll(&self.change_subscription).is_empty() {
+		if !self.message_bus.poll_consume(&self.change_subscription).all(|_| true) {
 			let mut room_builder = RoomMeshBuilder::new(world);
 
 			self.room_mesh_infos.clear();

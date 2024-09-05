@@ -21,7 +21,7 @@ impl MessageBus {
 
 		let current_message_count = self.inner.message_queues.borrow()
 			.get(&type_id)
-			.map_or(0, |queue| queue.current_message_count());
+			.map_or(0, |queue| queue.borrow().current_message_count());
 
 		let subscription_inner = Rc::new(SubscriptionInner {
 			// Make sure this subscription doesn't see any messages already in the queue
@@ -47,47 +47,47 @@ impl MessageBus {
 
 		self.inner.message_queues.borrow()
 			.get(&type_id)
-			.map_or(false, |queue| next_unread_message_index < queue.current_message_count())
+			.map_or(false, |queue| next_unread_message_index < queue.borrow().current_message_count())
 	}
 
-	pub fn poll<T: 'static>(&self, subscription: &Subscription<T>) -> Ref<'_, [T]> {
-		let type_id = TypeId::of::<T>();
-		let next_unread_message_index = subscription.inner.next_unread_message_index.get();
+	// pub fn poll<T: 'static>(&self, subscription: &Subscription<T>) -> Ref<'_, [T]> {
+	// 	let type_id = TypeId::of::<T>();
+	// 	let next_unread_message_index = subscription.inner.next_unread_message_index.get();
 
-		Ref::map(self.inner.message_queues.borrow(), move |message_queues| {
-			message_queues.get(&type_id)
-				.map(|queue| {
-					let queue = queue.to_concrete();
-
-					subscription.inner.next_unread_message_index.set(queue.messages.len());
-					&queue.messages[next_unread_message_index..]
-				})
-				.unwrap_or(&[])
-		})
-	}
+	// 	Ref::map(self.inner.message_queues.borrow(), move |message_queues| {
+	// 		message_queues.get(&type_id)
+	// 			.map(|queue| {
+	// 				let queue = queue.borrow();
+	// 				subscription.inner.next_unread_message_index.set(queue.current_message_count());
+	// 				&queue.to_concrete().messages[next_unread_message_index..]
+	// 			})
+	// 			.unwrap_or(&[])
+	// 	})
+	// }
 
 	pub fn poll_consume<T: 'static>(&self, subscription: &Subscription<T>) -> impl Iterator<Item=T> + '_ {
 		let type_id = TypeId::of::<T>();
 
-		let mut message_queues = self.inner.message_queues.borrow_mut();
+		let message_queues = self.inner.message_queues.borrow();
 
 		let subscription_inner = subscription.inner.clone();
 
 		std::iter::from_fn(move || {
 			let next_unread_message_index = subscription_inner.next_unread_message_index.get();
 
-			let messages = message_queues.get_mut(&type_id)
-				.map(|queue| &mut queue.to_concrete_mut().messages);
+			let Some(message_queue) = message_queues.get(&type_id) else {
+				return None;
+			};
 
-			if let Some(messages) = messages
-				&& next_unread_message_index < messages.len()
-			{
-				// No need to adjust next_unread_message_index since `remove` will shift every later message down.
-				Some(messages.remove(next_unread_message_index))
+			let mut message_queue = message_queue.borrow_mut();
+			if next_unread_message_index >= message_queue.current_message_count() {
+				return None;
 			}
-			else {
-				None
-			}
+
+			let typed_messages = &mut message_queue.to_concrete_mut().messages;
+
+			// No need to adjust next_unread_message_index since `remove` will shift every later message down.
+			Some(typed_messages.remove(next_unread_message_index))
 		})
 	}
 
@@ -95,27 +95,35 @@ impl MessageBus {
 	pub fn emit<T: 'static>(&self, message: T) {
 		let type_id = TypeId::of::<T>();
 
-		let mut message_queues = self.inner.message_queues.borrow_mut();
-		let message_queue = message_queues.entry(type_id)
-			.or_insert_with(|| Box::new(TypedMessageQueue::<T>::default()));
+		// Eager borrow to ensure message queue exists
+		let mut message_queues = self.inner.message_queues.borrow();
+		if !message_queues.contains_key(&type_id) {
+			drop(message_queues);
 
+			self.inner.message_queues.borrow_mut()
+				.insert(type_id, RefCell::new(Box::new(TypedMessageQueue::<T>::default())));
+
+			message_queues = self.inner.message_queues.borrow();
+		}
+
+		let mut message_queue = message_queues[&type_id].borrow_mut();
 		message_queue.to_concrete_mut().messages.push(message);
 	}
 
 	pub fn garbage_collect(&self) {
-		let mut message_queues = self.inner.message_queues.borrow_mut();
+		let message_queues = self.inner.message_queues.borrow();
 		let mut subscription_lists = self.inner.subscription_lists.borrow_mut();
 
-		for (type_id, queue) in message_queues.iter_mut() {
+		for (type_id, queue) in message_queues.iter() {
 			let subscription_list = subscription_lists.get_mut(&type_id);
-			queue.garbage_collect(subscription_list);
+			queue.borrow_mut().garbage_collect(subscription_list);
 		}
 	}
 }
 
 #[derive(Default)]
 struct MessageBusInner {
-	message_queues: RefCell<HashMap<TypeId, Box<dyn MessageQueue>>>,
+	message_queues: RefCell<HashMap<TypeId, RefCell<Box<dyn MessageQueue>>>>,
 	subscription_lists: RefCell<HashMap<TypeId, SubscriptionList>>,
 }
 
@@ -213,5 +221,11 @@ struct SubscriptionList {
 impl<T: 'static> std::fmt::Debug for Subscription<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "Subscription({})", std::any::type_name::<T>())
+	}
+}
+
+impl std::fmt::Debug for MessageBus {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "MessageBus{{...}}")
 	}
 }

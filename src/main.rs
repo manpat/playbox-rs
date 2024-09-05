@@ -151,7 +151,7 @@ impl toybox::App for App {
 			}
 		}
 
-		for menu_msg in self.message_bus.poll(&self.menu_cmd_subscription).iter() {
+		for menu_msg in self.message_bus.poll_consume(&self.menu_cmd_subscription) {
 			match menu_msg {
 				MenuCmd::Play(..) => {
 					let world = Self::load_world_or_default(ctx.vfs.resource_path("worlds/default.world"));

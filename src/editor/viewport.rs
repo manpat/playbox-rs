@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use model::{World, Room, VertexId, WallId, Placement, Location};
-use super::{Item, State, Context, EditorWorldEditCmd};
+use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
 enum ViewportItemShape {
@@ -102,7 +102,7 @@ pub struct Viewport<'c> {
 	painter: egui::Painter,
 	response: egui::Response,
 
-	editor_state: &'c mut State,
+	editor_state: &'c mut InnerState,
 	viewport_state: ViewportState,
 	viewport_metrics: ViewportMetrics,
 

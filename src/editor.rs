@@ -8,6 +8,9 @@ use viewport::{Viewport, ViewportItemFlags};
 mod commands;
 use commands::*;
 
+mod undo;
+use undo::*;
+
 pub use commands::{handle_editor_cmds, EditorWorldEditCmd};
 
 
@@ -46,38 +49,49 @@ impl Item {
 
 #[derive(Debug)]
 pub struct State {
+	inner: InnerState,
+	undo_stack: UndoStack,
+
+	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
+	undo_cmd_sub: Subscription<UndoCmd>,
+}
+
+#[derive(Debug)]
+struct InnerState {
 	hovered: Option<Item>,
 	selection: Option<Item>,
 
 	focused_room_index: usize,
 	track_player: bool,
-
-	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 }
 
 impl State {
 	pub fn new(message_bus: &MessageBus) -> Self {
 		State {
-			hovered: None,
-			selection: None,
+			inner: InnerState {
+				hovered: None,
+				selection: None,
 
-			focused_room_index: 0,
-			track_player: true,
+				focused_room_index: 0,
+				track_player: true,
+			},
 
+			undo_stack: UndoStack::new(message_bus.clone()),
 			editor_world_edit_cmd_sub: message_bus.subscribe(),
+			undo_cmd_sub: message_bus.subscribe(),
 		}
 	}
 }
 
 struct Context<'w> {
-	state: &'w mut State,
+	state: &'w mut InnerState,
 	model: &'w model::Model,
 	message_bus: &'w MessageBus,
 }
 
 pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
 	let mut context = Context {
-		state,
+		state: &mut state.inner,
 		model,
 		message_bus,
 	};
@@ -126,10 +140,36 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 			draw_item_inspector(ui, &mut context);
 		});
 
-	// egui::Window::new("Internal State")
-	// 	.show(ctx, |ui| {
-	// 		ui.label(format!("{state:#?}"));
-	// 	});
+	egui::Window::new("Undo Stack")
+		.show(ctx, |ui| {
+			ui.horizontal(|ui| {
+				if ui.button("Undo").clicked() {
+					context.message_bus.emit(UndoCmd::Undo);
+				}
+
+				ui.label(format!("{} / {}", state.undo_stack.index(), state.undo_stack.len()));
+
+				if ui.button("Redo").clicked() {
+					context.message_bus.emit(UndoCmd::Redo);
+				}
+			});
+
+			let text_style = egui::TextStyle::Body;
+			let row_height = ui.text_style_height(&text_style);
+
+			egui::ScrollArea::vertical()
+				.show_rows(ui, row_height, state.undo_stack.len(), |ui, range| {
+					for index in range {
+						if state.undo_stack.index() == index {
+							ui.separator();
+						}
+
+						ui.label(state.undo_stack.describe(index));
+					}
+				});
+
+			ui.label(format!("{:#?}", state.undo_stack));
+		});
 }
 
 fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
