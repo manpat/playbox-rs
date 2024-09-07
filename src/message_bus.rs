@@ -21,134 +21,217 @@ impl MessageBus {
 	}
 
 	pub fn subscribe<T: 'static>(&self) -> Subscription<T> {
-		let type_id = TypeId::of::<T>();
-
-		let current_message_count = self.inner.message_queues.borrow()
-			.get(&type_id)
-			.map_or(0, |queue| queue.borrow().current_message_count());
-
-		let subscription_inner = Rc::new(SubscriptionInner {
-			// Make sure this subscription doesn't see any messages already in the queue
-			next_unread_message_index: Cell::new(current_message_count),
-		});
-
-		let mut subscription_lists = self.inner.subscription_lists.borrow_mut();
-
-		let subscription_list = subscription_lists.entry(type_id)
-			.or_insert_with(Default::default);
-
-		subscription_list.subscribers.push(Rc::downgrade(&subscription_inner));
+		let store = self.inner.get_store::<T>();
 
 		Subscription {
-			inner: subscription_inner,
+			inner: store.new_subscriber(),
 			_phantom: PhantomData,
 		}
 	}
 
 	pub fn messages_available<T: 'static>(&self, subscription: &Subscription<T>) -> bool {
-		let type_id = TypeId::of::<T>();
 		let next_unread_message_index = subscription.inner.next_unread_message_index.get();
-
-		self.inner.message_queues.borrow()
-			.get(&type_id)
-			.map_or(false, |queue| next_unread_message_index < queue.borrow().current_message_count())
+		next_unread_message_index < self.inner.get_store::<T>().queued_message_count()
 	}
 
-	// pub fn poll<T: 'static>(&self, subscription: &Subscription<T>) -> Ref<'_, [T]> {
-	// 	let type_id = TypeId::of::<T>();
-	// 	let next_unread_message_index = subscription.inner.next_unread_message_index.get();
+	pub fn poll<T: Clone + 'static>(&self, subscription: &Subscription<T>) -> impl Iterator<Item=T> + '_ {
+		struct Iter<'s, T: Clone + 'static> {
+			subscription: Rc<SubscriptionInner>,
+			queue: *mut TypedMessageQueue<T>,
 
-	// 	Ref::map(self.inner.message_queues.borrow(), move |message_queues| {
-	// 		message_queues.get(&type_id)
-	// 			.map(|queue| {
-	// 				let queue = queue.borrow();
-	// 				subscription.inner.next_unread_message_index.set(queue.current_message_count());
-	// 				&queue.to_concrete().messages[next_unread_message_index..]
-	// 			})
-	// 			.unwrap_or(&[])
-	// 	})
-	// }
-
-	pub fn poll_consume<T: 'static>(&self, subscription: &Subscription<T>) -> impl Iterator<Item=T> + '_ {
-		let type_id = TypeId::of::<T>();
-
-		let message_queues = self.inner.message_queues.borrow();
-
-		let subscription_inner = subscription.inner.clone();
-
-		std::iter::from_fn(move || {
-			let next_unread_message_index = subscription_inner.next_unread_message_index.get();
-
-			let Some(message_queue) = message_queues.get(&type_id) else {
-				return None;
-			};
-
-			let mut message_queue = message_queue.borrow_mut();
-			if next_unread_message_index >= message_queue.current_message_count() {
-				return None;
-			}
-
-			let typed_messages = &mut message_queue.to_concrete_mut().messages;
-
-			// No need to adjust next_unread_message_index since `remove` will shift every later message down.
-			Some(typed_messages.remove(next_unread_message_index))
-		})
-	}
-
-	// TODO(pat.m): this will panic while polling
-	pub fn emit<T: 'static>(&self, message: T) {
-		let type_id = TypeId::of::<T>();
-
-		// Eager borrow to ensure message queue exists
-		let mut message_queues = self.inner.message_queues.borrow();
-		if !message_queues.contains_key(&type_id) {
-			drop(message_queues);
-
-			self.inner.message_queues.borrow_mut()
-				.insert(type_id, RefCell::new(Box::new(TypedMessageQueue::<T>::default())));
-
-			message_queues = self.inner.message_queues.borrow();
+			_lock: MessageQueuePollLock,
+			_phantom: PhantomData<&'s ()>,
 		}
 
-		let mut message_queue = message_queues[&type_id].borrow_mut();
-		message_queue.to_concrete_mut().messages.push(message);
+		impl<'s, T: Clone + 'static> Iterator for Iter<'s, T> {
+			// TODO(pat.m): this currently ties the lifetime of the Item to MessageBus, where what we _really_ want
+			// is to tie it to is the lifetime of the iterator.
+			type Item = T;
+
+			fn next(&mut self) -> Option<Self::Item> {
+				let next_unread_message_index = self.subscription.next_unread_message_index.get();
+
+				// SAFETY: There are only ever short lived references into messages, so this is guaranteed not to overlap.
+				let messages = unsafe { &(*self.queue).messages };
+
+				if let Some(message) = messages.get(next_unread_message_index) {
+					self.subscription.next_unread_message_index.set(next_unread_message_index + 1);
+					Some(message.clone())
+				} else {
+					None
+				}
+			}
+		}
+
+		let queue = self.inner.get_store::<T>().queue.cast::<TypedMessageQueue<T>>();
+
+		Iter {
+			subscription: subscription.inner.clone(),
+			queue,
+			_lock: MessageQueuePollLock::lock(queue),
+			_phantom: PhantomData,
+		}
+	}
+
+	pub fn poll_consume<T: 'static>(&self, subscription: &Subscription<T>) -> impl Iterator<Item=T> + '_ {
+		struct Iter<'s, T: 'static> {
+			subscription: Rc<SubscriptionInner>,
+			queue: *mut TypedMessageQueue<T>,
+
+			lock: MessageQueuePollLock,
+			_phantom: PhantomData<&'s ()>,
+		}
+
+		impl<'s, T: 'static> Iterator for Iter<'s, T> {
+			type Item = T;
+
+			fn next(&mut self) -> Option<Self::Item> {
+				let next_unread_message_index = self.subscription.next_unread_message_index.get();
+
+				// TODO(pat.m): document
+				assert!(self.lock.is_unique(), "Trying to poll consuming message bus iterator while also polling the same message type");
+
+				// SAFETY: Because of the above assert, we can guarantee that there are no shared references into messages,
+				// since messages is only ever borrowed temporarily or while the iterator returned from poll is alive.
+				let messages = unsafe { &mut (*self.queue).messages };
+
+				if next_unread_message_index < messages.len() {
+					// NOTE: NO need to increment subscription.next_unread_message_index since removing this message
+					// implicitly shifts all indices down by one anyway.
+					Some(messages.remove(next_unread_message_index))
+				} else {
+					None
+				}
+			}
+		}
+
+		let queue = self.inner.get_store::<T>().queue.cast::<TypedMessageQueue<T>>();
+
+		Iter {
+			subscription: subscription.inner.clone(),
+			queue,
+			lock: MessageQueuePollLock::lock(queue),
+			_phantom: PhantomData,
+		}
+	}
+
+	pub fn emit<T: 'static>(&self, message: T) {
+		let store = self.inner.get_store::<T>();
+		
+		unsafe {
+			(*store.queue).to_concrete_mut().emit(message)
+		}
+
 	}
 
 	pub fn garbage_collect(&self) {
-		let message_queues = self.inner.message_queues.borrow();
-		let mut subscription_lists = self.inner.subscription_lists.borrow_mut();
-
-		for (type_id, queue) in message_queues.iter() {
-			let subscription_list = subscription_lists.get_mut(&type_id);
-			queue.borrow_mut().garbage_collect(subscription_list);
+		let mut stores = self.inner.stores.borrow_mut();
+		for store in stores.iter_mut() {
+			store.garbage_collect();
 		}
 	}
 }
 
 #[derive(Default)]
 struct MessageBusInner {
-	message_queues: RefCell<HashMap<TypeId, RefCell<Box<dyn MessageQueue>>>>,
-	subscription_lists: RefCell<HashMap<TypeId, SubscriptionList>>,
+	// Indexes into self.stores
+	type_to_index: RefCell<HashMap<TypeId, usize>>,
+	stores: RefCell<Vec<RawBusStore>>,
 }
 
+impl MessageBusInner {
+	fn get_store<T: 'static>(&self) -> Ref<'_, RawBusStore> {
+		let type_id = TypeId::of::<T>();
+		let num_stores = self.stores.borrow().len();
+
+		// Get type index
+		let index = *self.type_to_index.borrow_mut()
+			.entry(type_id).or_insert(num_stores);
+
+		// Need to insert
+		if index == num_stores {
+			self.stores.try_borrow_mut()
+				.expect("Trying to create new BusStore while store list is borrowed")
+				.push(RawBusStore::new::<T>());
+		}
+
+		Ref::map(self.stores.borrow(), |stores| &stores[index])
+	}
+
+	fn try_get_store(&self, type_id: &TypeId) -> Option<Ref<'_, RawBusStore>> {
+		self.type_to_index.borrow()
+			.get(type_id)
+			.map(|&index| Ref::map(self.stores.borrow(), |stores| &stores[index]))
+	}
+}
+
+
+struct RawBusStore {
+	// Borrows are always shortlived so this won't cause any problems
+	subscriptions: RefCell<SubscriptionList>,
+	queue: *mut dyn MessageQueue,
+}
+
+impl RawBusStore {
+	pub fn new<T: 'static>() -> RawBusStore {
+		let queue = Box::new(TypedMessageQueue::<T>::default());
+
+		RawBusStore {
+			subscriptions: Default::default(),
+			queue: Box::into_raw(queue),
+		}
+	}
+
+	fn new_subscriber(&self) -> Rc<SubscriptionInner> {
+		let queued_message_count = self.queued_message_count();
+
+		let subscription_inner = Rc::new(SubscriptionInner {
+			// Make sure this subscription doesn't see any messages already in the queue
+			next_unread_message_index: Cell::new(queued_message_count),
+		});
+
+		self.subscriptions.borrow_mut()
+			.subscribers.push(Rc::downgrade(&subscription_inner));
+
+		subscription_inner
+	}
+
+	fn queued_message_count(&self) -> usize {
+		// SAFETY: Borrows of queue never escape the functions they exist in, so this is fine.
+		unsafe { (*self.queue).queued_message_count() }
+	}
+
+	fn garbage_collect(&mut self) {
+		let subscriptions = self.subscriptions.get_mut();
+
+		// SAFETY: For this function to be called, both MessageBusInner::stores has to be borrowed mutably,
+		// _and also_ self.queue.lock_for_poll must be false. So we can guarantee that both:
+		// 	- Noone else is borrowing self or subscriptions.
+		// 	- Noone has a pointer to queue that would attempt to read through it.
+		unsafe {
+			(*self.queue).garbage_collect(subscriptions);
+		}
+	}
+}
+
+impl Drop for RawBusStore {
+	fn drop(&mut self) {
+		// SAFETY: References into queue will always be tied to MessageBus, and so Drop cannot be called
+		// while references are active.
+		let _ = unsafe { Box::from_raw(self.queue) };
+	}
+}
 
 
 trait MessageQueue {
-	fn as_any(&self) -> &dyn Any;
 	fn as_any_mut(&mut self) -> &mut dyn Any;
 
-	fn current_message_count(&self) -> usize;
+	fn queued_message_count(&self) -> usize;
 
-	fn garbage_collect(&mut self, subscription_list: Option<&mut SubscriptionList>);
+	fn garbage_collect(&mut self, subscription_list: &mut SubscriptionList);
 }
 
 impl dyn MessageQueue {
-	fn to_concrete<T: Any>(&self) -> &TypedMessageQueue<T> {
-		self.as_any()
-			.downcast_ref()
-			.unwrap()
-	}
-
 	fn to_concrete_mut<T: Any>(&mut self) -> &mut TypedMessageQueue<T> {
 		self.as_any_mut()
 			.downcast_mut()
@@ -157,18 +240,14 @@ impl dyn MessageQueue {
 }
 
 impl<T: Any> MessageQueue for TypedMessageQueue<T> {
-	fn as_any(&self) -> &dyn Any { self as &dyn Any }
 	fn as_any_mut(&mut self) -> &mut dyn Any { self as &mut dyn Any }
 
-	fn current_message_count(&self) -> usize {
+	fn queued_message_count(&self) -> usize {
 		self.messages.len()
 	}
 
-	fn garbage_collect(&mut self, subscription_list: Option<&mut SubscriptionList>) {
-		let Some(subscription_list) = subscription_list else {
-			self.messages.clear();
-			return;
-		};
+	fn garbage_collect(&mut self, subscription_list: &mut SubscriptionList) {
+		assert!(self.poll_lock == 0, "Trying to garbage collect a message queue while being polled");
 
 		subscription_list.subscribers.retain(|subscriber| subscriber.strong_count() > 0);
 		if subscription_list.subscribers.is_empty() {
@@ -179,7 +258,8 @@ impl<T: Any> MessageQueue for TypedMessageQueue<T> {
 		let minimum_unread_index = subscription_list.subscribers.iter()
 			.flat_map(|subscriber| subscriber.upgrade().map(|inner| inner.next_unread_message_index.get()))
 			.min()
-			.unwrap_or(0);
+			.unwrap_or(0)
+			.min(self.messages.len());
 
 		if minimum_unread_index != 0 {
 			let to_drop = minimum_unread_index;
@@ -197,11 +277,19 @@ impl<T: Any> MessageQueue for TypedMessageQueue<T> {
 
 struct TypedMessageQueue<T: 'static> {
 	messages: Vec<T>,
+	poll_lock: u32,
 }
+
+impl<T: 'static> TypedMessageQueue<T> {
+	fn emit(&mut self, message: T) {
+		self.messages.push(message);
+	}
+}
+
 
 impl<T: 'static> Default for TypedMessageQueue<T> {
 	fn default() -> Self {
-		Self { messages: Vec::default() }
+		Self { messages: Vec::default(), poll_lock: 0, }
 	}
 }
 
@@ -222,6 +310,7 @@ struct SubscriptionList {
 }
 
 
+
 impl<T: 'static> std::fmt::Debug for Subscription<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "Subscription({})", std::any::type_name::<T>())
@@ -231,5 +320,36 @@ impl<T: 'static> std::fmt::Debug for Subscription<T> {
 impl std::fmt::Debug for MessageBus {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "MessageBus{{...}}")
+	}
+}
+
+
+
+struct MessageQueuePollLock {
+	poll_lock: *mut u32,
+}
+
+impl MessageQueuePollLock {
+	fn lock<T: 'static>(queue: *mut TypedMessageQueue<T>) -> MessageQueuePollLock {
+		unsafe {
+			let poll_lock = &raw mut (*queue).poll_lock;
+			*poll_lock += 1;
+
+			MessageQueuePollLock { poll_lock }
+		}
+	}
+
+	fn is_unique(&self) -> bool {
+		unsafe {
+			self.poll_lock.read() == 1
+		}
+	}
+}
+
+impl Drop for MessageQueuePollLock {
+	fn drop(&mut self) {
+		unsafe {
+			*self.poll_lock -= 1;
+		}
 	}
 }

@@ -13,7 +13,7 @@ pub struct Sprites {
 }
 
 impl Sprites {
-	pub fn new(gfx: &mut gfx::System) -> anyhow::Result<Sprites> {
+	pub fn new(_gfx: &mut gfx::System) -> anyhow::Result<Sprites> {
 		Ok(Sprites {
 			vertices: Vec::new(),
 			indices: Vec::new(),

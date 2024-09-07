@@ -1,4 +1,4 @@
-use crate::prelude::*;
+// use crate::prelude::*;
 use model::{WorldChangedEvent, Room, Object, VertexId, WallId};
 use super::*;
 
@@ -41,6 +41,7 @@ pub enum EditorWorldEditCmd {
 }
 
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum UndoCmd {
 	Undo,
@@ -51,7 +52,7 @@ pub enum UndoCmd {
 
 pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_bus: &MessageBus) {
 	// Handle undo/redo
-	for cmd in message_bus.poll_consume(&state.undo_cmd_sub) {
+	for cmd in message_bus.poll(&state.undo_cmd_sub) {
 		if let Err(err) = handle_undo_cmd(&mut state.undo_stack, model, cmd) {
 			log::error!("{cmd:?} failed: {err}");
 		}

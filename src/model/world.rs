@@ -7,6 +7,7 @@ pub use object::*;
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
 
+#[derive(Clone)]
 pub struct WorldChangedEvent;
 
 
