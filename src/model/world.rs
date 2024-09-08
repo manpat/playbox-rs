@@ -11,7 +11,7 @@ pub use object::*;
 pub struct WorldChangedEvent;
 
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
 	// TODO(pat.m): name
 

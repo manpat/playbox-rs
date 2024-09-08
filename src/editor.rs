@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use model::{Placement, VertexId, WallId};
+use model::{Model, Placement, VertexId, WallId};
 
 mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
@@ -466,3 +466,37 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 }
 
 
+
+fn validate_model(state: &mut State, model: &mut Model) {
+	if state.inner.focused_room_index >= model.world.rooms.len() {
+		state.inner.focused_room_index = 0;
+	}
+
+	validate_item(model, &mut state.inner.hovered);
+	validate_item(model, &mut state.inner.selection);
+}
+
+
+fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
+	let num_rooms = model.world.rooms.len();
+	let num_objects = model.world.objects.len();
+
+	match maybe_item {
+		Some(item) if item.room_index(&model.world) >= num_rooms => {
+			*maybe_item = None;
+		}
+
+		&mut Some(Item::Object(object_index)) if object_index >= num_objects => {
+			*maybe_item = None;
+		}
+
+		&mut Some(Item::Wall(WallId{room_index, wall_index: index}) | Item::Vertex(VertexId{room_index, vertex_index: index})) => {
+			// Safe because room_index is already checked
+			if index >= model.world.rooms[room_index].walls.len() {
+				*maybe_item = None;
+			}
+		}
+
+		_ => {}
+	}
+}

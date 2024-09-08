@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Model, Room, Wall, WallId, WorldChangedEvent};
+use model::{Model, Room, Wall, WallId, World, WorldChangedEvent};
 
 use std::borrow::Cow;
 use std::time::{Instant, Duration};
@@ -156,6 +156,12 @@ pub enum UndoEntry {
 		wall_id: WallId,
 		before: Wall,
 		after: Wall,
+	},
+
+	// TODO(pat.m): yuck - this is way too heavy
+	UpdateWorld {
+		before: World,
+		after: World,
 	}
 }
 
@@ -166,6 +172,7 @@ impl UndoEntry {
 		match self {
 			UpdateRoom{room_index, ..} => format!("Update room #{room_index}").into(),
 			UpdateWall{wall_id: WallId{room_index, wall_index}, ..} => format!("Update wall #{wall_index} in room #{room_index}").into(),
+			UpdateWorld{..} => "Update world".into(),
 		}
 	}
 
@@ -177,6 +184,8 @@ impl UndoEntry {
 			(UpdateWall{wall_id: left_id, ..}, UpdateWall{wall_id: right_id, ..}) => left_id == right_id,
 
 			(UpdateRoom{room_index, ..}, UpdateWall{wall_id, ..}) => *room_index == wall_id.room_index,
+
+			(UpdateWorld{..}, UpdateWorld{..}) => true,
 
 			_ => false,
 		}
@@ -198,6 +207,10 @@ impl UndoEntry {
 				room.walls[wall_index].clone_from(&wall);
 			}
 
+			(UpdateWorld{after, ..}, UpdateWorld{after: new_after, ..}) => {
+				*after = new_after;
+			}
+
 			_ => {}
 		}
 	}
@@ -215,6 +228,11 @@ impl UndoEntry {
 				ctx.model.world.rooms[wall_id.room_index].walls[wall_id.wall_index].clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
+
+			UpdateWorld{before, ..} => {
+				ctx.model.world.clone_from(before);
+				ctx.message_bus.emit(WorldChangedEvent);
+			}
 		}
 	}
 
@@ -229,6 +247,11 @@ impl UndoEntry {
 
 			UpdateWall{wall_id, after, ..} => {
 				ctx.model.world.rooms[wall_id.room_index].walls[wall_id.wall_index].clone_from(after);
+				ctx.message_bus.emit(WorldChangedEvent);
+			}
+
+			UpdateWorld{after, ..} => {
+				ctx.model.world.clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 		}
@@ -249,13 +272,17 @@ impl Transaction<'_> {
 		self.message_bus.emit(WorldChangedEvent);
 	}
 
-	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&mut Room)) -> anyhow::Result<()> {
+	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&mut Room) -> anyhow::Result<()>) -> anyhow::Result<()> {
 		let room = self.model.world.rooms.get_mut(room_index)
 			.with_context(|| format!("Trying to edit non-existent room #{room_index}"))?;
 
 		let before = room.clone();
 
-		edit(room);
+		if let Err(err) = edit(room) {
+			*room = before;
+			return Err(err);
+		}
+
 
 		self.undo_stack.push(UndoEntry::UpdateRoom {
 			room_index, 
@@ -268,7 +295,7 @@ impl Transaction<'_> {
 		Ok(())
 	}
 
-	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&mut Wall)) -> anyhow::Result<()> {
+	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&mut Wall) -> anyhow::Result<()>) -> anyhow::Result<()> {
 		let room = self.model.world.rooms.get_mut(wall_id.room_index)
 			.with_context(|| format!("Trying to edit wall in non-existent room #{}", wall_id.room_index))?;
 
@@ -277,12 +304,34 @@ impl Transaction<'_> {
 
 		let before = wall.clone();
 
-		edit(wall);
+		if let Err(err) = edit(wall) {
+			*wall = before;
+			return Err(err);
+		}
+
 
 		self.undo_stack.push(UndoEntry::UpdateWall {
 			wall_id, 
 			before,
 			after: wall.clone(),
+		});
+
+		self.message_bus.emit(WorldChangedEvent);
+
+		Ok(())
+	}
+
+	pub fn update_world(&mut self, edit: impl FnOnce(&mut World) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let before = self.model.world.clone();
+
+		if let Err(err) = edit(&mut self.model.world) {
+			self.model.world = before;
+			return Err(err);
+		}
+
+		self.undo_stack.push(UndoEntry::UpdateWorld {
+			before,
+			after: self.model.world.clone(),
 		});
 
 		self.message_bus.emit(WorldChangedEvent);

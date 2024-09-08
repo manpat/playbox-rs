@@ -3,7 +3,7 @@ use crate::prelude::*;
 use model::Placement;
 
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Object {
 	pub name: String,
 
@@ -26,7 +26,7 @@ pub struct Object {
 }
 
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind")]
 pub enum ObjectInfo {
 	Debug,
