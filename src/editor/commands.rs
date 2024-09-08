@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use model::{WorldChangedEvent, Room, Object, VertexId, WallId};
+use model::{Room, Object, VertexId, WallId};
 use super::*;
 
 
@@ -57,6 +57,10 @@ pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_b
 		}
 	}
 
+	let should_merge_previous_frames = state.undo_stack.time_since_last_command().as_secs_f32() < 0.4;
+
+	state.undo_stack.set_merging_enabled(should_merge_previous_frames);
+
 	// Handle editor commands
 	let mut transaction = state.undo_stack.transaction(model, message_bus);
 
@@ -91,12 +95,6 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 	match cmd {
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
-			// TODO(pat.m): this doesn't make sense for player spawn
-			let room_index = item.room_index(&model.world);
-			let Some(room) = model.world.rooms.get_mut(room_index) else {
-				anyhow::bail!("Trying to edit non-existent room #{room_index}");
-			};
-
 			match item {
 				Item::Vertex(VertexId {room_index, vertex_index}) => {
 					transaction.update_room(room_index, |room| {
@@ -104,7 +102,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					})?;
 				}
 
-				Item::Wall(WallId {wall_index, ..}) => {
+				Item::Wall(WallId {room_index, wall_index}) => {
 					transaction.update_room(room_index, |room| {
 						let wall_count = room.wall_vertices.len();
 						room.wall_vertices[wall_index] += delta;
@@ -112,7 +110,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					})?;
 				}
 
-				Item::Room(_) => {
+				Item::Room(room_index) => {
 					transaction.update_room(room_index, |room| {
 						for vertex in room.wall_vertices.iter_mut() {
 							*vertex += delta;

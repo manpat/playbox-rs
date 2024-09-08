@@ -2,6 +2,7 @@ use crate::prelude::*;
 use model::{Model, Room, Wall, WallId, WorldChangedEvent};
 
 use std::borrow::Cow;
+use std::time::{Instant, Duration};
 
 
 #[derive(Debug)]
@@ -9,6 +10,8 @@ pub struct UndoStack {
 	changes: Vec<UndoEntry>,
 	disabled_change_index: usize,
 	merging_enabled: bool,
+
+	last_command_time: Instant,
 
 	message_bus: MessageBus,
 }
@@ -20,11 +23,15 @@ impl UndoStack {
 			disabled_change_index: 0,
 			merging_enabled: false,
 
+			last_command_time: Instant::now(),
+
 			message_bus,
 		}
 	}
 
 	pub fn push(&mut self, entry: impl Into<UndoEntry>) {
+		self.last_command_time = Instant::now();
+
 		let entry = entry.into();
 
 		// If we're not at the head change, truncate the stack
@@ -43,6 +50,10 @@ impl UndoStack {
 			self.changes.push(entry);
 			self.disabled_change_index = self.changes.len();
 		}
+	}
+
+	pub fn time_since_last_command(&self) -> Duration {
+		self.last_command_time.elapsed()
 	}
 
 	pub fn set_merging_enabled(&mut self, enabled: bool) {
