@@ -58,21 +58,15 @@ pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_b
 	}
 
 	// Handle editor commands
-	let messages_available = message_bus.messages_available(&state.editor_world_edit_cmd_sub);
+	let mut transaction = state.undo_stack.transaction(model, message_bus);
 
 	for cmd in message_bus.poll_consume(&state.editor_world_edit_cmd_sub) {
-		if let Err(err) = handle_world_edit_cmd(state, model, cmd) {
+		if let Err(err) = handle_world_edit_cmd(&mut state.inner, &mut transaction, cmd) {
 			log::error!("Editor command failed: {err}");
 		}
 
 		// Enable after the first command, so that all commands within a frame that can be merged are merged
-		state.undo_stack.set_merging_enabled(true);
-	}
-
-	// state.undo_stack.set_merging_enabled(false);
-
-	if messages_available {
-		message_bus.emit(WorldChangedEvent);
+		transaction.undo_stack.set_merging_enabled(true);
 	}
 }
 
@@ -87,10 +81,13 @@ fn handle_undo_cmd(undo_stack: &mut UndoStack, model: &mut model::Model, cmd: Un
 	Ok(())
 }
 
-fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: EditorWorldEditCmd) -> anyhow::Result<()> {
+fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'_>, cmd: EditorWorldEditCmd) -> anyhow::Result<()> {
 	if !matches!(cmd, EditorWorldEditCmd::TranslateItem(..)) {
 		log::info!("{cmd:?}");
 	}
+
+	let model = &mut transaction.model;
+	let undo_stack = &mut transaction.undo_stack;
 
 	match cmd {
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
@@ -101,29 +98,26 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			};
 
 			match item {
-				Item::Vertex(VertexId {vertex_index, ..}) => {
-					let before = room.clone();
-					room.wall_vertices[vertex_index] += delta;
-
-					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
+				Item::Vertex(VertexId {room_index, vertex_index}) => {
+					transaction.update_room(room_index, |room| {
+						room.wall_vertices[vertex_index] += delta;
+					})?;
 				}
 
 				Item::Wall(WallId {wall_index, ..}) => {
-					let before = room.clone();
-					let wall_count = room.wall_vertices.len();
-					room.wall_vertices[wall_index] += delta;
-					room.wall_vertices[(wall_index+1) % wall_count] += delta;
-
-					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
+					transaction.update_room(room_index, |room| {
+						let wall_count = room.wall_vertices.len();
+						room.wall_vertices[wall_index] += delta;
+						room.wall_vertices[(wall_index+1) % wall_count] += delta;
+					})?;
 				}
 
 				Item::Room(_) => {
-					let before = room.clone();
-					for vertex in room.wall_vertices.iter_mut() {
-						*vertex += delta;
-					}
-
-					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
+					transaction.update_room(room_index, |room| {
+						for vertex in room.wall_vertices.iter_mut() {
+							*vertex += delta;
+						}
+					})?;
 				}
 
 				Item::Object(index) => {
@@ -142,69 +136,39 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 		}
 
 		EditorWorldEditCmd::SetCeilingColor(room_index, color) => {
-			if let Some(room) = model.world.rooms.get_mut(room_index) {
-				let before = room.clone();
+			transaction.update_room(room_index, |room| {
 				room.ceiling_color = color;
-				state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
-			} else {
-				anyhow::bail!("Trying to edit non-existent room #{room_index}");
-			}
+			})?;
 		}
 
 		EditorWorldEditCmd::SetCeilingHeight(room_index, height) => {
-			if let Some(room) = model.world.rooms.get_mut(room_index) {
-				let before = room.clone();
+			transaction.update_room(room_index, |room| {
 				room.height = height;
-				state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
-			} else {
-				anyhow::bail!("Trying to edit non-existent room #{room_index}");
-			}
+			})?;
 		}
 
 		EditorWorldEditCmd::SetFloorColor(room_index, color) => {
-			if let Some(room) = model.world.rooms.get_mut(room_index) {
-				let before = room.clone();
+			transaction.update_room(room_index, |room| {
 				room.floor_color = color;
-				state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
-			} else {
-				anyhow::bail!("Trying to edit non-existent room #{room_index}");
-			}
+			})?;
 		}
 
 		EditorWorldEditCmd::SetWallColor(wall_id, color) => {
-			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
-				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
-			{
-				let before = wall.clone();
+			transaction.update_wall(wall_id, |wall| {
 				wall.color = color;
-				state.undo_stack.push(UndoEntry::UpdateWall {wall_id, before, after: wall.clone()});
-			} else {
-				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
-			}
+			})?;
 		}
 
 		EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset) => {
-			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
-				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
-			{
-				let before = wall.clone();
+			transaction.update_wall(wall_id, |wall| {
 				wall.horizontal_offset = offset;
-				state.undo_stack.push(UndoEntry::UpdateWall {wall_id, before, after: wall.clone()});
-			} else {
-				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
-			}
+			})?;
 		}
 
 		EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset) => {
-			if let Some(wall) = model.world.rooms.get_mut(wall_id.room_index)
-				.and_then(|room| room.walls.get_mut(wall_id.wall_index))
-			{
-				let before = wall.clone();
+			transaction.update_wall(wall_id, |wall| {
 				wall.vertical_offset = offset;
-				state.undo_stack.push(UndoEntry::UpdateWall {wall_id, before, after: wall.clone()});
-			} else {
-				anyhow::bail!("Trying to edit non-existent wall {wall_id:?}");
-			}
+			})?;
 		}
 
 		EditorWorldEditCmd::SetFogParams(color) => {
@@ -236,6 +200,8 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 				// Create new connection
 				model.world.connections.push((source_wall_id, target_wall_id));
 			}
+
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::RemoveRoom(room_index) => {
@@ -261,20 +227,20 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 			}
 
 			// Clear or adjust selection
-			if let Some(selected_item) = &mut state.inner.selection {
+			if let Some(selected_item) = &mut state.selection {
 				// TODO(pat.m): this doesn't really make sense for player spawn
 				let selected_room_index = selected_item.room_index(&model.world);
 
 				if selected_room_index > room_index {
 					selected_item.set_room_index(selected_room_index.saturating_sub(1));
 				} else if selected_room_index == room_index {
-					state.inner.selection = None;
+					state.selection = None;
 				}
 			}
 
 			// Update focused room
-			if state.inner.focused_room_index >= room_index {
-				state.inner.focused_room_index = state.inner.focused_room_index.saturating_sub(1);
+			if state.focused_room_index >= room_index {
+				state.focused_room_index = state.focused_room_index.saturating_sub(1);
 			}
 
 			// Remove connections to deleted room
@@ -295,12 +261,16 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 			// Actually remove room
 			model.world.rooms.remove(room_index);
+
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::DisconnectRoom(room_index) => {
 			model.world.connections.retain(|&(wall_a, wall_b)| {
 				wall_a.room_index != room_index && wall_b.room_index != room_index
 			});
+			
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::ConnectWall(source_wall_id, target_wall_id) => {
@@ -312,12 +282,16 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 
 			// Connect
 			model.world.connections.push((source_wall_id, target_wall_id));
+			
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
 			model.world.connections.retain(|&(wall_a, wall_b)| {
 				wall_a != wall_id && wall_b != wall_id
 			});
+			
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
@@ -344,6 +318,8 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					wall_b.wall_index += 1;
 				}
 			}
+			
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::DeleteVertex(vertex_id) => {
@@ -374,11 +350,14 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					wall_b.wall_index -= 1;
 				}
 			}
+			
+			transaction.emit_world_changed();
 		}
 
 
 		EditorWorldEditCmd::AddObject(object) => {
 			model.world.objects.push(object);
+			transaction.emit_world_changed();
 		}
 
 		EditorWorldEditCmd::RemoveObject(_object_index) => {

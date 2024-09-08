@@ -114,6 +114,14 @@ impl UndoStack {
 		self.changes.get(index)
 			.map_or(Cow::from("<invalid index>"), UndoEntry::describe)
 	}
+
+	pub fn transaction<'m>(&'m mut self, model: &'m mut Model, message_bus: &'m MessageBus) -> Transaction<'m> {
+		Transaction {
+			undo_stack: self,
+			model,
+			message_bus,
+		}
+	}
 }
 
 
@@ -215,3 +223,60 @@ impl UndoEntry {
 		}
 	}
 }
+
+
+
+
+pub struct Transaction<'m> {
+	pub undo_stack: &'m mut UndoStack,
+	pub model: &'m mut Model,
+	pub message_bus: &'m MessageBus,
+}
+
+impl Transaction<'_> {
+	pub fn emit_world_changed(&self) {
+		self.message_bus.emit(WorldChangedEvent);
+	}
+
+	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&mut Room)) -> anyhow::Result<()> {
+		let room = self.model.world.rooms.get_mut(room_index)
+			.with_context(|| format!("Trying to edit non-existent room #{room_index}"))?;
+
+		let before = room.clone();
+
+		edit(room);
+
+		self.undo_stack.push(UndoEntry::UpdateRoom {
+			room_index, 
+			before,
+			after: room.clone(),
+		});
+
+		self.message_bus.emit(WorldChangedEvent);
+
+		Ok(())
+	}
+
+	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&mut Wall)) -> anyhow::Result<()> {
+		let room = self.model.world.rooms.get_mut(wall_id.room_index)
+			.with_context(|| format!("Trying to edit wall in non-existent room #{}", wall_id.room_index))?;
+
+		let wall = room.walls.get_mut(wall_id.wall_index)
+			.with_context(|| format!("Trying to edit non-existent wall {wall_id:?}"))?;
+
+		let before = wall.clone();
+
+		edit(wall);
+
+		self.undo_stack.push(UndoEntry::UpdateWall {
+			wall_id, 
+			before,
+			after: wall.clone(),
+		});
+
+		self.message_bus.emit(WorldChangedEvent);
+
+		Ok(())
+	}
+}
+
