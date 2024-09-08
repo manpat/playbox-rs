@@ -41,7 +41,6 @@ pub enum EditorWorldEditCmd {
 }
 
 
-#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum UndoCmd {
 	Undo,

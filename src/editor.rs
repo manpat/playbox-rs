@@ -90,6 +90,19 @@ struct Context<'w> {
 }
 
 pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
+	let undo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Z);
+	let redo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::Z);
+
+	ctx.input_mut(|input| {
+		if input.consume_shortcut(&redo_shortcut) {
+			message_bus.emit(UndoCmd::Redo);
+		}
+
+		if input.consume_shortcut(&undo_shortcut) {
+			message_bus.emit(UndoCmd::Undo);
+		}
+	});
+
 	let mut context = Context {
 		state: &mut state.inner,
 		model,
@@ -159,16 +172,25 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 
 			egui::ScrollArea::vertical()
 				.show_rows(ui, row_height, state.undo_stack.len(), |ui, range| {
-					for index in range {
-						if state.undo_stack.index() == index {
-							ui.separator();
-						}
+					if range.start == 0 {
+						let active = state.undo_stack.index() == 0;
 
-						ui.label(state.undo_stack.describe(index));
+						if ui.selectable_label(active, "<base>").clicked() {
+							context.message_bus.emit(UndoCmd::SetIndex(0));
+						}
+					}
+
+					for index in range {
+						let active = state.undo_stack.index() == index+1;
+						if ui.selectable_label(active, state.undo_stack.describe(index)).clicked() {
+							context.message_bus.emit(UndoCmd::SetIndex(index+1));
+						}
 					}
 				});
 
-			ui.label(format!("{:#?}", state.undo_stack));
+			ui.collapsing("Debug", |ui| {
+				ui.label(format!("{:#?}", state.undo_stack));
+			});
 		});
 }
 

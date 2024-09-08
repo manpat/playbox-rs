@@ -157,12 +157,6 @@ impl MessageBusInner {
 
 		Ref::map(self.stores.borrow(), |stores| &stores[index])
 	}
-
-	fn try_get_store(&self, type_id: &TypeId) -> Option<Ref<'_, RawBusStore>> {
-		self.type_to_index.borrow()
-			.get(type_id)
-			.map(|&index| Ref::map(self.stores.borrow(), |stores| &stores[index]))
-	}
 }
 
 
