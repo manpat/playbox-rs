@@ -126,8 +126,13 @@ fn handle_world_edit_cmd(state: &mut State, model: &mut model::Model, cmd: Edito
 					state.undo_stack.push(UndoEntry::UpdateRoom {room_index, before, after: room.clone()});
 				}
 
-				Item::Object(_) => {
-					todo!()
+				Item::Object(index) => {
+					let object = model.world.objects.get_mut(index)
+						.with_context(|| format!("Trying to edit non-existent object #{index}"))?;
+
+					object.placement.position += delta;
+
+					// TODO(pat.m): need to be able to move between rooms!
 				}
 
 				Item::PlayerSpawn => {

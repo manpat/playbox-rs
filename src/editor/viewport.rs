@@ -49,7 +49,12 @@ impl ViewportItemShape {
 
 			&ViewportItemShape::PlayerIndicator(_) => unimplemented!(),
 
-			&ViewportItemShape::ObjectIndicator(_) => unimplemented!(),
+			&ViewportItemShape::ObjectIndicator(transform) => {
+				let [vx, vy, pos] = transform.columns();
+				let radius = vx.square_length().max(vy.square_length()).sqrt();
+
+				((target_pos - pos).length() - radius).max(0.0)
+			}
 		}
 	}
 }
@@ -590,7 +595,8 @@ impl Viewport<'_> {
 
 					} else {
 						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
-						let rect = egui::Rect::from_center_size(vertex_px, egui::vec2(12.0, 12.0));
+						let size_widget = self.viewport_metrics.world_to_widget_scalar(0.2).min(12.0);
+						let rect = egui::Rect::from_center_size(vertex_px, egui::vec2(size_widget, size_widget));
 
 						if item_hovered || item_selected {
 							self.painter.rect_filled(rect, 0.0, color);

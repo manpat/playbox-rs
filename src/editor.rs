@@ -73,7 +73,7 @@ impl State {
 				selection: None,
 
 				focused_room_index: 0,
-				track_player: true,
+				track_player: false,
 			},
 
 			undo_stack: UndoStack::new(message_bus.clone()),
@@ -415,7 +415,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 	}
 
 	for (object_index, object) in world.objects.iter().enumerate() {
-		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::empty());
+		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
 	}
 
 	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
@@ -434,7 +434,7 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 	let mut position = Vec2::zero();
 	let mut max_height = 0.0f32;
 
-	let margin = 1.0;
+	let margin = 0.4;
 	let per_row = 5;
 
 	for (room_index, room) in world.rooms.iter().enumerate() {
@@ -456,7 +456,7 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 	}
 
 	for (object_index, object) in world.objects.iter().enumerate() {
-		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::empty());
+		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
 	}
 
 	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
