@@ -268,10 +268,6 @@ pub struct Transaction<'m> {
 }
 
 impl Transaction<'_> {
-	pub fn emit_world_changed(&self) {
-		self.message_bus.emit(WorldChangedEvent);
-	}
-
 	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&mut Room) -> anyhow::Result<()>) -> anyhow::Result<()> {
 		let room = self.model.world.rooms.get_mut(room_index)
 			.with_context(|| format!("Trying to edit non-existent room #{room_index}"))?;
@@ -282,7 +278,6 @@ impl Transaction<'_> {
 			*room = before;
 			return Err(err);
 		}
-
 
 		self.undo_stack.push(UndoEntry::UpdateRoom {
 			room_index, 
@@ -308,7 +303,6 @@ impl Transaction<'_> {
 			*wall = before;
 			return Err(err);
 		}
-
 
 		self.undo_stack.push(UndoEntry::UpdateWall {
 			wall_id, 
