@@ -468,8 +468,19 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 
 
 fn validate_model(state: &mut State, model: &mut Model) {
-	if state.inner.focused_room_index >= model.world.rooms.len() {
+	let num_rooms = model.world.rooms.len();
+
+	if state.inner.focused_room_index >= num_rooms {
 		state.inner.focused_room_index = 0;
+	}
+
+	if model.player.placement.room_index >= num_rooms {
+		model.player.placement.room_index = 0;
+	}
+
+	// Yuck
+	if model.world.player_spawn.room_index >= num_rooms {
+		model.world.player_spawn.room_index = 0;
 	}
 
 	validate_item(model, &mut state.inner.hovered);
