@@ -8,6 +8,7 @@ enum ViewportItemShape {
 	Line(Vec2, Vec2),
 
 	PlayerIndicator(Mat2x3),
+	ObjectIndicator(Mat2x3),
 }
 
 impl ViewportItemShape {
@@ -47,6 +48,8 @@ impl ViewportItemShape {
 			}
 
 			&ViewportItemShape::PlayerIndicator(_) => unimplemented!(),
+
+			&ViewportItemShape::ObjectIndicator(_) => unimplemented!(),
 		}
 	}
 }
@@ -250,13 +253,38 @@ impl<'c> Viewport<'c> {
 			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
-		let base_player_transform = Mat2x3::rotate_translate(placement.yaw, placement.position);
+		// TODO(pat.m): this should probably come from a constant 
+		let radius = 0.1;
+		let base_player_transform = Mat2x3::scale_rotate_translate(radius, placement.yaw, placement.position);
 		let item = item.into();
 		let color = color.into();
 
 		for room_to_world in transforms {
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::PlayerIndicator(room_to_world * base_player_transform),
+				item,
+				color,
+				room_to_world,
+				flags: flags,
+			});
+		}
+	}
+
+	pub fn add_object(&mut self, placement: Placement, item: impl Into<Option<Item>>, color: impl Into<Color>, flags: ViewportItemFlags) {
+		let transforms = self.items.iter()
+			.filter(|vpitem| vpitem.item == Some(Item::Room(placement.room_index)))
+			.map(|vpitem| vpitem.room_to_world)
+			.collect::<Vec<_>>();
+
+		// TODO(pat.m): this should be based on the actual object
+		let radius = 0.1;
+		let base_transform = Mat2x3::scale_rotate_translate(radius, placement.yaw, placement.position);
+		let item = item.into();
+		let color = color.into();
+
+		for room_to_world in transforms {
+			self.items.push(ViewportItem {
+				shape: ViewportItemShape::ObjectIndicator(room_to_world * base_transform),
 				item,
 				color,
 				room_to_world,
@@ -590,12 +618,38 @@ impl Viewport<'_> {
 
 					let center_widget = self.viewport_metrics.world_to_widget_position(origin);
 					let forward_widget = self.viewport_metrics.world_to_widget_delta(forward);
-					let radius_widget = self.viewport_metrics.world_to_widget_scalar(0.1);
 
-					let point = center_widget + forward_widget * 0.3;
+					let point = center_widget + forward_widget * 3.0;
 
-					self.painter.circle_stroke(center_widget, radius_widget, (1.0, color));
+					self.painter.circle_stroke(center_widget, forward_widget.length(), (1.0, color));
 					self.painter.line_segment([center_widget, point], (1.0, color));
+				}
+
+				ViewportItemShape::ObjectIndicator(transform) => {
+					let right = transform.column_x();
+					let forward = -transform.column_y();
+					let origin = transform.column_z();
+
+					let center_widget = self.viewport_metrics.world_to_widget_position(origin);
+					let forward_widget = self.viewport_metrics.world_to_widget_delta(forward);
+					let right_widget = self.viewport_metrics.world_to_widget_delta(right);
+
+					let points = [
+						center_widget + ( forward_widget + right_widget),
+						center_widget + ( forward_widget - right_widget),
+						center_widget + (-forward_widget - right_widget),
+						center_widget + (-forward_widget + right_widget),
+						center_widget + ( forward_widget + right_widget),
+					];
+
+					// Draw box
+					for i in 0..4 {
+						self.painter.line_segment([points[i], points[i+1]], (1.0, color));
+					}
+
+					// Draw orientation
+					self.painter.line_segment([center_widget, center_widget + right_widget / 2.0], (1.0, egui::Color32::LIGHT_RED));
+					self.painter.line_segment([center_widget, center_widget + forward_widget / 2.0], (1.0, egui::Color32::LIGHT_GREEN));
 				}
 			}
 		}

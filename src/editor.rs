@@ -360,6 +360,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 
 const PLAYER_SPAWN_COLOR: Color = Color::rgb(1.0, 0.3, 0.1);
+const OBJECT_COLOR: Color = Color::rgb(0.3, 0.8, 0.5);
 
 
 fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context) {
@@ -413,6 +414,10 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		viewport.add_room_connections(room_index, transform, ViewportItemFlags::empty());
 	}
 
+	for (object_index, object) in world.objects.iter().enumerate() {
+		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::empty());
+	}
+
 	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
 	viewport.add_player_indicator(player.placement, None, Color::grey(0.8), ViewportItemFlags::empty());
 
@@ -448,6 +453,10 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 			position.y += max_height + margin;
 			max_height = 0.0;
 		}
+	}
+
+	for (object_index, object) in world.objects.iter().enumerate() {
+		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::empty());
 	}
 
 	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
