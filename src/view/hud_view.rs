@@ -17,23 +17,22 @@ impl HudView {
 
 	pub fn draw(&mut self, gfx: &mut gfx::System, _model: &Model) {
 		let screen_size = gfx.backbuffer_size().to_vec2();
-		let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size);
+		let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
 
-		let mut usable_area = screen_bounds.shrink(20.0);
+		let mut usable_area = screen_bounds.shrink(4.0);
 
 
 		let quads = vec![
-			usable_area.cut_top(50.0).shrink(4.0),
-			usable_area.cut_bottom(50.0).shrink(4.0),
-			usable_area.cut_left(50.0).shrink(4.0),
-			usable_area.cut_right(50.0).shrink(4.0),
+			usable_area.cut_top(24.0).shrink(2.0),
+			usable_area.cut_bottom(24.0).shrink(2.0),
+			usable_area.cut_left(24.0).shrink(2.0),
+			usable_area.cut_right(24.0).shrink(2.0),
 		];
 
 
 		let mut hud_group = gfx.frame_encoder.command_group(HUD_FRAME_STAGE);
 		let indices = hud_group.upload(&[0, 1, 2, 0, 2, 3]);
 
-		// let projection = Mat4::ortho_aspect(1.0, aspect, -1.0, 1.0);
 		let projection = Mat4::ortho(
 			screen_bounds.min.x, screen_bounds.max.x,
 			screen_bounds.min.y, screen_bounds.max.y,
@@ -45,10 +44,10 @@ impl HudView {
 		for quad in quads {
 			let color = Color::white().with_alpha(0.02);
 			let vertices = [
-				gfx::StandardVertex::with_color(quad.min.extend(0.0), color),
-				gfx::StandardVertex::with_color(quad.min_max_corner().extend(0.0), color),
-				gfx::StandardVertex::with_color(quad.max.extend(0.0), color),
-				gfx::StandardVertex::with_color(quad.max_min_corner().extend(0.0), color),
+				gfx::StandardVertex::with_color(quad.min.floor().extend(0.0), color),
+				gfx::StandardVertex::with_color(quad.min_max_corner().floor().extend(0.0), color),
+				gfx::StandardVertex::with_color(quad.max.floor().extend(0.0), color),
+				gfx::StandardVertex::with_color(quad.max_min_corner().floor().extend(0.0), color),
 			];
 
 			hud_group.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
