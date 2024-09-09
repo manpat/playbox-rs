@@ -41,7 +41,7 @@ impl MenuPainter {
 		self.glyph_atlas.update_atlas(gfx);
 
 		if !self.shape_layer.is_empty() {
-			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0))
+			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(1))
 				.annotate("Menu")
 				.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
 				.elements(self.shape_layer.indices.len() as u32)
@@ -56,7 +56,7 @@ impl MenuPainter {
 		}
 
 		if !self.text_layer.is_empty() {
-			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(1))
+			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(2))
 				.annotate("Menu (Text)")
 				.draw(gfx::CommonShader::StandardVertex, self.f_text_shader)
 				.elements(self.text_layer.indices.len() as u32)

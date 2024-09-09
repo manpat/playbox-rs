@@ -11,7 +11,9 @@ pub struct GameScene {
 
 	// toy_renderer: ToyRenderer,
 	sprites: Sprites,
-	world_view: world_view::WorldView,
+
+	world_view: view::WorldView,
+	hud_view: view::HudView,
 
 	message_bus: MessageBus,
 
@@ -60,7 +62,8 @@ impl GameScene {
 
 			// toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
-			world_view: world_view::WorldView::new(&mut ctx.gfx, &world, ctx.message_bus.clone())?,
+			world_view: view::WorldView::new(&mut ctx.gfx, &world, ctx.message_bus.clone())?,
+			hud_view: view::HudView::new(ctx.message_bus.clone())?,
 
 			message_bus: ctx.message_bus.clone(),
 
@@ -140,7 +143,11 @@ impl GameScene {
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 		main_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
-		self.world_view.draw(gfx, &mut self.sprites, &self.model.world, player.placement, player.hack_height_change);
+		let mut hud_group = gfx.frame_encoder.command_group(view::HUD_FRAME_STAGE);
+		hud_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
+
+		self.world_view.draw(gfx, &self.model.world, player.placement, player.hack_height_change);
+		self.hud_view.draw(gfx, &self.model);
 
 		// self.toy_renderer.draw(gfx);
 		self.sprites.draw(gfx);

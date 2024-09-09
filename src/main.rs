@@ -3,13 +3,14 @@
 pub mod audio;
 pub mod menu;
 pub mod sprites;
-pub mod world_view;
 pub mod toy_draw;
 pub mod game_scene;
-pub mod model;
 pub mod main_menu;
 pub mod glyph_cache;
 pub mod message_bus;
+
+pub mod view;
+pub mod model;
 
 pub mod console;
 pub mod editor;
@@ -22,10 +23,10 @@ pub mod prelude {
 	pub use crate::main_menu::{MainMenuScene, MenuCmd, PauseMenuScene};
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
-	pub use crate::world_view;
 	pub use crate::menu;
 
 	pub use crate::model;
+	pub use crate::view;
 
 	pub use crate::editor;
 
