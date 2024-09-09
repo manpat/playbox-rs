@@ -220,6 +220,11 @@ pub enum UndoEntry {
 		after: Player,
 	},
 
+	UpdateConnections {
+		before: Vec<(WallId, WallId)>,
+		after: Vec<(WallId, WallId)>,
+	},
+
 	// TODO(pat.m): yuck - this is way too heavy
 	UpdateWorld {
 		before: World,
@@ -239,6 +244,7 @@ impl UndoEntry {
 
 			(UpdateWorld{..}, UpdateWorld{..}) => true,
 			(UpdatePlayer{..}, UpdatePlayer{..}) => true,
+			(UpdateConnections{..}, UpdateConnections{..}) => true,
 
 			_ => false,
 		}
@@ -260,8 +266,16 @@ impl UndoEntry {
 				room.walls[wall_index].clone_from(&wall);
 			}
 
+			(UpdateConnections{after, ..}, UpdateConnections{after: new_after, ..}) => {
+				*after = new_after;
+			}
+
 			(UpdateWorld{after, ..}, UpdateWorld{after: new_after, ..}) => {
 				*after = new_after;
+			}
+
+			(UpdateWorld{after, ..}, UpdateConnections{after: connections, ..}) => {
+				after.connections = connections;
 			}
 
 			(UpdatePlayer{after, ..}, UpdatePlayer{after: new_after, ..}) => {
@@ -283,6 +297,11 @@ impl UndoEntry {
 
 			UpdateWall{wall_id, before, ..} => {
 				ctx.model.world.rooms[wall_id.room_index].walls[wall_id.wall_index].clone_from(before);
+				ctx.message_bus.emit(WorldChangedEvent);
+			}
+
+			UpdateConnections{before, ..} => {
+				ctx.model.world.connections.clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
@@ -308,6 +327,11 @@ impl UndoEntry {
 
 			UpdateWall{wall_id, after, ..} => {
 				ctx.model.world.rooms[wall_id.room_index].walls[wall_id.wall_index].clone_from(after);
+				ctx.message_bus.emit(WorldChangedEvent);
+			}
+
+			UpdateConnections{after, ..} => {
+				ctx.model.world.connections.clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
@@ -412,11 +436,16 @@ impl Transaction<'_> {
 
 		Ok(())
 	}
-}
 
+	pub fn update_connections(&mut self, edit: impl FnOnce(&Model, &mut Vec<(WallId, WallId)>) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let before = self.model.world.connections.clone();
+		let mut after = self.model.world.connections.clone();
 
-impl<'m> Drop for Transaction<'m> {
-	fn drop(&mut self) {
-		self.submit();
+		edit(&self.model, &mut after)?;
+
+		self.group.push(UndoEntry::UpdateConnections {before, after});
+
+		Ok(())
 	}
 }
+

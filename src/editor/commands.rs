@@ -226,14 +226,16 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			}
 
 			transaction.update_world(|_, world| {
-				let new_room_index = world.rooms.len();
-
 				world.rooms.push(room);
+				Ok(())
+			})?;
 
-				// TODO(pat.m): can be a separate entry
-				if let Some((source_wall_index, target_wall_id)) = connection {
+			if let Some((source_wall_index, target_wall_id)) = connection {
+				transaction.update_connections(|model, connections| {
+					let new_room_index = model.world.rooms.len();
+
 					// Disconnect target wall
-					world.connections.retain(|&(wall_a, wall_b)| {
+					connections.retain(|&(wall_a, wall_b)| {
 						wall_a != target_wall_id && wall_b != target_wall_id
 					});
 
@@ -243,11 +245,12 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					};
 
 					// Create new connection
-					world.connections.push((source_wall_id, target_wall_id));
-				}
+					connections.push((source_wall_id, target_wall_id));
 
-				Ok(())
-			})?;
+					Ok(())
+				})?;
+			}
+
 			transaction.submit();
 		}
 
@@ -287,13 +290,20 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					state.focused_room_index = state.focused_room_index.saturating_sub(1);
 				}
 
+				// Actually remove room
+				world.rooms.remove(room_index);
+
+				Ok(())
+			})?;
+
+			transaction.update_connections(|_, connections| {
 				// Remove connections to deleted room
-				world.connections.retain(|&(wall_a, wall_b)| {
+				connections.retain(|&(wall_a, wall_b)| {
 					wall_a.room_index != room_index && wall_b.room_index != room_index
 				});
 
 				// Update all connections with corrected room indices
-				for (wall_a, wall_b) in world.connections.iter_mut() {
+				for (wall_a, wall_b) in connections.iter_mut() {
 					if wall_a.room_index > room_index {
 						wall_a.room_index -= 1;
 					}
@@ -302,10 +312,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 						wall_b.room_index -= 1;
 					}
 				}
-
-				// Actually remove room
-				world.rooms.remove(room_index);
-
+				
 				Ok(())
 			})?;
 
@@ -313,8 +320,9 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			transaction.update_player(|_, player| {
 				if player.placement.room_index > room_index {
 					player.placement.room_index = player.placement.room_index.saturating_sub(1);
-					Ok(())
 				}
+
+				Ok(())
 			})?;
 
 			transaction.submit();
@@ -322,8 +330,8 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 		EditorWorldEditCmd::DisconnectRoom(room_index) => {
 			transaction.describe(format!("Disconnect Room #{room_index}"));
-			transaction.update_world(|_, world| {
-				world.connections.retain(|&(wall_a, wall_b)| {
+			transaction.update_connections(|_, connections| {
+				connections.retain(|&(wall_a, wall_b)| {
 					wall_a.room_index != room_index && wall_b.room_index != room_index
 				});
 				
@@ -334,15 +342,15 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 		EditorWorldEditCmd::ConnectWall(source_wall_id, target_wall_id) => {
 			transaction.describe(format!("Connect {source_wall_id} -> {target_wall_id}"));
-			transaction.update_world(|_, world| {
+			transaction.update_connections(|_, connections| {
 				// Remove any connections to either the source or target walls
-				world.connections.retain(|&(wall_a, wall_b)| {
+				connections.retain(|&(wall_a, wall_b)| {
 					wall_a != source_wall_id && wall_b != source_wall_id
 					&& wall_a != target_wall_id && wall_b != target_wall_id
 				});
 
 				// Connect
-				world.connections.push((source_wall_id, target_wall_id));
+				connections.push((source_wall_id, target_wall_id));
 				
 				Ok(())
 			})?;
@@ -351,8 +359,8 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
 			transaction.describe(format!("Disconnect {wall_id}"));
-			transaction.update_world(|_, world| {
-				world.connections.retain(|&(wall_a, wall_b)| {
+			transaction.update_connections(|_, connections| {
+				connections.retain(|&(wall_a, wall_b)| {
 					wall_a != wall_id && wall_b != wall_id
 				});
 				
@@ -362,23 +370,25 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
-			transaction.describe(format!("Split Wall {wall_id}"));
-			transaction.update_world(|_, world| {
-				let room = world.rooms.get_mut(wall_id.room_index)
-					.context("Invalid room index")?;
+			let new_wall_index = wall_id.wall_index + 1;
 
+			transaction.describe(format!("Split Wall {wall_id}"));
+
+			transaction.update_room(wall_id.room_index, |_, room| {
 				let wall = room.walls.get(wall_id.wall_index)
 					.context("Invalid wall index")?
 					.clone();
-
-				let new_wall_index = wall_id.wall_index + 1;
 
 				// Insert the new wall after the target wall
 				room.walls.insert(new_wall_index, wall);
 				room.wall_vertices.insert(new_wall_index, new_position);
 
+				Ok(())
+			})?;
+
+			transaction.update_connections(|_, connections| {
 				// Update all connections with corrected wall ids
-				for (wall_a, wall_b) in world.connections.iter_mut() {
+				for (wall_a, wall_b) in connections.iter_mut() {
 					if wall_a.room_index == wall_id.room_index && wall_a.wall_index >= new_wall_index {
 						wall_a.wall_index += 1;
 					}
@@ -396,10 +406,9 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 		EditorWorldEditCmd::DeleteVertex(vertex_id) => {
 			transaction.describe(format!("Remove Vertex {vertex_id}"));
-			transaction.update_world(|_, world| {
-				let room = world.rooms.get_mut(vertex_id.room_index)
-					.context("Invalid room index")?;
 
+			// Remove vertex and adjacent wall
+			transaction.update_room(vertex_id.room_index, |_, room| {
 				if vertex_id.vertex_index >= room.walls.len() {
 					anyhow::bail!("Trying to delete invalid vertex");
 				}
@@ -407,15 +416,20 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				room.walls.remove(vertex_id.vertex_index);
 				room.wall_vertices.remove(vertex_id.vertex_index);
 
+				Ok(())
+			})?;
+
+			// Remove connections to adjacent wall
+			transaction.update_connections(|_, connections| {
 				let wall_id = vertex_id.to_wall_id();
 
 				// Remove connections to deleted wall
-				world.connections.retain(|&(wall_a, wall_b)| {
+				connections.retain(|&(wall_a, wall_b)| {
 					wall_a != wall_id && wall_b != wall_id
 				});
 
 				// Update all connections with corrected wall ids
-				for (wall_a, wall_b) in world.connections.iter_mut() {
+				for (wall_a, wall_b) in connections.iter_mut() {
 					if wall_a.room_index == vertex_id.room_index && wall_a.wall_index > vertex_id.vertex_index {
 						wall_a.wall_index -= 1;
 					}
@@ -427,6 +441,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				Ok(())
 			})?;
+
 			transaction.submit();
 		}
 
