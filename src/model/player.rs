@@ -6,7 +6,7 @@ pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
 pub const PLAYER_RADIUS: f32 = 0.1;
 
 // TODO(pat.m): maybe this should just be 'camera'? only some of this should be serialized
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Player {
 	pub placement: Placement,
 	pub pitch: f32,

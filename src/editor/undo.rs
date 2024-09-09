@@ -1,16 +1,16 @@
 use crate::prelude::*;
-use model::{Model, Room, Wall, WallId, World, WorldChangedEvent};
+use model::{Model, Player, Room, Wall, WallId, World, WorldChangedEvent};
 
-use std::borrow::Cow;
 use std::time::{Instant, Duration};
+
+
+pub const UNDO_ENTRY_MERGE_WINDOW: Duration = Duration::from_millis(400);
 
 
 #[derive(Debug)]
 pub struct UndoStack {
-	changes: Vec<UndoEntry>,
+	groups: Vec<UndoGroup>,
 	disabled_change_index: usize,
-	merging_enabled: bool,
-
 	last_command_time: Instant,
 
 	message_bus: MessageBus,
@@ -19,45 +19,44 @@ pub struct UndoStack {
 impl UndoStack {
 	pub fn new(message_bus: MessageBus) -> UndoStack {
 		UndoStack {
-			changes: Vec::new(),
+			groups: Vec::new(),
 			disabled_change_index: 0,
-			merging_enabled: false,
-
 			last_command_time: Instant::now(),
 
 			message_bus,
 		}
 	}
 
-	pub fn push(&mut self, entry: impl Into<UndoEntry>) {
+	pub fn transaction<'m>(&'m mut self, model: &'m mut Model, message_bus: &'m MessageBus) -> Transaction<'m> {
+		Transaction {
+			undo_stack: self,
+			model,
+			message_bus,
+			group: UndoGroup::default(),
+		}
+	}
+
+	fn push_group(&mut self, group: UndoGroup) {
+		let in_merge_window = self.last_command_time.elapsed() < UNDO_ENTRY_MERGE_WINDOW;
+
 		self.last_command_time = Instant::now();
 
-		let entry = entry.into();
-
 		// If we're not at the head change, truncate the stack
-		if self.disabled_change_index < self.changes.len() {
-			self.changes.drain(self.disabled_change_index..);
+		if self.disabled_change_index < self.groups.len() {
+			self.groups.drain(self.disabled_change_index..);
 		}
 
-		// If we can merge, try and get the last change and merge it if possible
-		if self.merging_enabled
-			&& let Some(last_entry) = self.changes.last_mut()
-			&& last_entry.can_merge(&entry)
+		if let Some(last_group) = self.groups.last_mut()
+			&& in_merge_window
+			&& last_group.can_merge(&group)
 		{
-			last_entry.merge(entry);
+			last_group.merge(group);
 		}
 		else {
-			self.changes.push(entry);
-			self.disabled_change_index = self.changes.len();
+			self.groups.push(group);
 		}
-	}
 
-	pub fn time_since_last_command(&self) -> Duration {
-		self.last_command_time.elapsed()
-	}
-
-	pub fn set_merging_enabled(&mut self, enabled: bool) {
-		self.merging_enabled = enabled;
+		self.disabled_change_index = self.groups.len();
 	}
 
 	pub fn can_undo(&self) -> bool {
@@ -65,7 +64,7 @@ impl UndoStack {
 	}
 
 	pub fn can_redo(&self) -> bool {
-		self.disabled_change_index < self.changes.len()
+		self.disabled_change_index < self.groups.len()
 	}
 
 	pub fn undo(&mut self, model: &mut Model) {
@@ -76,7 +75,7 @@ impl UndoStack {
 		let mut context = UndoContext { model, message_bus: &self.message_bus };
 
 		self.disabled_change_index -= 1;
-		self.changes[self.disabled_change_index].undo(&mut context);
+		self.groups[self.disabled_change_index].undo(&mut context);
 	}
 
 	pub fn redo(&mut self, model: &mut Model) {
@@ -86,7 +85,7 @@ impl UndoStack {
 
 		let mut context = UndoContext { model, message_bus: &self.message_bus };
 
-		self.changes[self.disabled_change_index].redo(&mut context);
+		self.groups[self.disabled_change_index].redo(&mut context);
 		self.disabled_change_index += 1;
 	}
 
@@ -96,19 +95,19 @@ impl UndoStack {
 		}
 
 		// Make sure we can never go out of bounds
-		let index = index.min(self.changes.len());
+		let index = index.min(self.groups.len());
 
 		let mut context = UndoContext { model, message_bus: &self.message_bus };
 
 		// Undo
 		while self.disabled_change_index > index {
 			self.disabled_change_index -= 1;
-			self.changes[self.disabled_change_index].undo(&mut context);
+			self.groups[self.disabled_change_index].undo(&mut context);
 		}
 
 		// Redo
 		while self.disabled_change_index < index {
-			self.changes[self.disabled_change_index].redo(&mut context);
+			self.groups[self.disabled_change_index].redo(&mut context);
 			self.disabled_change_index += 1;
 		}
 	}
@@ -118,19 +117,77 @@ impl UndoStack {
 	}
 
 	pub fn len(&self) -> usize {
-		self.changes.len()
+		self.groups.len()
 	}
 
-	pub fn describe(&self, index: usize) -> Cow<'_, str> {
-		self.changes.get(index)
-			.map_or(Cow::from("<invalid index>"), UndoEntry::describe)
+	pub fn describe(&self, index: usize) -> &str {
+		self.groups.get(index)
+			.map_or("<invalid index>", UndoGroup::describe)
+			.into()
+	}
+}
+
+
+#[derive(Default, Debug)]
+pub struct UndoGroup {
+	changes: Vec<UndoEntry>,
+	description: String,
+}
+
+impl UndoGroup {
+	pub fn new(description: impl Into<String>) -> UndoGroup {
+		UndoGroup {
+			changes: Vec::with_capacity(1),
+			description: description.into(),
+		}
 	}
 
-	pub fn transaction<'m>(&'m mut self, model: &'m mut Model, message_bus: &'m MessageBus) -> Transaction<'m> {
-		Transaction {
-			undo_stack: self,
-			model,
-			message_bus,
+	pub fn push(&mut self, entry: UndoEntry) {
+		if let Some(last_entry) = self.changes.last_mut()
+			&& last_entry.can_merge(&entry)
+		{
+			last_entry.merge(entry);
+		}
+		else {
+			self.changes.push(entry);
+		}
+	}
+
+	pub fn can_merge(&self, other: &UndoGroup) -> bool {
+		// A bit yucky but probably reliable enough for now
+		self.description == other.description
+	}
+
+	pub fn merge(&mut self, other: UndoGroup) {
+		for change in other.changes {
+			if let Some(last_change) = self.changes.last_mut()
+				&& last_change.can_merge(&change)
+			{
+				last_change.merge(change);
+			}
+			else {
+				self.changes.push(change);
+			}
+		}
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.changes.is_empty()
+	}
+
+	pub fn describe(&self) -> &str {
+		&self.description
+	}
+
+	fn undo(&self, ctx: &mut UndoContext<'_>) {
+		for change in self.changes.iter().rev() {
+			change.undo(ctx);
+		}
+	}
+
+	fn redo(&self, ctx: &mut UndoContext<'_>) {
+		for change in self.changes.iter() {
+			change.redo(ctx);
 		}
 	}
 }
@@ -158,6 +215,11 @@ pub enum UndoEntry {
 		after: Wall,
 	},
 
+	UpdatePlayer {
+		before: Player,
+		after: Player,
+	},
+
 	// TODO(pat.m): yuck - this is way too heavy
 	UpdateWorld {
 		before: World,
@@ -166,16 +228,6 @@ pub enum UndoEntry {
 }
 
 impl UndoEntry {
-	fn describe(&self) -> Cow<'_, str> {
-		use UndoEntry::*;
-
-		match self {
-			UpdateRoom{room_index, ..} => format!("Update room #{room_index}").into(),
-			UpdateWall{wall_id: WallId{room_index, wall_index}, ..} => format!("Update wall #{wall_index} in room #{room_index}").into(),
-			UpdateWorld{..} => "Update world".into(),
-		}
-	}
-
 	fn can_merge(&self, other: &UndoEntry) -> bool {
 		use UndoEntry::*;
 
@@ -186,6 +238,7 @@ impl UndoEntry {
 			(UpdateRoom{room_index, ..}, UpdateWall{wall_id, ..}) => *room_index == wall_id.room_index,
 
 			(UpdateWorld{..}, UpdateWorld{..}) => true,
+			(UpdatePlayer{..}, UpdatePlayer{..}) => true,
 
 			_ => false,
 		}
@@ -211,6 +264,10 @@ impl UndoEntry {
 				*after = new_after;
 			}
 
+			(UpdatePlayer{after, ..}, UpdatePlayer{after: new_after, ..}) => {
+				*after = new_after;
+			}
+
 			_ => {}
 		}
 	}
@@ -233,6 +290,10 @@ impl UndoEntry {
 				ctx.model.world.clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
+
+			UpdatePlayer{before, ..} => {
+				ctx.model.player.clone_from(before);
+			}
 		}
 	}
 
@@ -254,6 +315,10 @@ impl UndoEntry {
 				ctx.model.world.clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
+
+			UpdatePlayer{after, ..} => {
+				ctx.model.player.clone_from(after);
+			}
 		}
 	}
 }
@@ -262,75 +327,96 @@ impl UndoEntry {
 
 
 pub struct Transaction<'m> {
-	pub undo_stack: &'m mut UndoStack,
-	pub model: &'m mut Model,
-	pub message_bus: &'m MessageBus,
+	undo_stack: &'m mut UndoStack,
+	model: &'m mut Model,
+	message_bus: &'m MessageBus,
+	group: UndoGroup,
 }
 
 impl Transaction<'_> {
-	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&mut Room) -> anyhow::Result<()>) -> anyhow::Result<()> {
+	pub fn describe(&mut self, description: impl Into<String>) {
+		self.group.description = description.into();
+	}
+
+	pub fn submit(&mut self) {
+		if self.group.is_empty() {
+			return;
+		}
+
+		let group = std::mem::take(&mut self.group);
+		group.redo(&mut UndoContext { model: self.model, message_bus: self.message_bus });
+		self.undo_stack.push_group(group);
+	}
+
+	pub fn model(&self) -> &Model {
+		&self.model
+	}
+
+	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&Model, &mut Room) -> anyhow::Result<()>) -> anyhow::Result<()> {
 		let room = self.model.world.rooms.get_mut(room_index)
 			.with_context(|| format!("Trying to edit non-existent room #{room_index}"))?;
 
 		let before = room.clone();
+		let mut after = room.clone();
 
-		if let Err(err) = edit(room) {
-			*room = before;
-			return Err(err);
-		}
+		edit(&self.model, &mut after)?;
 
-		self.undo_stack.push(UndoEntry::UpdateRoom {
+		self.group.push(UndoEntry::UpdateRoom {
 			room_index, 
 			before,
-			after: room.clone(),
+			after,
 		});
-
-		self.message_bus.emit(WorldChangedEvent);
 
 		Ok(())
 	}
 
-	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&mut Wall) -> anyhow::Result<()>) -> anyhow::Result<()> {
+	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&Model, &mut Wall) -> anyhow::Result<()>) -> anyhow::Result<()> {
 		let room = self.model.world.rooms.get_mut(wall_id.room_index)
-			.with_context(|| format!("Trying to edit wall in non-existent room #{}", wall_id.room_index))?;
+			.with_context(|| format!("Trying to edit {wall_id} in non-existent room"))?;
 
 		let wall = room.walls.get_mut(wall_id.wall_index)
-			.with_context(|| format!("Trying to edit non-existent wall {wall_id:?}"))?;
+			.with_context(|| format!("Trying to edit non-existent {wall_id}"))?;
 
 		let before = wall.clone();
+		let mut after = wall.clone();
 
-		if let Err(err) = edit(wall) {
-			*wall = before;
-			return Err(err);
-		}
+		edit(&self.model, &mut after)?;
 
-		self.undo_stack.push(UndoEntry::UpdateWall {
+		self.group.push(UndoEntry::UpdateWall {
 			wall_id, 
 			before,
-			after: wall.clone(),
+			after,
 		});
-
-		self.message_bus.emit(WorldChangedEvent);
 
 		Ok(())
 	}
 
-	pub fn update_world(&mut self, edit: impl FnOnce(&mut World) -> anyhow::Result<()>) -> anyhow::Result<()> {
+	pub fn update_world(&mut self, edit: impl FnOnce(&Model, &mut World) -> anyhow::Result<()>) -> anyhow::Result<()> {
 		let before = self.model.world.clone();
+		let mut after = self.model.world.clone();
 
-		if let Err(err) = edit(&mut self.model.world) {
-			self.model.world = before;
-			return Err(err);
-		}
+		edit(&self.model, &mut after)?;
 
-		self.undo_stack.push(UndoEntry::UpdateWorld {
-			before,
-			after: self.model.world.clone(),
-		});
+		self.group.push(UndoEntry::UpdateWorld {before, after});
 
-		self.message_bus.emit(WorldChangedEvent);
+		Ok(())
+	}
+
+	pub fn update_player(&mut self, edit: impl FnOnce(&Model, &mut Player) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let before = self.model.player.clone();
+		let mut after = self.model.player.clone();
+
+		edit(&self.model, &mut after)?;
+
+		self.group.push(UndoEntry::UpdatePlayer {before, after});
 
 		Ok(())
 	}
 }
 
+
+impl<'m> Drop for Transaction<'m> {
+	fn drop(&mut self) {
+		self.submit();
+	}
+}

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::fmt::{self, Display};
 
 pub mod world;
 pub mod player;
@@ -88,6 +89,12 @@ impl WallId {
 	}
 }
 
+impl Display for WallId {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "Wall {}:{}", self.room_index, self.wall_index)
+	}
+}
+
 
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -103,6 +110,12 @@ impl VertexId {
 			room_index: self.room_index,
 			wall_index: self.vertex_index,
 		}
+	}
+}
+
+impl Display for VertexId {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "Vertex {}:{}", self.room_index, self.vertex_index)
 	}
 }
 

@@ -57,10 +57,6 @@ pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_b
 		}
 	}
 
-	let should_merge_previous_frames = state.undo_stack.time_since_last_command().as_secs_f32() < 0.4;
-
-	state.undo_stack.set_merging_enabled(should_merge_previous_frames);
-
 	// Handle editor commands
 	let mut transaction = state.undo_stack.transaction(model, message_bus);
 
@@ -68,10 +64,9 @@ pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_b
 		if let Err(err) = handle_world_edit_cmd(&mut state.inner, &mut transaction, cmd) {
 			log::error!("Editor command failed: {err}");
 		}
-
-		// Enable after the first command, so that all commands within a frame that can be merged are merged
-		transaction.undo_stack.set_merging_enabled(true);
 	}
+
+	drop(transaction);
 
 	// Make sure we haven't messed anything up
 	super::validate_model(state, model);
@@ -95,31 +90,33 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		log::info!("{cmd:?}");
 	}
 
-	let model = &mut transaction.model;
-
 	match cmd {
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
 			match item {
-				Item::Vertex(VertexId {room_index, vertex_index}) => {
-					transaction.update_room(room_index, |room| {
+				Item::Vertex(vertex_id @ VertexId {room_index, vertex_index}) => {
+					transaction.describe(format!("Move {vertex_id}"));
+					transaction.update_room(room_index, |_, room| {
 						room.wall_vertices[vertex_index] += delta;
 
 						Ok(())
 					})?;
+					transaction.submit();
 				}
 
-				Item::Wall(WallId {room_index, wall_index}) => {
-					transaction.update_room(room_index, |room| {
+				Item::Wall(wall_id @ WallId {room_index, wall_index}) => {
+					transaction.describe(format!("Move {wall_id}"));
+					transaction.update_room(room_index, |_, room| {
 						let wall_count = room.wall_vertices.len();
 						room.wall_vertices[wall_index] += delta;
 						room.wall_vertices[(wall_index+1) % wall_count] += delta;
-
 						Ok(())
 					})?;
+					transaction.submit();
 				}
 
 				Item::Room(room_index) => {
-					transaction.update_room(room_index, |room| {
+					transaction.describe(format!("Recenter Room #{room_index}"));
+					transaction.update_room(room_index, |_, room| {
 						for vertex in room.wall_vertices.iter_mut() {
 							*vertex += delta;
 						}
@@ -130,7 +127,8 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				Item::Object(index) => {
 					// TODO(pat.m): :(
-					transaction.update_world(|world| {
+					transaction.describe(format!("Move Object #{index}"));
+					transaction.update_world(|_, world| {
 						let object = world.objects.get_mut(index)
 							.with_context(|| format!("Trying to edit non-existent object #{index}"))?;
 
@@ -139,6 +137,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 						Ok(())
 					})?;
+					transaction.submit();
 				}
 
 				Item::PlayerSpawn => {
@@ -148,68 +147,90 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::SetCeilingColor(room_index, color) => {
-			transaction.update_room(room_index, |room| {
+			transaction.describe(format!("Set Room #{room_index} ceiling color"));
+			transaction.update_room(room_index, |_, room| {
 				room.ceiling_color = color;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetCeilingHeight(room_index, height) => {
-			transaction.update_room(room_index, |room| {
+			transaction.describe(format!("Set Room #{room_index} ceiling height"));
+			transaction.update_room(room_index, |_, room| {
 				room.height = height;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetFloorColor(room_index, color) => {
-			transaction.update_room(room_index, |room| {
+			transaction.describe(format!("Set Room #{room_index} floor color"));
+			transaction.update_room(room_index, |_, room| {
 				room.floor_color = color;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetWallColor(wall_id, color) => {
-			transaction.update_wall(wall_id, |wall| {
+			transaction.describe(format!("Set {wall_id} color"));
+			transaction.update_wall(wall_id, |_, wall| {
 				wall.color = color;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset) => {
-			transaction.update_wall(wall_id, |wall| {
+			transaction.describe(format!("Set {wall_id} horizontal offset"));
+			transaction.update_wall(wall_id, |_, wall| {
 				wall.horizontal_offset = offset;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset) => {
-			transaction.update_wall(wall_id, |wall| {
+			transaction.describe(format!("Set {wall_id} vertical offset"));
+			transaction.update_wall(wall_id, |_, wall| {
 				wall.vertical_offset = offset;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetFogParams(color) => {
-			transaction.update_world(|world| {
+			transaction.describe("Change fog color");
+			transaction.update_world(|_, world| {
 				world.fog_color = color;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SetPlayerSpawn => {
-			let new_player_spawn = model.player.placement;
-			transaction.update_world(|world| {
-				world.player_spawn = new_player_spawn;
+			transaction.describe("Set player spawn");
+			transaction.update_world(|model, world| {
+				world.player_spawn = model.player.placement;
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::AddRoom { room, connection } => {
-			transaction.update_world(|world| {
+			if let Some((_, target_wall_id)) = connection {
+				transaction.describe(format!("Add Room from {target_wall_id}"));
+			} else {
+				transaction.describe("Add Room");
+			}
+
+			transaction.update_world(|_, world| {
 				let new_room_index = world.rooms.len();
 
 				world.rooms.push(room);
 
+				// TODO(pat.m): can be a separate entry
 				if let Some((source_wall_index, target_wall_id)) = connection {
 					// Disconnect target wall
 					world.connections.retain(|&(wall_a, wall_b)| {
@@ -227,18 +248,21 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::RemoveRoom(room_index) => {
-			if model.world.rooms.len() == 1 {
+			if transaction.model().world.rooms.len() == 1 {
 				anyhow::bail!("Can't delete last room in world")
 			}
 
-			if model.player.placement.room_index == room_index {
+			if transaction.model().player.placement.room_index == room_index {
 				anyhow::bail!("Can't delete room containing player");
 			}
 
-			transaction.update_world(|world| {
+			transaction.describe(format!("Remove Room #{room_index}"));
+
+			transaction.update_world(|_, world| {
 				// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every Location in the model
 
 				// Fix player spawn
@@ -286,24 +310,31 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			})?;
 
 			// Fix player position if we've made it this far
-			// TODO(pat.m): BAD
-			if transaction.model.player.placement.room_index > room_index {
-				transaction.model.player.placement.room_index = transaction.model.player.placement.room_index.saturating_sub(1);
-			}
+			transaction.update_player(|_, player| {
+				if player.placement.room_index > room_index {
+					player.placement.room_index = player.placement.room_index.saturating_sub(1);
+					Ok(())
+				}
+			})?;
+
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectRoom(room_index) => {
-			transaction.update_world(|world| {
+			transaction.describe(format!("Disconnect Room #{room_index}"));
+			transaction.update_world(|_, world| {
 				world.connections.retain(|&(wall_a, wall_b)| {
 					wall_a.room_index != room_index && wall_b.room_index != room_index
 				});
 				
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::ConnectWall(source_wall_id, target_wall_id) => {
-			transaction.update_world(|world| {
+			transaction.describe(format!("Connect {source_wall_id} -> {target_wall_id}"));
+			transaction.update_world(|_, world| {
 				// Remove any connections to either the source or target walls
 				world.connections.retain(|&(wall_a, wall_b)| {
 					wall_a != source_wall_id && wall_b != source_wall_id
@@ -315,20 +346,24 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
-			transaction.update_world(|world| {
+			transaction.describe(format!("Disconnect {wall_id}"));
+			transaction.update_world(|_, world| {
 				world.connections.retain(|&(wall_a, wall_b)| {
 					wall_a != wall_id && wall_b != wall_id
 				});
 				
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
-			transaction.update_world(|world| {
+			transaction.describe(format!("Split Wall {wall_id}"));
+			transaction.update_world(|_, world| {
 				let room = world.rooms.get_mut(wall_id.room_index)
 					.context("Invalid room index")?;
 
@@ -355,10 +390,13 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				Ok(())
 			})?;
+
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DeleteVertex(vertex_id) => {
-			transaction.update_world(|world| {
+			transaction.describe(format!("Remove Vertex {vertex_id}"));
+			transaction.update_world(|_, world| {
 				let room = world.rooms.get_mut(vertex_id.room_index)
 					.context("Invalid room index")?;
 
@@ -389,17 +427,22 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				Ok(())
 			})?;
+			transaction.submit();
 		}
 
 
 		EditorWorldEditCmd::AddObject(object) => {
 			// TODO(pat.m): :(
-			transaction.update_world(|world| { world.objects.push(object); Ok(()) })?;
+			transaction.describe("New Object");
+			transaction.update_world(|_, world| { world.objects.push(object); Ok(()) })?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::RemoveObject(object_index) => {
 			// TODO(pat.m): :(
-			transaction.update_world(|world| { world.objects.remove(object_index); Ok(()) })?;
+			transaction.describe(format!("Remove Object #{object_index}"));
+			transaction.update_world(|_, world| { world.objects.remove(object_index); Ok(()) })?;
+			transaction.submit();
 		}
 	}
 
