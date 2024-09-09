@@ -1,10 +1,10 @@
 use crate::prelude::*;
-use model::{Model, Player, Room, Wall, WallId, World, WorldChangedEvent};
+use model::{Model, Player, Object, Room, Wall, WallId, World, WorldChangedEvent};
 
 use std::time::{Instant, Duration};
 
 
-pub const UNDO_ENTRY_MERGE_WINDOW: Duration = Duration::from_millis(400);
+pub const UNDO_ENTRY_MERGE_WINDOW: Duration = Duration::from_millis(600);
 
 
 #[derive(Debug)]
@@ -135,13 +135,6 @@ pub struct UndoGroup {
 }
 
 impl UndoGroup {
-	pub fn new(description: impl Into<String>) -> UndoGroup {
-		UndoGroup {
-			changes: Vec::with_capacity(1),
-			description: description.into(),
-		}
-	}
-
 	pub fn push(&mut self, entry: UndoEntry) {
 		if let Some(last_entry) = self.changes.last_mut()
 			&& last_entry.can_merge(&entry)
@@ -225,6 +218,12 @@ pub enum UndoEntry {
 		after: Vec<(WallId, WallId)>,
 	},
 
+	UpdateObject {
+		object_index: usize,
+		before: Object,
+		after: Object,
+	},
+
 	// TODO(pat.m): yuck - this is way too heavy
 	UpdateWorld {
 		before: World,
@@ -239,6 +238,7 @@ impl UndoEntry {
 		match (self, other) {
 			(UpdateRoom{room_index: left_index, ..}, UpdateRoom{room_index: right_index, ..}) => left_index == right_index,
 			(UpdateWall{wall_id: left_id, ..}, UpdateWall{wall_id: right_id, ..}) => left_id == right_id,
+			(UpdateObject{object_index: left, ..}, UpdateObject{object_index: right, ..}) => left == right,
 
 			(UpdateRoom{room_index, ..}, UpdateWall{wall_id, ..}) => *room_index == wall_id.room_index,
 
@@ -259,6 +259,10 @@ impl UndoEntry {
 			}
 
 			(UpdateWall{after: old_after, ..}, UpdateWall{after: new_after, ..}) => {
+				*old_after = new_after;
+			}
+
+			(UpdateObject{after: old_after, ..}, UpdateObject{after: new_after, ..}) => {
 				*old_after = new_after;
 			}
 
@@ -313,6 +317,10 @@ impl UndoEntry {
 			UpdatePlayer{before, ..} => {
 				ctx.model.player.clone_from(before);
 			}
+
+			UpdateObject{object_index, before, ..} => {
+				ctx.model.world.objects[*object_index].clone_from(before);
+			}
 		}
 	}
 
@@ -342,6 +350,10 @@ impl UndoEntry {
 
 			UpdatePlayer{after, ..} => {
 				ctx.model.player.clone_from(after);
+			}
+
+			UpdateObject{object_index, after, ..} => {
+				ctx.model.world.objects[*object_index].clone_from(after);
 			}
 		}
 	}
@@ -385,11 +397,7 @@ impl Transaction<'_> {
 
 		edit(&self.model, &mut after)?;
 
-		self.group.push(UndoEntry::UpdateRoom {
-			room_index, 
-			before,
-			after,
-		});
+		self.group.push(UndoEntry::UpdateRoom {room_index, before, after});
 
 		Ok(())
 	}
@@ -406,11 +414,21 @@ impl Transaction<'_> {
 
 		edit(&self.model, &mut after)?;
 
-		self.group.push(UndoEntry::UpdateWall {
-			wall_id, 
-			before,
-			after,
-		});
+		self.group.push(UndoEntry::UpdateWall {wall_id, before, after});
+
+		Ok(())
+	}
+
+	pub fn update_object(&mut self, object_index: usize, edit: impl FnOnce(&Model, &mut Object) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let object = self.model.world.objects.get_mut(object_index)
+			.with_context(|| format!("Trying to edit non-existent object #{object_index}"))?;
+
+		let before = object.clone();
+		let mut after = object.clone();
+
+		edit(&self.model, &mut after)?;
+
+		self.group.push(UndoEntry::UpdateObject {object_index, before, after});
 
 		Ok(())
 	}

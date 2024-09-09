@@ -13,6 +13,8 @@ use undo::*;
 
 pub use commands::{handle_editor_cmds, EditorWorldEditCmd};
 
+use std::borrow::Cow;
+
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Item {
@@ -267,6 +269,10 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 			draw_room_inspector(ui, ctx, room_index);
 		}
 
+		Some(Item::Object(object_index)) => {
+			draw_object_inspector(ui, ctx, object_index);
+		}
+
 		_ => {
 			ui.label("<unimplemented>");
 		}
@@ -352,6 +358,23 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset));
+		}
+	});
+}
+
+fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, object_index: usize) {
+	let Some(object) = model.world.objects.get(object_index) else {
+		return
+	};
+
+	ui.label(format!("Object #{object_index} - \"{}\"", object.name));
+
+	ui.horizontal(|ui| {
+		ui.label("Name");
+
+		let mut object_name = Cow::from(&object.name);
+		if ui.text_edit_singleline(&mut object_name).changed() {
+			message_bus.emit(EditorWorldEditCmd::SetObjectName(object_index, object_name.into_owned()));
 		}
 	});
 }

@@ -38,6 +38,8 @@ pub enum EditorWorldEditCmd {
 
 	AddObject(Object),
 	RemoveObject(usize),
+
+	SetObjectName(usize, String),
 }
 
 
@@ -125,16 +127,11 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					})?;
 				}
 
-				Item::Object(index) => {
-					// TODO(pat.m): :(
-					transaction.describe(format!("Move Object #{index}"));
-					transaction.update_world(|_, world| {
-						let object = world.objects.get_mut(index)
-							.with_context(|| format!("Trying to edit non-existent object #{index}"))?;
-
+				Item::Object(object_index) => {
+					transaction.describe(format!("Move Object #{object_index}"));
+					transaction.update_object(object_index, |_, object| {
 						// TODO(pat.m): need to be able to move between rooms!
 						object.placement.position += delta;
-
 						Ok(())
 					})?;
 					transaction.submit();
@@ -457,6 +454,12 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			// TODO(pat.m): :(
 			transaction.describe(format!("Remove Object #{object_index}"));
 			transaction.update_world(|_, world| { world.objects.remove(object_index); Ok(()) })?;
+			transaction.submit();
+		}
+
+		EditorWorldEditCmd::SetObjectName(object_index, object_name) => {
+			transaction.describe(format!("Change Object #{object_index}'s name"));
+			transaction.update_object(object_index, |_, object| { object.name = object_name; Ok(()) })?;
 			transaction.submit();
 		}
 	}
