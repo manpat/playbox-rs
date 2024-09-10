@@ -19,19 +19,20 @@ impl HudView {
 		let screen_size = gfx.backbuffer_size().to_vec2();
 		let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
 
-		let mut usable_area = screen_bounds.shrink(4.0);
+		let mut usable_area = screen_bounds.shrink(2.0);
 
 
 		let mut quads = vec![
-			usable_area.cut_top(24.0).shrink(2.0),
+			usable_area.cut_top(12.0).shrink(2.0),
 			usable_area.cut_bottom(24.0).shrink(2.0),
 			usable_area.cut_left(24.0).shrink(2.0),
 			usable_area.cut_right(24.0).shrink(2.0),
+			usable_area.cut_top(12.0).shrink(2.0),
 		];
 
 		if model.interactions.can_interact {
 			quads.push(Aabb2::from_center_extents(usable_area.center(), 8.0));
-			// TODO(pat.m): info about hovered interactable
+			// TODO(pat.m): text info about hovered interactable
 		}
 
 		let mut hud_group = gfx.frame_encoder.command_group(HUD_FRAME_STAGE);
