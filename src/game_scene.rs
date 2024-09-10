@@ -81,12 +81,12 @@ impl GameScene {
 				},
 				world,
 
-				inventory: model::Inventory,
-				progress: model::ProgressModel,
-				processed_world: model::ProcessedWorld,
-				interactions: model::InteractionModel,
-				environment: model::EnvironmentModel,
-				hud: model::HudModel,
+				inventory: model::Inventory::default(),
+				progress: model::ProgressModel::default(),
+				processed_world: model::ProcessedWorld::default(),
+				interactions: model::Interactions::default(),
+				environment: model::EnvironmentModel::default(),
+				hud: model::HudModel::default(),
 			},
 
 			time: 0.0,
@@ -117,6 +117,7 @@ impl GameScene {
 		}
 
 		self.model.player.handle_input(ctx, &self.model.world);
+		self.model.interactions.update(&self.model.player, &self.model.world);
 
 		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.model.player.placement.yaw));
 		// self.update_interactive_objects(ctx);

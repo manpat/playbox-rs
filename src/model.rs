@@ -3,9 +3,11 @@ use std::fmt::{self, Display};
 
 pub mod world;
 pub mod player;
+pub mod interactions;
 
 pub use world::*;
 pub use player::*;
+pub use interactions::*;
 
 #[derive(Debug)]
 pub struct Model {
@@ -38,7 +40,7 @@ pub struct Model {
 
 	// Keeps track of what kind of interactions are available, where, and responsible for triggering effects.
 	// Derived from ProcessedWorld - interacts with Hud and Player
-	pub interactions: InteractionModel,
+	pub interactions: Interactions,
 
 	// Keeps track of state of environmental effects - fog settings, reverb settings, active particle effects etc
 	pub environment: EnvironmentModel,
@@ -120,9 +122,8 @@ impl Display for VertexId {
 }
 
 
-#[derive(Debug)] pub struct Inventory;
-#[derive(Debug)] pub struct ProgressModel;
-#[derive(Debug)] pub struct ProcessedWorld;
-#[derive(Debug)] pub struct InteractionModel;
-#[derive(Debug)] pub struct EnvironmentModel;
-#[derive(Debug)] pub struct HudModel;
+#[derive(Debug, Default)] pub struct Inventory;
+#[derive(Debug, Default)] pub struct ProgressModel;
+#[derive(Debug, Default)] pub struct ProcessedWorld;
+#[derive(Debug, Default)] pub struct EnvironmentModel;
+#[derive(Debug, Default)] pub struct HudModel;
