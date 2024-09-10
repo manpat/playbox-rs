@@ -20,6 +20,7 @@ pub struct GameScene {
 	model: model::Model,
 
 	time: f32,
+	height_offset: f32,
 
 	editor_state: editor::State,
 	show_editor: bool,
@@ -81,7 +82,6 @@ impl GameScene {
 				},
 				world,
 
-				inventory: model::Inventory::default(),
 				progress: model::ProgressModel::default(),
 				processed_world: model::ProcessedWorld::default(),
 				interactions: model::Interactions::default(),
@@ -90,6 +90,7 @@ impl GameScene {
 			},
 
 			time: 0.0,
+			height_offset: 0.0,
 
 			editor_state: editor::State::new(ctx.message_bus),
 			show_editor: false,
@@ -111,16 +112,18 @@ impl GameScene {
 		if self.show_editor {
 			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, &self.message_bus);
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
-			if !self.force_game_controls {
-				return;
-			}
 		}
 
-		self.model.player.handle_input(ctx, &self.model.world);
-		self.model.interactions.update(&self.model.player, &self.model.world);
+		let model::Model { processed_world, world, player, progress, interactions, .. } = &mut self.model;
 
-		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(self.model.player.placement.yaw));
-		// self.update_interactive_objects(ctx);
+		processed_world.update(&world, &progress);
+
+		if !self.show_editor || self.force_game_controls {
+			player.handle_input(ctx, &world);
+			interactions.update(&player, &world);
+		}
+
+		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
 	}
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
@@ -128,12 +131,24 @@ impl GameScene {
 
 		let player = &self.model.player;
 
+		if let Some(height_change) = player.hack_height_change {
+			self.height_offset += height_change;
+		}
+
+		if self.height_offset.abs() > 0.02 {
+			self.height_offset -= self.height_offset.signum() * 0.02;
+
+		} else {
+			self.height_offset = 0.0;
+		}
+
+
 		let aspect = gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);
 		let projection_view = projection
 			* Mat4::rotate_x(player.pitch)
 			* Mat4::rotate_y(player.placement.yaw)
-			* Mat4::translate(-player.free_pos-Vec3::from_y(player.height));
+			* Mat4::translate(-player.free_pos-Vec3::from_y(player.height - self.height_offset));
 
 		let inverse_projection = projection.inverse();
 
@@ -147,7 +162,7 @@ impl GameScene {
 		let mut hud_group = gfx.frame_encoder.command_group(view::HUD_FRAME_STAGE);
 		hud_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
-		self.world_view.draw(gfx, &self.model.world, player.placement, player.hack_height_change);
+		self.world_view.draw(gfx, &self.model.world, player.placement);
 		self.hud_view.draw(gfx, &self.model);
 
 		// self.toy_renderer.draw(gfx);

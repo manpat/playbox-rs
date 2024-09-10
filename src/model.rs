@@ -11,22 +11,21 @@ pub use interactions::*;
 
 #[derive(Debug)]
 pub struct Model {
-	// Immutable - loaded from resources
+	// Immutable - loaded from resources, edited by editor
 	pub world: World,
-
-	// TODO(pat.m): dialog model?
+	// TODO(pat.m): item info
+	// TODO(pat.m): any dialogue stuff
 
 	// Mutable - save game state
 
 	pub player: Player,
-	pub inventory: Inventory,
 
 	// TODO(pat.m): active effects/stats/equipment
 	// TODO(pat.m): general behaviours - spell casting/attacks/etc
 
-
 	// Keeps track of progression. what doors unlocked, items gathered, etc
 	pub progress: ProgressModel,
+
 
 	// Mutable - runtime state, generated from above on load
 
@@ -122,8 +121,12 @@ impl Display for VertexId {
 }
 
 
-#[derive(Debug, Default)] pub struct Inventory;
 #[derive(Debug, Default)] pub struct ProgressModel;
 #[derive(Debug, Default)] pub struct ProcessedWorld;
 #[derive(Debug, Default)] pub struct EnvironmentModel;
 #[derive(Debug, Default)] pub struct HudModel;
+
+
+impl ProcessedWorld {
+	pub fn update(&mut self, _world: &World, _progress: &ProgressModel) {}
+}
