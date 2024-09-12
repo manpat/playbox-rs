@@ -106,7 +106,7 @@ impl App {
 		match vfs.load_json_resource(path) {
 			Ok(world) => world,
 			Err(err) => {
-				eprintln!("Failed to load world at '{}', creating empty world. {err}", path.display());
+				log::error!("Failed to load world at '{}', creating empty world. {err}", path.display());
 				model::World::new()
 			},
 		}
@@ -122,7 +122,7 @@ impl toybox::App for App {
 		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
 			&& self.game_scene.is_none()
 		{
-			eprintln!("Active scene wants game scene but no game scene is loaded. Transitioning back to main menu");
+			log::error!("Active scene wants game scene but no game scene is loaded. Transitioning back to main menu");
 			self.active_scene = ActiveScene::MainMenu;
 		}
 

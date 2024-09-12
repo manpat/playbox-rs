@@ -242,7 +242,7 @@ impl GameScene {
 					}
 
 					Err(error) => {
-						eprintln!("Failed to load world '{default_world_path}': {error}");
+						log::error!("Failed to load world '{default_world_path}': {error}");
 					}
 				}
 
@@ -253,7 +253,7 @@ impl GameScene {
 				let default_world_path = "worlds/default.world";
 
 				if let Err(error) = ctx.vfs.save_json_resource(default_world_path, &self.model.world) {
-					eprintln!("Failed to save world to '{default_world_path}': {error}");
+					log::error!("Failed to save world to '{default_world_path}': {error}");
 				}
 
 				ui.close_menu();
