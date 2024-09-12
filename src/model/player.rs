@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, WallId};
+use model::{Placement, WallId, World, ProcessedWorld};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
@@ -22,7 +22,7 @@ pub struct Player {
 }
 
 impl Player {
-	pub fn handle_input(&mut self, ctx: &mut Context<'_>, world: &model::World) {
+	pub fn handle_input(&mut self, ctx: &mut Context<'_>, world: &World, processed_world: &ProcessedWorld) {
 		self.hack_height_change = None;
 
 		if ctx.input.button_just_down(input::keys::KeyV) {
@@ -95,7 +95,7 @@ impl Player {
 				delta -= right * speed;
 			}
 
-			self.try_move_by(world, delta);
+			self.try_move_by(world, processed_world, delta);
 		}
 	}
 }
@@ -104,7 +104,7 @@ impl Player {
 // TODO(pat.m): some kind of transform/connectivity cache
 
 impl Player {
-	fn try_move_by(&mut self, world: &model::World, delta: Vec2) {
+	fn try_move_by(&mut self, world: &World, processed_world: &ProcessedWorld, delta: Vec2) {
 		if delta.dot(delta) <= 0.00001 {
 			return;
 		}
@@ -134,7 +134,6 @@ impl Player {
 		// Collide with walls
 		for wall_index in 0..current_room.walls.len() {
 			let (wall_start, wall_end) = current_room.wall_vertices(wall_index);
-			let wall = &current_room.walls[wall_index];
 
 			let wall_direction = (wall_end - wall_start).normalize();
 			let wall_length = (wall_end - wall_start).length();
@@ -158,55 +157,35 @@ impl Player {
 			// We have some kind of intersection here - figure out if we need to transition to another room
 			// or if we need to slide against the wall
 			let wall_id = WallId{room_index: self.placement.room_index, wall_index};
-			if let Some(opposing_wall_id) = world.wall_target(wall_id) {
-				// Connected walls may be different lengths, so we need to calculate the aperture that we can actually
-				// pass through.
-				let opposing_room = &world.rooms[opposing_wall_id.room_index];
-				let opposing_wall = &opposing_room.walls[opposing_wall_id.wall_index];
-				let opposing_wall_length = {
-					let (wall_start, wall_end) = opposing_room.wall_vertices(opposing_wall_id.wall_index);
-					(wall_end - wall_start).length()
-				};
-
-				let aperture_extent = wall_length.min(opposing_wall_length) / 2.0;
-				let aperture_offset = wall.horizontal_offset.clamp(aperture_extent-wall_length/2.0, wall_length/2.0-aperture_extent);
-
-
-				let wall_center = wall_length/2.0 + aperture_offset;
-				let aperture_a = wall_start + (wall_center - aperture_extent) * wall_direction;
-				let aperture_b = wall_start + (wall_center + aperture_extent) * wall_direction;
+			if let Some(connection_info) = processed_world.connection_for(wall_id) {
+				let wall_center = wall_length/2.0 + connection_info.aperture_offset;
+				let aperture_a = wall_start + (wall_center - connection_info.aperture_extent) * wall_direction;
+				let aperture_b = wall_start + (wall_center + connection_info.aperture_extent) * wall_direction;
 				let intersection_dist_from_center = (wall_center - distance_along_wall).abs();
 
 				// Collide with the virtual aperture verts
 				collide_vertex(&mut desired_position, aperture_a, PLAYER_RADIUS);
 				collide_vertex(&mut desired_position, aperture_b, PLAYER_RADIUS);
 
-				let vertical_offset = wall.vertical_offset - opposing_wall.vertical_offset;
-				let aperture_height = (current_room.height - vertical_offset).min(opposing_room.height + vertical_offset);
-
 				// Target room must be tall enough and the step must not be too steep
-				let can_transition_to_opposing_room = self.height < aperture_height
-					&& vertical_offset.abs() < self.height * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
+				let can_transition_to_opposing_room = self.height < connection_info.aperture_height
+					&& connection_info.step_size.abs() < self.height * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
 
 				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
-				if can_transition_to_opposing_room && intersection_dist_from_center < aperture_extent {
+				if can_transition_to_opposing_room && intersection_dist_from_center < connection_info.aperture_extent {
 					if wall_penetration < 0.0 {
 						continue
 					}
 
-					let transform = model::calculate_portal_transform(world, opposing_wall_id, wall_id);
-
-					self.placement.room_index = opposing_wall_id.room_index;
-					self.placement.position = transform * desired_position;
+					self.placement.room_index = connection_info.target_id.room_index;
+					self.placement.position = connection_info.source_to_target * desired_position;
 
 					// Apply yaw offset
-					let row = transform.rows[0];
-					let angle_delta = row.y.atan2(row.x);
-					self.placement.yaw -= angle_delta;
+					self.placement.yaw += connection_info.yaw_delta;
 
 					// TODO(pat.m): figure out another way to do this
-					self.hack_height_change = Some(vertical_offset);
+					self.hack_height_change = Some(connection_info.step_size);
 
 					// TODO(pat.m): collide with walls in opposing wall as well
 					return;

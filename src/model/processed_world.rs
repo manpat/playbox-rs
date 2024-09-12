@@ -28,6 +28,10 @@ impl ProcessedWorld {
 		}
 	}
 
+	pub fn connection_for(&self, wall_id: WallId) -> Option<&ConnectionInfo> {
+		self.wall_connections.get(&wall_id)
+	}
+
 	fn rebuild(&mut self, world: &World) {
 		self.wall_connections.clear();
 
@@ -55,7 +59,10 @@ impl ProcessedWorld {
 #[derive(Debug)]
 pub struct ConnectionInfo {
 	pub target_id: WallId,
-	pub transform: Mat2x3,
+
+	pub target_to_source: Mat2x3,
+	pub source_to_target: Mat2x3,
+
 	pub yaw_delta: f32,
 
 	// Half width
@@ -88,15 +95,18 @@ impl ConnectionInfo {
 		let vertical_offset = source_wall.vertical_offset - target_wall.vertical_offset;
 		let aperture_height = (source_room.height - vertical_offset).min(target_room.height + vertical_offset);
 
-		let transform = calculate_portal_transform(world, source_id, target_id);
+		let target_to_source = calculate_portal_transform(world, source_id, target_id);
+		let source_to_target = target_to_source.inverse();
+
 		let yaw_delta = {
-			let row = transform.rows[0];
-			-row.y.atan2(row.x)
+			let row = target_to_source.rows[0];
+			row.y.atan2(row.x)
 		};
 
 		ConnectionInfo {
 			target_id,
-			transform,
+			target_to_source,
+			source_to_target,
 			yaw_delta,
 
 			aperture_extent,
