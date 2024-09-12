@@ -232,10 +232,9 @@ impl GameScene {
 			}
 
 			if ui.button("Load World").clicked() {
-				// TODO(pat.m): get resource manager to find load/save path
-				let default_world_path = ctx.vfs.resource_path("worlds/default.world");
+				let default_world_path = "worlds/default.world";
 
-				match model::World::load(&default_world_path) {
+				match ctx.vfs.load_json_resource::<model::World>(default_world_path) {
 					Ok(new_world) => {
 						self.model.world = new_world;
 						self.message_bus.emit(model::WorldChangedEvent);
@@ -243,7 +242,7 @@ impl GameScene {
 					}
 
 					Err(error) => {
-						eprintln!("Failed to load world '{}': {error}", default_world_path.display());
+						eprintln!("Failed to load world '{default_world_path}': {error}");
 					}
 				}
 
@@ -251,10 +250,10 @@ impl GameScene {
 			}
 
 			if ui.button("Save World").clicked() {
-				let default_world_path = ctx.vfs.resource_path("worlds/default.world");
+				let default_world_path = "worlds/default.world";
 
-				if let Err(error) = self.model.world.save(&default_world_path) {
-					eprintln!("Failed to save world to '{}': {error}", default_world_path.display());
+				if let Err(error) = ctx.vfs.save_json_resource(default_world_path, &self.model.world) {
+					eprintln!("Failed to save world to '{default_world_path}': {error}");
 				}
 
 				ui.close_menu();

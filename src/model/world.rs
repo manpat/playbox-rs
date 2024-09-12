@@ -166,27 +166,6 @@ impl Wall {
 
 
 
-// TODO(pat.m): these should use the resource manager
-impl World {
-	pub fn save(&self, path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
-		let path = path.as_ref();
-
-		if let Some(parent_path) = path.parent() {
-			std::fs::create_dir_all(parent_path)?;
-		}
-
-		let data = serde_json::to_vec_pretty(self)?;
-		std::fs::write(path, &data).map_err(Into::into)
-	}
-
-	pub fn load(path: impl AsRef<std::path::Path>) -> anyhow::Result<World> {
-		let data = std::fs::read(path)?;
-		serde_json::from_slice(&data).map_err(Into::into)
-	}
-}
-
-
-
 // TODO(pat.m): would be good to move some of the below into a higher level model that can cache transforms, since
 // transforms between connected rooms will always be the same.
 

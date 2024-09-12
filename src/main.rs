@@ -81,7 +81,7 @@ impl App {
 
 		if true /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
-			let world = Self::load_world_or_default(ctx.vfs.resource_root().join("worlds/default.world"));
+			let world = Self::load_world_or_default(&ctx.vfs, "worlds/default.world");
 			game_scene = Some(GameScene::new(ctx, world)?);
 		}
 
@@ -100,10 +100,10 @@ impl App {
 		})
 	}
 
-	fn load_world_or_default(path: impl AsRef<std::path::Path>) -> model::World {
+	fn load_world_or_default(vfs: &vfs::Vfs, path: impl AsRef<std::path::Path>) -> model::World {
 		let path = path.as_ref();
 
-		match model::World::load(path) {
+		match vfs.load_json_resource(path) {
 			Ok(world) => world,
 			Err(err) => {
 				eprintln!("Failed to load world at '{}', creating empty world. {err}", path.display());
@@ -157,7 +157,7 @@ impl toybox::App for App {
 		for menu_msg in self.message_bus.poll_consume(&self.menu_cmd_subscription) {
 			match menu_msg {
 				MenuCmd::Play(..) => {
-					let world = Self::load_world_or_default(ctx.vfs.resource_path("worlds/default.world"));
+					let world = Self::load_world_or_default(&ctx.vfs, "worlds/default.world");
 					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus);
 					self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
 					self.active_scene = ActiveScene::Game;
