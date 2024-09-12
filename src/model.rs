@@ -5,11 +5,13 @@ pub mod world;
 pub mod player;
 pub mod interactions;
 pub mod environment;
+pub mod processed_world;
 
 pub use world::*;
 pub use player::*;
 pub use interactions::*;
 pub use environment::*;
+pub use processed_world::*;
 
 #[derive(Debug)]
 pub struct Model {
@@ -76,7 +78,7 @@ impl Placement {
 }
 
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct WallId {
 	pub room_index: usize,
 	pub wall_index: usize,
@@ -100,7 +102,7 @@ impl Display for WallId {
 
 
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct VertexId {
 	pub room_index: usize,
 	pub vertex_index: usize,
@@ -125,13 +127,3 @@ impl Display for VertexId {
 
 #[derive(Debug, Default)] pub struct ProgressModel;
 #[derive(Debug, Default)] pub struct HudModel;
-
-#[derive(Debug, Default)]
-pub struct ProcessedWorld;
-
-impl ProcessedWorld {
-	pub fn new(_world: &World) -> Self { Self::default() }
-	pub fn update(&mut self, _world: &World, _progress: &ProgressModel) {}
-	// TODO(pat.m): update for editor only - world won't change otherwise
-}
-

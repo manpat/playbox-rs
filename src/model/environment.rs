@@ -14,6 +14,9 @@ impl EnvironmentModel {
 	}
 
 	pub fn update(&mut self, world: &World, _message_bus: &MessageBus) {
+		// TODO(pat.m): respond to requests to change parameters
+		// TODO(pat.m): interpolate fog values
+
 		self.fog = world.fog;
 	}
 }

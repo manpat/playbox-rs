@@ -34,6 +34,8 @@ pub mod prelude {
 
 	pub use crate::Context;
 	pub use crate::message_bus::{MessageBus, Subscription};
+
+	pub use std::collections::HashMap;
 }
 
 use prelude::*;

@@ -52,6 +52,8 @@ impl GameScene {
 		// 	toy_renderer
 		// };
 
+		let processed_world = model::ProcessedWorld::new(&world, &ctx.message_bus);
+
 		Ok(GameScene {
 			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
 			hdr_to_ldr_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/hdr_to_ldr.cs.glsl")?),
@@ -81,8 +83,8 @@ impl GameScene {
 					hack_height_change: None,
 				},
 
-				processed_world: model::ProcessedWorld::new(&world),
 				environment: model::EnvironmentModel::new(&world, ctx.message_bus),
+				processed_world,
 
 				progress: model::ProgressModel::default(),
 				interactions: model::Interactions::default(),
@@ -118,7 +120,7 @@ impl GameScene {
 
 		let model::Model { processed_world, world, player, progress, interactions, environment, .. } = &mut self.model;
 
-		processed_world.update(&world, &progress);
+		processed_world.update(&world, &progress, &self.message_bus);
 
 		if !self.show_editor || self.force_game_controls {
 			player.handle_input(ctx, &world);
