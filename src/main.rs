@@ -208,13 +208,16 @@ pub struct Context<'tb> {
 
 	pub message_bus: &'tb MessageBus,
 	pub audio: &'tb MyAudioSystem,
+
+	pub show_editor: bool,
 }
 
 impl<'tb> Context<'tb> {
 	pub fn new(tb: &'tb mut toybox::Context, audio: &'tb MyAudioSystem, message_bus: &'tb MessageBus) -> Self {
-		let toybox::Context { gfx, input, egui, cfg, vfs, .. } = tb;
+		let toybox::Context { gfx, input, egui, cfg, vfs, show_debug_menu, .. } = tb;
+		let show_editor = *show_debug_menu;
 
-		Self {gfx, input, egui, cfg, vfs, audio, message_bus}
+		Self {gfx, input, egui, cfg, vfs, audio, message_bus, show_editor}
 	}
 }
 

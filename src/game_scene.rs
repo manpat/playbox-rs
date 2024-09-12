@@ -23,7 +23,6 @@ pub struct GameScene {
 	height_offset: f32,
 
 	editor_state: editor::State,
-	show_editor: bool,
 	force_game_controls: bool,
 }
 
@@ -97,7 +96,6 @@ impl GameScene {
 			height_offset: 0.0,
 
 			editor_state: editor::State::new(ctx.message_bus),
-			show_editor: false,
 			force_game_controls: false,
 		})
 	}
@@ -107,13 +105,9 @@ impl GameScene {
 			self.force_game_controls = !self.force_game_controls;
 		}
 
-		if ctx.input.button_just_down(input::keys::F2) {
-			self.show_editor = !self.show_editor;
-		}
+		ctx.input.set_capture_mouse(!ctx.show_editor || self.force_game_controls);
 
-		ctx.input.set_capture_mouse(!self.show_editor || self.force_game_controls);
-
-		if self.show_editor {
+		if ctx.show_editor {
 			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, &self.message_bus);
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
 		}
@@ -122,7 +116,7 @@ impl GameScene {
 
 		processed_world.update(&world, &progress, &self.message_bus);
 
-		if !self.show_editor || self.force_game_controls {
+		if !ctx.show_editor || self.force_game_controls {
 			player.handle_input(ctx, &world);
 			interactions.update(&player, &world);
 		}
