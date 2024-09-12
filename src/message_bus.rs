@@ -29,9 +29,24 @@ impl MessageBus {
 		}
 	}
 
-	pub fn messages_available<T: 'static>(&self, subscription: &Subscription<T>) -> bool {
+	pub fn peek_count<T: 'static>(&self, subscription: &Subscription<T>) -> usize {
 		let next_unread_message_index = subscription.inner.next_unread_message_index.get();
-		next_unread_message_index < self.inner.get_store::<T>().queued_message_count()
+		self.inner.get_store::<T>().queued_message_count().saturating_sub(next_unread_message_index)
+	}
+
+	pub fn peek_any<T: 'static>(&self, subscription: &Subscription<T>) -> bool {
+		self.peek_count(subscription) > 0
+	}
+
+	pub fn count<T: 'static>(&self, subscription: &Subscription<T>) -> usize {
+		let next_unread_message_index = subscription.inner.next_unread_message_index.get();
+		let available_messages = self.inner.get_store::<T>().queued_message_count();
+		subscription.inner.next_unread_message_index.set(available_messages);
+		available_messages.saturating_sub(next_unread_message_index)
+	}
+
+	pub fn any<T: 'static>(&self, subscription: &Subscription<T>) -> bool {
+		self.count(subscription) > 0
 	}
 
 	pub fn poll<T: Clone + 'static>(&self, subscription: &Subscription<T>) -> impl Iterator<Item=T> + '_ {

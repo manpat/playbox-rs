@@ -4,10 +4,12 @@ use std::fmt::{self, Display};
 pub mod world;
 pub mod player;
 pub mod interactions;
+pub mod environment;
 
 pub use world::*;
 pub use player::*;
 pub use interactions::*;
+pub use environment::*;
 
 #[derive(Debug)]
 pub struct Model {
@@ -122,11 +124,14 @@ impl Display for VertexId {
 
 
 #[derive(Debug, Default)] pub struct ProgressModel;
-#[derive(Debug, Default)] pub struct ProcessedWorld;
-#[derive(Debug, Default)] pub struct EnvironmentModel;
 #[derive(Debug, Default)] pub struct HudModel;
 
+#[derive(Debug, Default)]
+pub struct ProcessedWorld;
 
 impl ProcessedWorld {
+	pub fn new(_world: &World) -> Self { Self::default() }
 	pub fn update(&mut self, _world: &World, _progress: &ProgressModel) {}
+	// TODO(pat.m): update for editor only - world won't change otherwise
 }
+

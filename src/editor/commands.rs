@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use model::{Room, Object, VertexId, WallId};
+use model::{Room, Object, VertexId, WallId, FogParameters};
 use super::*;
 
 
@@ -15,7 +15,7 @@ pub enum EditorWorldEditCmd {
 	SetHorizontalWallOffset(WallId, f32),
 	SetVerticalWallOffset(WallId, f32),
 
-	SetFogParams(Color),
+	SetFogParams(FogParameters),
 
 
 	AddRoom {
@@ -197,10 +197,10 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::SetFogParams(color) => {
-			transaction.describe("Change fog color");
+		EditorWorldEditCmd::SetFogParams(parameters) => {
+			transaction.describe("Change fog parameters");
 			transaction.update_world(|_, world| {
-				world.fog_color = color;
+				world.fog = parameters;
 				Ok(())
 			})?;
 			transaction.submit();

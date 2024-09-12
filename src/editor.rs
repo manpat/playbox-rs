@@ -14,7 +14,7 @@ use undo::*;
 pub use commands::{handle_editor_cmds, EditorWorldEditCmd};
 
 use std::borrow::Cow;
-
+use egui::widgets::Slider;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Item {
@@ -208,12 +208,47 @@ fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
 		}
 	});
 
+	let mut fog = ctx.model.world.fog;
+
 	ui.horizontal(|ui| {
 		ui.label("Fog Color");
 
-		let mut fog_color = ctx.model.world.fog_color;
-		if ui.color_edit_button_rgb(fog_color.as_mut()).changed() {
-			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog_color));
+		if ui.color_edit_button_rgb(fog.color.as_mut()).changed() {
+			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
+		}
+	});
+
+	ui.horizontal(|ui| {
+		ui.label("Fog Start");
+
+		if ui.add(Slider::new(&mut fog.start, 0.0..=5.0)).changed() {
+			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
+		}
+	});
+
+	ui.horizontal(|ui| {
+		ui.label("Fog Distance");
+
+		if ui.add(Slider::new(&mut fog.distance, 1.0..=300.0).logarithmic(true)).changed() {
+			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
+		}
+	});
+
+	ui.horizontal(|ui| {
+		ui.label("Fog Emission");
+
+		let mut emission_non_linear = (fog.emission * 2.0 + 1.0).ln();
+		if ui.add(Slider::new(&mut emission_non_linear, 0.0..=1.0)).changed() {
+			fog.emission = (emission_non_linear.exp() - 1.0) / 2.0;
+			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
+		}
+	});
+
+	ui.horizontal(|ui| {
+		ui.label("Fog Transparency");
+
+		if ui.add(Slider::new(&mut fog.transparency, 0.0..=1.0)).changed() {
+			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
 		}
 	});
 }
@@ -300,7 +335,7 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Ceiling Height");
 
 		let mut height = room.height;
-		if ui.add(egui::widgets::Slider::new(&mut height, 0.1..=5.0).step_by(0.01).logarithmic(true))
+		if ui.add(Slider::new(&mut height, 0.1..=5.0).step_by(0.01).logarithmic(true))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetCeilingHeight(room_index, height));
@@ -343,7 +378,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("horizontal Offset");
 		
 		let mut offset = wall.horizontal_offset;
-		if ui.add(egui::widgets::Slider::new(&mut offset, -2.0..=2.0).step_by(0.01).clamp_to_range(false))
+		if ui.add(Slider::new(&mut offset, -2.0..=2.0).step_by(0.01).clamp_to_range(false))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset));
@@ -354,7 +389,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Vertical Offset");
 		
 		let mut offset = wall.vertical_offset;
-		if ui.add(egui::widgets::Slider::new(&mut offset, -1.0..=1.0).step_by(0.01).clamp_to_range(false))
+		if ui.add(Slider::new(&mut offset, -1.0..=1.0).step_by(0.01).clamp_to_range(false))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset));

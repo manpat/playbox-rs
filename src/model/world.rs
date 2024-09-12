@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, VertexId, WallId};
+use model::{Placement, VertexId, WallId, FogParameters};
 
 mod object;
 pub use object::*;
@@ -25,7 +25,7 @@ pub struct World {
 	
 	// TODO(pat.m): split out into 'environment settings'
 	// TODO(pat.m): can this be specified per room?
-	pub fog_color: Color,
+	pub fog: FogParameters,
 }
 
 impl World {
@@ -42,7 +42,7 @@ impl World {
 				yaw: 0.0,
 			},
 
-			fog_color: Color::white(),
+			fog: FogParameters::default(),
 		}
 	}
 

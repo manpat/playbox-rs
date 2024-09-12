@@ -80,13 +80,15 @@ impl GameScene {
 
 					hack_height_change: None,
 				},
-				world,
+
+				processed_world: model::ProcessedWorld::new(&world),
+				environment: model::EnvironmentModel::new(&world, ctx.message_bus),
 
 				progress: model::ProgressModel::default(),
-				processed_world: model::ProcessedWorld::default(),
 				interactions: model::Interactions::default(),
-				environment: model::EnvironmentModel::default(),
 				hud: model::HudModel::default(),
+
+				world,
 			},
 
 			time: 0.0,
@@ -114,7 +116,7 @@ impl GameScene {
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
 		}
 
-		let model::Model { processed_world, world, player, progress, interactions, .. } = &mut self.model;
+		let model::Model { processed_world, world, player, progress, interactions, environment, .. } = &mut self.model;
 
 		processed_world.update(&world, &progress);
 
@@ -122,6 +124,8 @@ impl GameScene {
 			player.handle_input(ctx, &world);
 			interactions.update(&player, &world);
 		}
+
+		environment.update(&world, &self.message_bus);
 
 		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
 	}
@@ -152,15 +156,12 @@ impl GameScene {
 
 		let inverse_projection = projection.inverse();
 
-		gfx.frame_encoder.backbuffer_color(self.model.world.fog_color);
+		gfx.frame_encoder.backbuffer_color(self.model.world.fog.color);
 		gfx.frame_encoder.bind_global_ubo(0, &[projection_view, inverse_projection]);
+		gfx.frame_encoder.bind_global_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
-		main_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
-
-		let mut hud_group = gfx.frame_encoder.command_group(view::HUD_FRAME_STAGE);
-		hud_group.bind_shared_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
 		self.world_view.draw(gfx, &self.model.world, player.placement);
 		self.hud_view.draw(gfx, &self.model);
@@ -180,13 +181,21 @@ impl GameScene {
 		#[derive(Copy, Clone)]
 		struct FogParameters {
 			fog_color: Color,
+			fog_start: f32,
+			fog_distance: f32,
+			fog_emission: f32,
+			fog_transparency: f32,
 		}
 
 		group.compute(self.fog_shader)
 			.image_rw(0, self.hdr_color_rt)
 			.sampled_image(1, self.depth_rt, gfx::CommonSampler::Nearest)
 			.ubo(1, &[FogParameters {
-				fog_color: self.model.world.fog_color
+				fog_color: self.model.environment.fog.color,
+				fog_start: self.model.environment.fog.start,
+				fog_distance: self.model.environment.fog.distance,
+				fog_emission: self.model.environment.fog.emission,
+				fog_transparency: self.model.environment.fog.transparency,
 			}])
 			.groups_from_image_size(self.hdr_color_rt);
 

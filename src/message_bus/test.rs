@@ -12,16 +12,16 @@ fn basic_scenario() {
 	bus.emit(EmptyMessage);
 
 	let subscription = bus.subscribe::<EmptyMessage>();
-	assert!(!bus.messages_available(&subscription), "New subscriptions shouldn't see prior messages");
+	assert!(!bus.peek_any(&subscription), "New subscriptions shouldn't see prior messages");
 	assert_eq!(bus.poll(&subscription).count(), 0, "New subscriptions shouldn't see prior messages");
 
 	bus.emit(EmptyMessage);
 	bus.emit(EmptyMessage);
 
-	assert!(bus.messages_available(&subscription), "Existing subscriptions should see new messages");
+	assert!(bus.peek_any(&subscription), "Existing subscriptions should see new messages");
 	assert_eq!(bus.poll(&subscription).count(), 2, "Subscriptions should see _all_ new messages");
 
-	assert!(!bus.messages_available(&subscription), "Subscriptions should only see each message once");
+	assert!(!bus.peek_any(&subscription), "Subscriptions should only see each message once");
 	assert_eq!(bus.poll(&subscription).count(), 0, "Subscriptions should only see each message once");
 
 	bus.emit(EmptyMessage);
@@ -29,7 +29,7 @@ fn basic_scenario() {
 
 	bus.garbage_collect();
 
-	assert!(bus.messages_available(&subscription), "Existing subscriptions should still see new messages after garbage_collect");
+	assert!(bus.peek_any(&subscription), "Existing subscriptions should still see new messages after garbage_collect");
 	assert_eq!(bus.poll(&subscription).count(), 2, "Subscriptions should still see _all_ new messages after garbage_collect");
 }
 
@@ -212,9 +212,9 @@ fn multiple_same_subs() {
 
 	bus.garbage_collect();
 
-	assert!(bus.messages_available(&subscription_1), "Existing subscriptions should still see new messages after garbage_collect");
+	assert!(bus.peek_any(&subscription_1), "Existing subscriptions should still see new messages after garbage_collect");
 	assert_eq!(bus.poll(&subscription_1).count(), 2, "Subscriptions should still see _all_ new messages after garbage_collect");
 
-	assert!(bus.messages_available(&subscription_2));
+	assert!(bus.peek_any(&subscription_2));
 	assert_eq!(bus.poll(&subscription_2).count(), 4);
 }

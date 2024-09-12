@@ -8,6 +8,10 @@ layout(binding=0) uniform P {
 
 layout(binding=1) uniform F {
 	vec4 u_fog_color;
+	float u_fog_start;
+	float u_fog_distance;
+	float u_fog_emission;
+	float u_fog_transparency;
 };
 
 layout(binding=0, rgba16f) uniform image2D u_image;
@@ -29,34 +33,24 @@ void main() {
 	vec4 view = u_inverse_projection * ndc;
 	view.xyz /= view.w;
 
-	// view.xyz = round(view.xyz*4.0)/4.0;
-
 	float distance = length(view.xyz);
+	float fog_distance = max(distance - u_fog_start, 0.0) / u_fog_distance;
 
-	float fog_factor = 1.0 - pow(clamp(1.0 - distance / 10.0, 0.0, 1.0), 10.0);
+	float fog_factor = 1.0 - pow(clamp(1.0 - fog_distance, 0.0, 1.0), 10.0);
 
 	vec3 fog_color = u_fog_color.rgb;
-	// vec3 fog_absorption = vec3(1.0) - fog_color;
 
 
+	// Initial linear fade
 	texel.rgb = mix(texel.rgb, fog_color, fog_factor);
 
-	// vec3 softlight = (1.0 - 2.0 * texel.rgb) * fog_color * fog_color + 2.0 * fog_color * texel.rgb;
-	// texel.rgb = overlay;
-	// texel.rgb = mix(texel.rgb, softlight, fog_factor);
+	// Second multiplicative fade???
+	texel.rgb *= mix(vec3(1.0), fog_color * fog_factor, fog_factor * u_fog_transparency);
+
+	// Emission
+	texel.rgb += fog_color * pow(fog_distance * u_fog_emission, 2.0);
 
 
 	texel.a = 1.0;
-
-	// texel.rgb -= texel.rgb * fog_absorption * pow(distance / 4.0, 0.7);
-	// texel.rgb -= texel.rgb * fog_absorption * max(distance + 50.0, 0.0) / 61.0;
-
-	texel.rgb += fog_color * pow(distance / 10.0, 2.0);
-
-	// texel.rgb = mix(texel.rgb, vec3(1.0) - (vec3(1.0) - texel.rgb * u_fog_color.rgb * fog_factor), fog_factor);
-
-
-	// texel.rgb += fog_color * fog_factor;
-
 	imageStore(u_image, texel_uv, texel);
 }

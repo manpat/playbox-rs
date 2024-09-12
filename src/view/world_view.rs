@@ -49,8 +49,7 @@ impl WorldView {
 		// 	calculate transform between connected walls, and build that room,
 		// 	using wall intersection to calculate a frustum to cull by
 
-		// TODO(pat.m): helper function
-		if self.message_bus.poll(&self.change_subscription).count() > 0 {
+		if self.message_bus.any(&self.change_subscription) {
 			let mut room_builder = RoomMeshBuilder::new(world);
 
 			self.room_mesh_infos.clear();
