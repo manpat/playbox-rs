@@ -5,8 +5,8 @@ use super::{MenuBuilder};
 
 // const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Tuffy.otf");
 // const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Quicksand-Light.ttf");
-// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
-const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Outflank 9.ttf");
+const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
+// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Outflank 9.ttf");
 
 
 pub struct MenuPainter {
