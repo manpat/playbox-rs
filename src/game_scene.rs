@@ -65,7 +65,7 @@ impl GameScene {
 			// toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
 			world_view: view::WorldView::new(&mut ctx.gfx, &world, &processed_world, ctx.message_bus.clone())?,
-			hud_view: view::HudView::new(ctx.message_bus.clone())?,
+			hud_view: view::HudView::new(&mut ctx.gfx, ctx.message_bus.clone())?,
 
 			message_bus: ctx.message_bus.clone(),
 
@@ -82,11 +82,11 @@ impl GameScene {
 					hack_height_change: None,
 				},
 
+				interactions: model::Interactions::new(ctx.message_bus),
 				environment: model::EnvironmentModel::new(&world, ctx.message_bus),
 				processed_world,
 
 				progress: model::ProgressModel::default(),
-				interactions: model::Interactions::default(),
 				hud: model::HudModel::default(),
 
 				world,
@@ -118,7 +118,7 @@ impl GameScene {
 
 		if !ctx.show_editor || self.force_game_controls {
 			player.handle_input(ctx, &world, &processed_world);
-			interactions.update(&player, &world);
+			interactions.update(&player, &world, &self.message_bus);
 		}
 
 		environment.update(&world, &self.message_bus);

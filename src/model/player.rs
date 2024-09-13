@@ -5,6 +5,13 @@ use model::{Placement, WallId, World, ProcessedWorld};
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
 pub const PLAYER_RADIUS: f32 = 0.1;
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PlayerCmd {
+	Interact,
+}
+
+
 // TODO(pat.m): maybe this should just be 'camera'? only some of this should be serialized
 #[derive(Debug, Clone)]
 pub struct Player {
@@ -31,6 +38,10 @@ impl Player {
 			if !self.free_cam {
 				self.free_pos = Vec3::zero();
 			}
+		}
+
+		if ctx.input.button_just_down(input::MouseButton::Left) {
+			ctx.message_bus.emit(PlayerCmd::Interact);
 		}
 
 		{

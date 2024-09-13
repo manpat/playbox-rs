@@ -85,7 +85,7 @@ impl GlyphCache {
 		}
 	}
 
-	pub fn layout(&mut self, font: &fontdue::Font, font_size: u32, s: &str, mut f: impl FnMut(Aabb2, Aabb2)) {
+	pub fn layout(&mut self, font: &fontdue::Font, font_size: u32, s: impl AsRef<str>, mut f: impl FnMut(Aabb2, Aabb2)) {
 		use fontdue::layout::{Layout, TextStyle, CoordinateSystem, LayoutSettings};
 		let mut layout = Layout::new(CoordinateSystem::PositiveYUp);
 
@@ -94,7 +94,7 @@ impl GlyphCache {
 			y: font_size as f32,
 			..LayoutSettings::default()
 		});
-		layout.append(&[font], &TextStyle::new(s, font_size as f32, 0));
+		layout.append(&[font], &TextStyle::new(s.as_ref(), font_size as f32, 0));
 
 		for glyph in layout.glyphs() {
 			let ch = glyph.parent;

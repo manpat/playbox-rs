@@ -6,12 +6,14 @@ pub const HUD_FRAME_STAGE: gfx::FrameStage = gfx::FrameStage::Ui(0);
 
 pub struct HudView {
 	_message_bus: MessageBus,
+	painter: menu::MenuPainter,
 }
 
 impl HudView {
-	pub fn new(message_bus: MessageBus) -> anyhow::Result<Self> {
+	pub fn new(gfx: &mut gfx::System, message_bus: MessageBus) -> anyhow::Result<Self> {
 		Ok(HudView {
 			_message_bus: message_bus,
+			painter: menu::MenuPainter::new(gfx, HUD_FRAME_STAGE)?,
 		})
 	}
 
@@ -21,8 +23,20 @@ impl HudView {
 
 		let mut usable_area = screen_bounds.shrink(2.0);
 
+		let text_size = self.painter.text_rect(16, "Testing 123").size();
 
-		let mut quads = vec![
+		self.painter.text(usable_area.min, 16, "Testing 123", Color::white());
+		self.painter.text(usable_area.max - text_size, 16, "Testing 123", Color::white());
+		self.painter.text(usable_area.max_min_corner() - Vec2::from_x(text_size.x), 16, "Testing 123", Color::white());
+		self.painter.text(usable_area.min_max_corner() - Vec2::from_y(text_size.y), 16, "Testing 123", Color::white());
+
+
+		if let Some(object) = model.interactions.hovered_object.and_then(|idx| model.world.objects.get(idx)) {
+			self.painter.text(usable_area.center(), 16, format!("{object:#?}"), Color::white());
+		}
+
+
+		let quads = [
 			usable_area.cut_top(12.0).shrink(2.0),
 			usable_area.cut_bottom(24.0).shrink(2.0),
 			usable_area.cut_left(24.0).shrink(2.0),
@@ -30,37 +44,13 @@ impl HudView {
 			usable_area.cut_top(12.0).shrink(2.0),
 		];
 
-		if model.interactions.can_interact {
-			quads.push(Aabb2::from_center_extents(usable_area.center(), 8.0));
-			// TODO(pat.m): text info about hovered interactable
-		}
-
-		let mut hud_group = gfx.frame_encoder.command_group(HUD_FRAME_STAGE);
-		let indices = hud_group.upload(&[0, 1, 2, 0, 2, 3]);
-
-		let projection = Mat4::ortho(
-			screen_bounds.min.x, screen_bounds.max.x,
-			screen_bounds.min.y, screen_bounds.max.y,
-			-1.0, 1.0
-		);
-		hud_group.bind_shared_ubo(0, &[projection]);
-
-
 		for quad in quads {
 			let color = Color::white().with_alpha(0.02);
-			let vertices = [
-				gfx::StandardVertex::with_color(quad.min.floor().extend(0.0), color),
-				gfx::StandardVertex::with_color(quad.min_max_corner().floor().extend(0.0), color),
-				gfx::StandardVertex::with_color(quad.max.floor().extend(0.0), color),
-				gfx::StandardVertex::with_color(quad.max_min_corner().floor().extend(0.0), color),
-			];
-
-			hud_group.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
-				.ssbo(0, &vertices)
-				.indexed(indices)
-				.elements(6)
-				.blend_mode(gfx::BlendMode::ALPHA);
+			self.painter.rect(quad, color);
 		}
+
+
+		self.painter.submit(gfx, screen_bounds);
 	}
 }
 

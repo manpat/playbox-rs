@@ -1,5 +1,9 @@
 use crate::prelude::*;
 
+
+pub const MAIN_MENU_FRAME_STAGE: gfx::FrameStage = gfx::FrameStage::Ui(10);
+
+
 pub struct MainMenuScene {
 	painter: menu::MenuPainter,
 }
@@ -7,7 +11,7 @@ pub struct MainMenuScene {
 impl MainMenuScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<MainMenuScene> {
 		Ok(MainMenuScene{
-			painter: menu::MenuPainter::new(&mut ctx.gfx)?,
+			painter: menu::MenuPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE)?,
 		})
 	}
 
@@ -62,7 +66,7 @@ pub struct PauseMenuScene {
 impl PauseMenuScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<PauseMenuScene> {
 		Ok(PauseMenuScene{
-			painter: menu::MenuPainter::new(&mut ctx.gfx)?,
+			painter: menu::MenuPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE)?,
 		})
 	}
 

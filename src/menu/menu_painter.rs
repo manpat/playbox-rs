@@ -5,8 +5,8 @@ use super::{MenuBuilder};
 
 // const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Tuffy.otf");
 // const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Quicksand-Light.ttf");
-const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
-// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Outflank 9.ttf");
+// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
+const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Outflank 9.ttf");
 
 
 pub struct MenuPainter {
@@ -17,11 +17,12 @@ pub struct MenuPainter {
 	pub font: fontdue::Font,
 	pub glyph_atlas: GlyphCache,
 
+	frame_stage: gfx::FrameStage,
 	f_text_shader: gfx::ShaderHandle,
 }
 
 impl MenuPainter {
-	pub fn new(gfx: &mut gfx::System) -> anyhow::Result<MenuPainter> {
+	pub fn new(gfx: &mut gfx::System, frame_stage: gfx::FrameStage) -> anyhow::Result<MenuPainter> {
 		let font = fontdue::Font::from_bytes(FONT_DATA, fontdue::FontSettings::default())
 			.map_err(|err| anyhow::anyhow!("{err}"))?;
 
@@ -32,6 +33,7 @@ impl MenuPainter {
 			font,
 			glyph_atlas: GlyphCache::new(gfx),
 
+			frame_stage,
 			f_text_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::fragment("shaders/text.fs.glsl")),
 		})
 	}
@@ -43,7 +45,7 @@ impl MenuPainter {
 		self.glyph_atlas.update_atlas(gfx);
 
 		if !self.shape_layer.is_empty() {
-			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(1))
+			gfx.frame_encoder.command_group(self.frame_stage)
 				.annotate("Menu")
 				.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
 				.elements(self.shape_layer.indices.len() as u32)
@@ -58,7 +60,7 @@ impl MenuPainter {
 		}
 
 		if !self.text_layer.is_empty() {
-			gfx.frame_encoder.command_group(gfx::FrameStage::Ui(2))
+			gfx.frame_encoder.command_group(self.frame_stage)
 				.annotate("Menu (Text)")
 				.draw(gfx::CommonShader::StandardVertex, self.f_text_shader)
 				.elements(self.text_layer.indices.len() as u32)
@@ -83,7 +85,7 @@ impl MenuPainter {
 		self.shape_layer.draw_quad(geom, Aabb2::zero(), color);
 	}
 
-	pub fn text(&mut self, origin: Vec2, font_size: u32, s: &str, color: impl Into<Color>) {
+	pub fn text(&mut self, origin: Vec2, font_size: u32, s: impl AsRef<str>, color: impl Into<Color>) {
 		let origin = origin.floor();
 		let color = color.into();
 
@@ -92,7 +94,7 @@ impl MenuPainter {
 		});
 	}
 
-	pub fn text_rect(&mut self, font_size: u32, s: &str) -> Aabb2 {
+	pub fn text_rect(&mut self, font_size: u32, s: impl AsRef<str>) -> Aabb2 {
 		let mut full = Aabb2::zero();
 		self.glyph_atlas.layout(&self.font, font_size, s, |geom_rect, _| {
 			full = full.include_rect(geom_rect);
