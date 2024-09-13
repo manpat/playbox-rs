@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, Room, VertexId, WallId, Placement, Location};
+use model::{World, ProcessedWorld, Room, VertexId, WallId, Placement, Location};
 use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -117,6 +117,7 @@ pub struct Viewport<'c> {
 	tracked_location: Option<Location>,
 
 	world: &'c World,
+	processed_world: &'c ProcessedWorld,
 	message_bus: &'c MessageBus,
 
 	items: Vec<ViewportItem>,
@@ -157,6 +158,7 @@ impl<'c> Viewport<'c> {
 			tracked_location,
 
 			world: &context.model.world,
+			processed_world: &context.model.processed_world,
 			message_bus: context.message_bus,
 
 			items: Vec::new(),
@@ -221,30 +223,17 @@ impl<'c> Viewport<'c> {
 		for wall_index in 0..num_walls {
 			let src_wall_id = WallId{room_index, wall_index};
 
-			let Some(tgt_wall_id) = self.world.wall_target(src_wall_id) else {
+			let Some(connection_info) = self.processed_world.connection_for(src_wall_id) else {
 				continue
 			};
 
-			let (src_start, src_end) = self.world.wall_vertices(src_wall_id);
-			let (tgt_start, tgt_end) = self.world.wall_vertices(tgt_wall_id);
-
-			let src_wall_length = (src_start - src_end).length();
-			let tgt_wall_length = (tgt_start - tgt_end).length();
-
-			let src_dir = (src_end - src_start).normalize();
-			let src_center = (src_start + src_end) / 2.0;
-
-			let aperture_extent = src_wall_length.min(tgt_wall_length) / 2.0;
-			let aperture_horizontal_offset = room.walls[wall_index].horizontal_offset.clamp(aperture_extent-src_wall_length/2.0, src_wall_length/2.0-aperture_extent);
-			let aperture_offset = src_dir.perp() * 0.1;
-
-			let aperture_center = src_center + aperture_offset + aperture_horizontal_offset * src_dir;
-			let aperture_start = aperture_center - src_dir * aperture_extent;
-			let aperture_end = aperture_center + src_dir * aperture_extent;
+			let visual_separation = connection_info.wall_normal * 0.1;
+			let aperture_start = connection_info.aperture_start + visual_separation;
+			let aperture_end = connection_info.aperture_end + visual_separation;
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(room_to_world * aperture_start, room_to_world * aperture_end),
-				item: Some(Item::Wall(tgt_wall_id)),
+				item: Some(Item::Wall(connection_info.target_id)),
 				color: WALL_CONNECTION_COLOR,
 				room_to_world,
 				flags: interaction_flags,
@@ -258,9 +247,7 @@ impl<'c> Viewport<'c> {
 			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
-		// TODO(pat.m): this should probably come from a constant 
-		let radius = 0.1;
-		let base_player_transform = Mat2x3::scale_rotate_translate(radius, placement.yaw, placement.position);
+		let base_player_transform = Mat2x3::scale_rotate_translate(model::PLAYER_RADIUS, placement.yaw, placement.position);
 		let item = item.into();
 		let color = color.into();
 
