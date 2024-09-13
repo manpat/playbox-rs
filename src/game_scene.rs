@@ -137,7 +137,6 @@ impl GameScene {
 
 		if self.height_offset.abs() > 0.02 {
 			self.height_offset -= self.height_offset.signum() * 0.02;
-
 		} else {
 			self.height_offset = 0.0;
 		}
