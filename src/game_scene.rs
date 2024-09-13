@@ -64,7 +64,7 @@ impl GameScene {
 
 			// toy_renderer,
 			sprites: Sprites::new(&mut ctx.gfx)?,
-			world_view: view::WorldView::new(&mut ctx.gfx, &world, ctx.message_bus.clone())?,
+			world_view: view::WorldView::new(&mut ctx.gfx, &world, &processed_world, ctx.message_bus.clone())?,
 			hud_view: view::HudView::new(ctx.message_bus.clone())?,
 
 			message_bus: ctx.message_bus.clone(),

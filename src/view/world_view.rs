@@ -17,8 +17,8 @@ pub struct WorldView {
 }
 
 impl WorldView {
-	pub fn new(gfx: &mut gfx::System, world: &World, message_bus: MessageBus) -> anyhow::Result<Self> {
-		let mut room_builder = RoomMeshBuilder::new(world);
+	pub fn new(gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld, message_bus: MessageBus) -> anyhow::Result<Self> {
+		let mut room_builder = RoomMeshBuilder::new(world, processed_world);
 		let mut room_mesh_infos = Vec::new();
 
 		for room_idx in 0..world.rooms.len() {
@@ -50,7 +50,7 @@ impl WorldView {
 		// 	using wall intersection to calculate a frustum to cull by
 
 		if self.message_bus.any(&self.change_subscription) {
-			let mut room_builder = RoomMeshBuilder::new(world);
+			let mut room_builder = RoomMeshBuilder::new(world, processed_world);
 
 			self.room_mesh_infos.clear();
 
