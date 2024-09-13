@@ -170,13 +170,8 @@ impl WorldView {
 							continue;
 						}
 
-						let wall_length = (end_vertex - start_vertex).length();
-						let wall_dir = (end_vertex - start_vertex) / wall_length;
-
-						let wall_center = wall_length/2.0 + connection_info.aperture_offset;
-
-						let left_vertex = start_vertex + wall_dir * (wall_center - connection_info.aperture_extent);
-						let right_vertex = start_vertex + wall_dir * (wall_center + connection_info.aperture_extent);
+						let left_vertex = connection_info.aperture_start;
+						let right_vertex = connection_info.aperture_end;
 
 						if let Some(clip_state) = &clip_by {
 							match clip_wall_segment((left_vertex, right_vertex), clip_state) {

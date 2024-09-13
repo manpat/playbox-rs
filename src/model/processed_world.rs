@@ -69,6 +69,9 @@ pub struct ConnectionInfo {
 	// TODO(pat.m): maybe this should just be in wall info?
 	pub wall_normal: Vec2,
 
+	pub aperture_start: Vec2,
+	pub aperture_end: Vec2,
+
 	// Half width
 	pub aperture_extent: f32,
 
@@ -93,10 +96,19 @@ impl ConnectionInfo {
 		let source_wall_length = world.wall_length(source_id);
 		let target_wall_length = world.wall_length(target_id);
 
-		let wall_normal = world.wall_vector(source_id).perp() / source_wall_length;
+		let start_vertex = source_room.wall_vertices[source_id.wall_index];
+		let wall_vector = world.wall_vector(source_id);
+		let wall_direction = wall_vector / source_wall_length;
+		let wall_normal = wall_direction.perp();
 
 		let aperture_extent = source_wall_length.min(target_wall_length) / 2.0;
 		let aperture_offset = source_wall.horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
+
+		let aperture_center = source_wall_length/2.0 + aperture_offset;
+
+		let aperture_start = start_vertex + wall_direction * (aperture_center - aperture_extent);
+		let aperture_end = start_vertex + wall_direction * (aperture_center + aperture_extent);
+
 
 		let vertical_offset = source_wall.vertical_offset - target_wall.vertical_offset;
 		let aperture_height = (source_room.height - vertical_offset).min(target_room.height + vertical_offset);
@@ -115,6 +127,9 @@ impl ConnectionInfo {
 			source_to_target,
 			yaw_delta,
 			wall_normal,
+
+			aperture_start,
+			aperture_end,
 
 			aperture_extent,
 			aperture_offset,
