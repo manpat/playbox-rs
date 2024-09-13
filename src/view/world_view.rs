@@ -5,6 +5,13 @@ mod room_mesh_builder;
 use room_mesh_builder::*;
 
 
+// This fudge factor is to deal with the fact that we can look up and see behind us.
+const BEHIND_VIEWER_BUFFER_DIST: f32 = 10.0;
+
+// Max recursion depth when calculating room visibility.
+const MAX_VISIBILITY_RECURSION_DEPTH: i32 = 50;
+
+
 pub struct WorldView {
 	room_mesh_infos: Vec<RoomMeshInfo>,
 	vbo: gfx::BufferName,
@@ -140,8 +147,6 @@ impl WorldView {
 	}
 
 	fn build_visibility_graph(&mut self, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
-		const MAX_DEPTH: i32 = 50;
-
 		self.visible_rooms.clear();
 		self.visible_rooms.push(RoomInstance {
 			room_index: viewer_placement.room_index,
@@ -160,7 +165,7 @@ impl WorldView {
 			instance_index += 1;
 
 			let depth = clip_by.map_or(0, |c| c.depth);
-			if depth >= MAX_DEPTH {
+			if depth >= MAX_VISIBILITY_RECURSION_DEPTH {
 				continue
 			}
 
@@ -169,65 +174,63 @@ impl WorldView {
 
 			for wall_index in 0..num_walls {
 				let wall_id = WallId{room_index, wall_index};
+				let Some(connection_info) = processed_world.connection_for(wall_id) else {
+					continue
+				};
 
-				if let Some(connection_info) = processed_world.connection_for(wall_id) {
-					let (left_aperture, right_aperture, unclipped_left_aperture) = {
-						let start_vertex = connection_info.aperture_start;
-						let end_vertex = connection_info.aperture_end;
+				let start_vertex = connection_info.aperture_start;
+				let end_vertex = connection_info.aperture_end;
 
-						// If the aperture we're considering isn't CCW from our position then cull it and the room it connects to.
-						if (end_vertex - local_viewer_position).wedge(start_vertex - local_viewer_position) < 0.0 {
-							continue;
-						}
-
-						// This fudge factor is to deal with the fact that we can look up and see behind us.
-						const BEHIND_VIEWER_BUFFER_DIST: f32 = 10.0;
-
-						let start_vertex_invisible = viewer_forward.dot(room_to_world * start_vertex) < -BEHIND_VIEWER_BUFFER_DIST;
-						let end_vertex_invisible = viewer_forward.dot(room_to_world * end_vertex) < -BEHIND_VIEWER_BUFFER_DIST;
-
-						// If the aperture is completely behind us then cull it and the room it connects to.
-						if start_vertex_invisible && end_vertex_invisible {
-							continue;
-						}
-
-
-						if let Some(clip_state) = &clip_by {
-							match clip_wall_segment((start_vertex, end_vertex), clip_state) {
-								Some((left, right)) => (left, right, start_vertex),
-								None => continue,
-							}
-
-						} else {
-							(start_vertex, end_vertex, start_vertex)
-						}
-					};
-
-
-					let total_transform = room_to_world * connection_info.target_to_source;
-
-					// TODO(pat.m): this is kind of a mess, and wouldn't really be necessary if clip_wall_segment actually clipped things.
-					// but it works
-					let aperture_normal = connection_info.source_to_target * connection_info.wall_normal.extend(0.0);
-					let aperture_plane = aperture_normal.extend(aperture_normal.dot(connection_info.source_to_target * unclipped_left_aperture));
-
-					self.visible_rooms.push(RoomInstance {
-						room_index: connection_info.target_id.room_index,
-						room_to_world: total_transform,
-						height_offset: height_offset + connection_info.height_difference,
-
-						clip_by: Some(ClipState {
-							depth: depth+1,
-
-							// All of these should be in the space of the target room
-							local_viewer_position: connection_info.source_to_target * local_viewer_position,
-							left_aperture: connection_info.source_to_target * left_aperture,
-							right_aperture: connection_info.source_to_target * right_aperture,
-
-							aperture_plane,
-						})
-					});
+				// If the aperture we're considering isn't CCW from our position then cull it and the room it connects to.
+				if (end_vertex - local_viewer_position).wedge(start_vertex - local_viewer_position) < 0.0 {
+					continue;
 				}
+
+				// If the aperture is completely behind us then cull it and the room it connects to.
+				let start_vertex_invisible = viewer_forward.dot(room_to_world * start_vertex) < -BEHIND_VIEWER_BUFFER_DIST;
+				let end_vertex_invisible = viewer_forward.dot(room_to_world * end_vertex) < -BEHIND_VIEWER_BUFFER_DIST;
+
+				if start_vertex_invisible && end_vertex_invisible {
+					continue;
+				}
+
+
+				let (left_aperture, right_aperture, unclipped_left_aperture) = {
+					if let Some(clip_state) = &clip_by {
+						match clip_wall_segment((start_vertex, end_vertex), clip_state) {
+							Some((left, right)) => (left, right, start_vertex),
+							None => continue,
+						}
+
+					} else {
+						(start_vertex, end_vertex, start_vertex)
+					}
+				};
+
+
+				let total_transform = room_to_world * connection_info.target_to_source;
+
+				// TODO(pat.m): this is kind of a mess, and wouldn't really be necessary if clip_wall_segment actually clipped things.
+				// but it works
+				let aperture_normal = connection_info.source_to_target * connection_info.wall_normal.extend(0.0);
+				let aperture_plane = aperture_normal.extend(aperture_normal.dot(connection_info.source_to_target * unclipped_left_aperture));
+
+				self.visible_rooms.push(RoomInstance {
+					room_index: connection_info.target_id.room_index,
+					room_to_world: total_transform,
+					height_offset: height_offset + connection_info.height_difference,
+
+					clip_by: Some(ClipState {
+						depth: depth+1,
+
+						// All of these should be in the space of the target room
+						local_viewer_position: connection_info.source_to_target * local_viewer_position,
+						left_aperture: connection_info.source_to_target * left_aperture,
+						right_aperture: connection_info.source_to_target * right_aperture,
+
+						aperture_plane,
+					})
+				});
 			}
 		}
 	}
