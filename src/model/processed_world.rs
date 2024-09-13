@@ -65,6 +65,10 @@ pub struct ConnectionInfo {
 
 	pub yaw_delta: f32,
 
+	// Points out of the room
+	// TODO(pat.m): maybe this should just be in wall info?
+	pub wall_normal: Vec2,
+
 	// Half width
 	pub aperture_extent: f32,
 
@@ -75,7 +79,7 @@ pub struct ConnectionInfo {
 	pub aperture_height: f32,
 
 	// Floor height difference when transitioning connection
-	pub step_size: f32,
+	pub height_difference: f32,
 }
 
 impl ConnectionInfo {
@@ -88,6 +92,8 @@ impl ConnectionInfo {
 
 		let source_wall_length = world.wall_length(source_id);
 		let target_wall_length = world.wall_length(target_id);
+
+		let wall_normal = world.wall_vector(source_id).perp() / source_wall_length;
 
 		let aperture_extent = source_wall_length.min(target_wall_length) / 2.0;
 		let aperture_offset = source_wall.horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
@@ -108,12 +114,13 @@ impl ConnectionInfo {
 			target_to_source,
 			source_to_target,
 			yaw_delta,
+			wall_normal,
 
 			aperture_extent,
 			aperture_offset,
 
 			aperture_height,
-			step_size: vertical_offset,
+			height_difference: vertical_offset,
 		}
 	}
 }

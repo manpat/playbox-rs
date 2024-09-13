@@ -360,16 +360,12 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 	for wall_index in 0..context.model.world.rooms[focused_room_index].walls.len() {
 		let src_wall_id = WallId{room_index: focused_room_index, wall_index};
-		let Some(tgt_wall_id) = context.model.world.wall_target(src_wall_id)
+		let Some(connection_info) = context.model.processed_world.connection_for(src_wall_id)
 			else { continue };
 
-		let (start, end) = context.model.world.wall_vertices(src_wall_id);
-		let wall_normal = (end - start).normalize().perp();
+		let offset_transform = Mat2x3::translate(connection_info.wall_normal * neighbouring_room_margin) * connection_info.target_to_source;
 
-		let transform = model::calculate_portal_transform(&context.model.world, src_wall_id, tgt_wall_id);
-		let offset_transform = Mat2x3::translate(wall_normal * neighbouring_room_margin) * transform;
-
-		neighbouring_rooms.push((tgt_wall_id.room_index, offset_transform));
+		neighbouring_rooms.push((connection_info.target_id.room_index, offset_transform));
 	}
 
 	let player = &context.model.player;

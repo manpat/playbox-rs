@@ -42,7 +42,7 @@ impl WorldView {
 		})
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System, world: &World, viewer_placement: Placement) {
+	pub fn draw(&mut self, gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
 		// Draw room you're in
 		// then for each wall,
 		// 	check if it has a neighbouring room, and if so
@@ -68,8 +68,6 @@ impl WorldView {
 			room_builder.upload(gfx, self.vbo, self.ebo);
 		}
 
-		let initial_transform = Mat2x3::rotate_translate(0.0, -viewer_placement.position);
-
 		const MAX_DEPTH: i32 = 50;
 
 		struct Entry {
@@ -82,7 +80,7 @@ impl WorldView {
 		let mut room_stack = vec![
 			Entry {
 				room_index: viewer_placement.room_index,
-				transform: initial_transform,
+				transform: Mat2x3::identity(),
 				height_offset: 0.0,
 				clip_by: None,
 			}
@@ -157,104 +155,67 @@ impl WorldView {
 				continue
 			}
 
-			let connections = world.connections.iter()
-				.filter_map(|&(left, right)| {
-					if left.room_index == room_index {
-						Some((left, right))
-					} else if right.room_index == room_index {
-						Some((right, left))
-					} else {
-						None
-					}
-				});
+			let num_walls = world.rooms[room_index].walls.len();
+			let local_position = clip_by.map_or(viewer_placement.position, |c| c.local_position);
 
-			fn try_add_connection(room_stack: &mut Vec<Entry>, world: &World, current_wall_id: WallId, target_wall_id: WallId,
-				transform: &Mat2x3, clip_by: &Option<ClipState>, local_position: Vec2, height_offset: f32, depth: i32)
-			{
-				let local_position = clip_by.map_or(local_position, |c| c.local_position);
+			for wall_index in 0..num_walls {
+				let wall_id = WallId{room_index, wall_index};
 
-				let current_wall = &world.rooms[current_wall_id.room_index].walls[current_wall_id.wall_index];
-				let target_wall = &world.rooms[target_wall_id.room_index].walls[target_wall_id.wall_index];
+				if let Some(connection_info) = processed_world.connection_for(wall_id) {
+					let (left_aperture, right_aperture, unclipped_left_aperture) = {
+						let (start_vertex, end_vertex) = world.wall_vertices(wall_id);
 
-				let (left_aperture, right_aperture, aperture_normal, unclipped_left_aperture) = {
-					let (start_vertex, end_vertex) = world.wall_vertices(current_wall_id);
+						// If the aperture we're considering isn't CCW from our perspective then cull it and the room it connects to.
+						if (end_vertex - local_position).wedge(start_vertex - local_position) < 0.0 {
+							continue;
+						}
 
-					// If the aperture we're considering isn't CCW from our perspective then cull it and the room it connects to.
-					if (end_vertex - local_position).wedge(start_vertex - local_position) < 0.0 {
-						return;
-					}
+						let wall_length = (end_vertex - start_vertex).length();
+						let wall_dir = (end_vertex - start_vertex) / wall_length;
 
-					let wall_length = (end_vertex - start_vertex).length();
-					let wall_dir = (end_vertex - start_vertex) / wall_length;
-					let opposing_wall_length = {
-						let (wall_start, wall_end) = world.wall_vertices(target_wall_id);
-						(wall_end - wall_start).length()
+						let wall_center = wall_length/2.0 + connection_info.aperture_offset;
+
+						let left_vertex = start_vertex + wall_dir * (wall_center - connection_info.aperture_extent);
+						let right_vertex = start_vertex + wall_dir * (wall_center + connection_info.aperture_extent);
+
+						if let Some(clip_state) = &clip_by {
+							match clip_wall_segment((left_vertex, right_vertex), clip_state) {
+								Some((left, right)) => (left, right, left_vertex),
+								None => continue,
+							}
+
+						} else {
+							(left_vertex, right_vertex, left_vertex)
+						}
 					};
 
 
-					let aperture_extent = wall_length.min(opposing_wall_length) / 2.0;
-					let aperture_offset = current_wall.horizontal_offset.clamp(aperture_extent-wall_length/2.0, wall_length/2.0-aperture_extent);
+					let total_transform = transform * connection_info.target_to_source;
 
-					let wall_center = wall_length/2.0 + aperture_offset;
+					// TODO(pat.m): this is kind of a mess, and wouldn't really be necessary if clip_wall_segment actually clipped things.
+					// but it works
+					let aperture_normal = connection_info.source_to_target * connection_info.wall_normal.extend(0.0);
+					let aperture_plane = aperture_normal.extend(aperture_normal.dot(connection_info.source_to_target * unclipped_left_aperture));
 
-					let left_vertex = start_vertex + wall_dir * (wall_center - aperture_extent);
-					let right_vertex = start_vertex + wall_dir * (wall_center + aperture_extent);
+					room_stack.push(Entry {
+						room_index: connection_info.target_id.room_index,
+						transform: total_transform,
+						height_offset: height_offset + connection_info.height_difference,
 
-					let normal = (right_vertex - left_vertex).normalize().perp();
+						clip_by: Some(ClipState {
+							depth: depth+1,
 
-					if let Some(clip_state) = &clip_by {
-						match clip_wall_segment((left_vertex, right_vertex), clip_state) {
-							Some((left, right)) => (left, right, normal, left_vertex),
-							None => return,
-						}
+							// All of these should be in the space of the target room
+							local_position: connection_info.source_to_target * local_position,
+							left_aperture: connection_info.source_to_target * left_aperture,
+							right_aperture: connection_info.source_to_target * right_aperture,
 
-					} else {
-						(left_vertex, right_vertex, normal, left_vertex)
-					}
-				};
-
-				let portal_transform = calculate_portal_transform(world, current_wall_id, target_wall_id);
-				let inv_portal_transform = portal_transform.inverse();
-				let total_transform = *transform * portal_transform;
-
-				let left_aperture = inv_portal_transform * left_aperture;
-				let right_aperture = inv_portal_transform * right_aperture;
-
-				// TODO(pat.m): this is kind of a mess, and wouldn't really be necessary if clip_wall_segment actually clipped things.
-				// but it works
-				let aperture_normal = inv_portal_transform * aperture_normal.extend(0.0);
-				let aperture_plane = aperture_normal.extend(aperture_normal.dot(inv_portal_transform * unclipped_left_aperture));
-
-				let height_difference = current_wall.vertical_offset - target_wall.vertical_offset;
-
-				room_stack.push(Entry {
-					room_index: target_wall_id.room_index,
-					transform: total_transform,
-					height_offset: height_offset + height_difference,
-
-					clip_by: Some(ClipState {
-						depth: depth+1,
-
-						// All of these should be in the space of the target room
-						local_position: inv_portal_transform * local_position,
-						left_aperture,
-						right_aperture,
-
-						aperture_plane,
-					})
-				});
-			}
-
-			for (current_wall_id, target_wall_id) in connections {
-				try_add_connection(&mut room_stack, world, current_wall_id, target_wall_id, &transform, &clip_by, viewer_placement.position, height_offset, depth);
-
-				// If we connect to the same room then we need to draw again with the inverse transform to make sure both walls get recursed through
-				if current_wall_id.room_index == target_wall_id.room_index {
-					try_add_connection(&mut room_stack, world, target_wall_id, current_wall_id, &transform, &clip_by, viewer_placement.position, height_offset, depth);
+							aperture_plane,
+						})
+					});
 				}
 			}
 		}
-
 	}
 }
 

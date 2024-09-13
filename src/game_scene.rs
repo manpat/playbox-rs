@@ -143,12 +143,14 @@ impl GameScene {
 		}
 
 
+		let eye_position = player.placement.position.to_x0y() + Vec3::from_y(player.height - self.height_offset) + player.free_pos;
+
 		let aspect = gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);
 		let projection_view = projection
 			* Mat4::rotate_x(player.pitch)
 			* Mat4::rotate_y(player.placement.yaw)
-			* Mat4::translate(-player.free_pos-Vec3::from_y(player.height - self.height_offset));
+			* Mat4::translate(-eye_position);
 
 		let inverse_projection = projection.inverse();
 
@@ -159,7 +161,7 @@ impl GameScene {
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 
-		self.world_view.draw(gfx, &self.model.world, player.placement);
+		self.world_view.draw(gfx, &self.model.world, &self.model.processed_world, player.placement);
 		self.hud_view.draw(gfx, &self.model);
 
 		// self.toy_renderer.draw(gfx);

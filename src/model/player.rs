@@ -169,7 +169,7 @@ impl Player {
 
 				// Target room must be tall enough and the step must not be too steep
 				let can_transition_to_opposing_room = self.height < connection_info.aperture_height
-					&& connection_info.step_size.abs() < self.height * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
+					&& connection_info.height_difference.abs() < self.height * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
 
 				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
@@ -185,7 +185,7 @@ impl Player {
 					self.placement.yaw += connection_info.yaw_delta;
 
 					// TODO(pat.m): figure out another way to do this
-					self.hack_height_change = Some(connection_info.step_size);
+					self.hack_height_change = Some(connection_info.height_difference);
 
 					// TODO(pat.m): collide with walls in opposing wall as well
 					return;
