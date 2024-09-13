@@ -195,16 +195,15 @@ impl WorldView {
 				}
 
 
-				let (left_aperture, right_aperture, unclipped_left_aperture) = {
-					if let Some(clip_state) = &clip_by {
+				let (left_aperture, right_aperture, unclipped_left_aperture) = match &clip_by {
+					Some(clip_state) => {
 						match clip_wall_segment((start_vertex, end_vertex), clip_state) {
 							Some((left, right)) => (left, right, start_vertex),
 							None => continue,
 						}
-
-					} else {
-						(start_vertex, end_vertex, start_vertex)
 					}
+
+					None => (start_vertex, end_vertex, start_vertex),
 				};
 
 
