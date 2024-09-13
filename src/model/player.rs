@@ -158,14 +158,12 @@ impl Player {
 			// or if we need to slide against the wall
 			let wall_id = WallId{room_index: self.placement.room_index, wall_index};
 			if let Some(connection_info) = processed_world.connection_for(wall_id) {
-				let wall_center = wall_length/2.0 + connection_info.aperture_offset;
-				let aperture_a = wall_start + (wall_center - connection_info.aperture_extent) * wall_direction;
-				let aperture_b = wall_start + (wall_center + connection_info.aperture_extent) * wall_direction;
-				let intersection_dist_from_center = (wall_center - distance_along_wall).abs();
-
 				// Collide with the virtual aperture verts
-				collide_vertex(&mut desired_position, aperture_a, PLAYER_RADIUS);
-				collide_vertex(&mut desired_position, aperture_b, PLAYER_RADIUS);
+				collide_vertex(&mut desired_position, connection_info.aperture_start, PLAYER_RADIUS);
+				collide_vertex(&mut desired_position, connection_info.aperture_end, PLAYER_RADIUS);
+
+				let aperture_center = wall_length/2.0 + connection_info.aperture_offset;
+				let intersection_dist_from_center = (aperture_center - distance_along_wall).abs();
 
 				// Target room must be tall enough and the step must not be too steep
 				let can_transition_to_opposing_room = self.height < connection_info.aperture_height
