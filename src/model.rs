@@ -75,6 +75,14 @@ impl Placement {
 			position: self.position,
 		}
 	}
+
+	pub fn right(&self) -> Vec2 {
+		Vec2::from_angle(self.yaw)
+	}
+
+	pub fn forward(&self) -> Vec2 {
+		-self.right().perp()
+	}
 }
 
 

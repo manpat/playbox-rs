@@ -151,7 +151,7 @@ impl WorldView {
 		});
 
 		// Viewer forward vector
-		let viewer_forward = Vec2::from_angle(viewer_placement.yaw - PI / 2.0);
+		let viewer_forward = viewer_placement.forward();
 
 		let mut instance_index = 0;
 

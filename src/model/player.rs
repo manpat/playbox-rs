@@ -74,8 +74,8 @@ impl Player {
 			}
 
 		} else {
-			let right = Vec2::from_angle(self.placement.yaw);
-			let forward = -right.perp();
+			let forward = self.placement.forward();
+			let right = self.placement.right();
 
 			let mut delta = Vec2::zero();
 
