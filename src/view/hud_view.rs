@@ -23,6 +23,17 @@ impl HudView {
 
 		let usable_area = screen_bounds.shrink(8.0);
 
+		if model.hud.in_dialog {
+			self.draw_dialog(usable_area, model);
+
+		} else {
+			self.draw_playing(usable_area, model);
+		}
+
+		self.painter.submit(gfx, screen_bounds);
+	}
+
+	fn draw_playing(&mut self, usable_area: Aabb2, model: &Model) {
 		let text_size = self.painter.text_rect(16, "Testing 123").size();
 
 		self.painter.text(usable_area.min, 16, "Testing 123", Color::white());
@@ -43,9 +54,24 @@ impl HudView {
 			// self.painter.text(usable_area.center() - text_size * Vec2::new(0.5, 1.0) - Vec2::from_y(12.0), 16, interact_message, Color::grey(0.5));
 			self.painter.text(usable_area.center() - text_size.to_0y()/2.0 + Vec2::from_x(12.0), 16, interact_message, Color::grey(0.5));
 		}
+	}
 
+	fn draw_dialog(&mut self, usable_area: Aabb2, model: &Model) {
+		let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque vulputate nunc orci.
+Proin varius a neque vel ultrices. Nulla facilisi. Praesent eget dictum ante.
+In blandit diam quis nibh convallis ultricies. Donec facilisis enim a mauris scelerisque,
+vitae vulputate urna mattis.";
 
-		self.painter.submit(gfx, screen_bounds);
+		let font_size = 16;
+
+		let text_bounds = self.painter.text_rect(font_size, text);
+		let text_extents = text_bounds.size()/2.0;
+		let center = usable_area.center();
+
+		let bounds = Aabb2::from_center_extents(center, text_extents + Vec2::splat(16.0));
+
+		self.painter.rect(bounds, Color::grey(0.02));
+		self.painter.text(center + text_extents * Vec2::new(-1.0, 1.0) - Vec2::from_y(font_size as f32 - 4.0), font_size, text, Color::rgb(0.6, 0.1, 0.1));
 	}
 }
 

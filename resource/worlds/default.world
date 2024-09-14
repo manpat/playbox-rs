@@ -1258,13 +1258,25 @@
       }
     },
     {
-      "name": "Crambus",
+      "name": "Doohicky",
       "room_index": 10,
       "position": [
         0.42157876,
         0.12854277
       ],
       "yaw": 0.099265665,
+      "info": {
+        "kind": "Debug"
+      }
+    },
+    {
+      "name": "Wahoo",
+      "room_index": 0,
+      "position": [
+        -0.26429075,
+        0.6818955
+      ],
+      "yaw": 0.48792684,
       "info": {
         "kind": "Debug"
       }

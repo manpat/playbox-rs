@@ -6,6 +6,7 @@ use model::*;
 #[derive(Debug)]
 pub struct ProcessedWorld {
 	wall_connections: HashMap<WallId, ConnectionInfo>,
+	active_objects: Vec<usize>,
 
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
@@ -15,16 +16,19 @@ impl ProcessedWorld {
 		let mut this = Self {
 			wall_connections: HashMap::default(),
 
+			// TODO(pat.m): some objects might be disabled on first spawn - this should take ProgressModel into account
+			active_objects: (0..world.objects.len()).collect(),
+
 			world_change_sub: message_bus.subscribe(),
 		};
 
-		this.rebuild(world);
+		this.rebuild_world(world);
 		this
 	}
 
 	pub fn update(&mut self, world: &World, _progress: &ProgressModel, message_bus: &MessageBus) {
 		if message_bus.any(&self.world_change_sub) {
-			self.rebuild(world);
+			self.rebuild_world(world);
 		}
 	}
 
@@ -32,7 +36,11 @@ impl ProcessedWorld {
 		self.wall_connections.get(&wall_id)
 	}
 
-	fn rebuild(&mut self, world: &World) {
+	pub fn is_object_active(&self, object_index: usize) -> bool {
+		self.active_objects.contains(&object_index)
+	}
+
+	fn rebuild_world(&mut self, world: &World) {
 		self.wall_connections.clear();
 
 		for (room_index, room) in world.rooms.iter().enumerate() {

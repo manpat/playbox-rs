@@ -1,14 +1,18 @@
 use crate::prelude::*;
 use std::fmt::{self, Display};
 
+pub mod hud;
 pub mod world;
 pub mod player;
+pub mod progress;
 pub mod interactions;
 pub mod environment;
 pub mod processed_world;
 
+pub use hud::*;
 pub use world::*;
 pub use player::*;
+pub use progress::*;
 pub use interactions::*;
 pub use environment::*;
 pub use processed_world::*;
@@ -131,7 +135,3 @@ impl Display for VertexId {
 		write!(f, "Vertex {}:{}", self.room_index, self.vertex_index)
 	}
 }
-
-
-#[derive(Debug, Default)] pub struct ProgressModel;
-#[derive(Debug, Default)] pub struct HudModel;

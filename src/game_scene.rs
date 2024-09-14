@@ -82,10 +82,10 @@ impl GameScene {
 
 				interactions: model::Interactions::new(ctx.message_bus),
 				environment: model::EnvironmentModel::new(&world, ctx.message_bus),
+				hud: model::HudModel::new(ctx.message_bus),
 				processed_world,
 
 				progress: model::ProgressModel::default(),
-				hud: model::HudModel::default(),
 
 				world,
 			},
@@ -110,14 +110,16 @@ impl GameScene {
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
 		}
 
-		let model::Model { processed_world, world, player, progress, interactions, environment, .. } = &mut self.model;
+		let model::Model { processed_world, world, player, progress, interactions, environment, hud, .. } = &mut self.model;
 
 		processed_world.update(&world, &progress, &self.message_bus);
 
 		if !ctx.show_editor || self.force_game_controls {
-			player.handle_input(ctx, &world, &processed_world);
-			interactions.update(&player, &world, &self.message_bus);
+			player.handle_input(ctx, &world, &processed_world, &hud);
+			interactions.update(&player, &world, &processed_world, &self.message_bus);
 		}
+
+		hud.update(&self.message_bus);
 
 		environment.update(&world, &self.message_bus);
 

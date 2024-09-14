@@ -17,16 +17,17 @@ impl Interactions {
 		}
 	}
 
-	pub fn update(&mut self, player: &Player, world: &World, message_bus: &MessageBus) {
-		if let Some(object_index) = self.hovered_object
-			&& let Some(object) = world.objects.get(object_index)
-		{
-			if message_bus.poll(&self.player_cmd_sub).any(|msg| msg == PlayerCmd::Interact) {
+	pub fn update(&mut self, player: &Player, world: &World, processed_world: &ProcessedWorld, message_bus: &MessageBus) {
+		if message_bus.poll(&self.player_cmd_sub).any(|msg| msg == PlayerCmd::Interact) {
+			if let Some(object_index) = self.hovered_object
+				&& let Some(object) = world.objects.get(object_index)
+			{
 				log::info!("Interact '{}'", object.name);
 
 				match object.info {
 					ObjectInfo::Debug => {
 						// TODO(pat.m): uuuhhhhhh
+						message_bus.emit(HudCmd::ShowDialog(()));
 					}
 
 					_ => {}
@@ -37,7 +38,9 @@ impl Interactions {
 		self.hovered_object = None;
 
 		for (object_index, object) in world.objects.iter().enumerate() {
-			if object.placement.room_index != player.placement.room_index {
+			if object.placement.room_index != player.placement.room_index
+				|| !processed_world.is_object_active(object_index)
+			{
 				continue
 			}
 

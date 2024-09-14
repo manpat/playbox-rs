@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, WallId, World, ProcessedWorld};
+use model::{Placement, WallId, World, ProcessedWorld, HudModel};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
@@ -10,6 +10,7 @@ pub const PLAYER_RADIUS: f32 = 0.1;
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerCmd {
 	Interact,
+	DismissDialog,
 }
 
 
@@ -28,8 +29,16 @@ pub struct Player {
 }
 
 impl Player {
-	pub fn handle_input(&mut self, ctx: &mut Context<'_>, world: &World, processed_world: &ProcessedWorld) {
+	pub fn handle_input(&mut self, ctx: &mut Context<'_>, world: &World, processed_world: &ProcessedWorld, hud: &HudModel) {
 		self.hack_height_change = None;
+
+		if hud.in_dialog {
+			if ctx.input.button_just_down(input::MouseButton::Left) {
+				ctx.message_bus.emit(PlayerCmd::DismissDialog);
+			}
+
+			return;
+		}
 
 		if ctx.input.button_just_down(input::keys::KeyV) {
 			self.free_cam = !self.free_cam;
