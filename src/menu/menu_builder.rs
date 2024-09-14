@@ -17,9 +17,9 @@ pub struct MenuBuilder<'mp, 'ctx> {
 
 impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
 	pub fn new(painter: &'mp mut MenuPainter, ctx: &'ctx Context<'_>) -> Self {
-		let size = ctx.gfx.backbuffer_size();
+		let size = ctx.gfx.backbuffer_size()/2;
 		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
-		let content_rect = screen_rect.shrink(Vec2::splat(8.0));
+		let content_rect = screen_rect.shrink(32.0);
 
 		MenuBuilder {
 			painter,
@@ -29,7 +29,7 @@ impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
 
 			cursor: content_rect.min_max_corner() + Vec2::new(8.0, -8.0),
 			item_spacing: 8.0,
-			font_size: 32,
+			font_size: 16,
 		}
 	}
 
@@ -49,7 +49,7 @@ impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
 		self.cursor.y -= self.item_spacing;
 
 		let is_hovered = self.input.mouse_position_pixels()
-			.map(|pos| button_rect.contains_point(pos))
+			.map(|pos| button_rect.contains_point(pos/2.0))
 			.unwrap_or(false);
 
 		let is_pressed = is_hovered

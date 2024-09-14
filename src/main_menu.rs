@@ -23,7 +23,7 @@ impl MainMenuScene {
 		let mut builder = self.painter.builder(ctx);
 		let screen_bounds = builder.screen_rect;
 
-		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
+		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.8));
 
 		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
@@ -76,7 +76,7 @@ impl PauseMenuScene {
 		let mut builder = self.painter.builder(ctx);
 		let screen_bounds = builder.screen_rect;
 
-		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
+		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.8));
 
 		if builder.button("Resume") || ctx.input.button_just_down(input::keys::Escape) {
 			ctx.message_bus.emit(MenuCmd::Resume);
