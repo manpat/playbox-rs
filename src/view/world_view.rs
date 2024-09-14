@@ -86,7 +86,7 @@ impl WorldView {
 		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 
 		for &RoomInstance{room_index, room_to_world, clip_by, height_offset} in self.visible_rooms.iter() {
-			let room_info = &self.room_mesh_infos[room_index];
+			let room_mesh = &self.room_mesh_infos[room_index];
 			let index_size = std::mem::size_of::<u32>() as u32;
 
 			let [x,z,w] = room_to_world.columns();
@@ -130,7 +130,7 @@ impl WorldView {
 			};
 
 			group.draw(self.v_shader, gfx::CommonShader::FlatTexturedFragment)
-				.elements(room_info.num_elements)
+				.elements(room_mesh.num_elements)
 				.ssbo(0, self.vbo)
 				.ubo(1, &[RoomUniforms {
 					transform,
@@ -139,10 +139,12 @@ impl WorldView {
 					plane_2,
 				}])
 				.indexed(self.ebo.with_offset_size(
-					room_info.base_index * index_size,
-					room_info.num_elements * index_size
+					room_mesh.base_index * index_size,
+					room_mesh.num_elements * index_size
 				))
-				.base_vertex(room_info.base_vertex);
+				.base_vertex(room_mesh.base_vertex);
+
+			// TODO(pat.m): draw objects!
 		}
 	}
 

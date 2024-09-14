@@ -354,6 +354,8 @@ impl UndoEntry {
 
 			UpdateObject{object_index, after, ..} => {
 				ctx.model.world.objects[*object_index].clone_from(after);
+				// TODO(pat.m): fucky - only here because I'm baking objects into room meshes
+				ctx.message_bus.emit(WorldChangedEvent);
 			}
 		}
 	}

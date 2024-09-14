@@ -18,8 +18,20 @@ impl Interactions {
 	}
 
 	pub fn update(&mut self, player: &Player, world: &World, message_bus: &MessageBus) {
-		if message_bus.poll(&self.player_cmd_sub).any(|msg| msg == PlayerCmd::Interact) {
-			log::info!("Interact {:?}", self.hovered_object);
+		if let Some(object_index) = self.hovered_object
+			&& let Some(object) = world.objects.get(object_index)
+		{
+			if message_bus.poll(&self.player_cmd_sub).any(|msg| msg == PlayerCmd::Interact) {
+				log::info!("Interact '{}'", object.name);
+
+				match object.info {
+					ObjectInfo::Debug => {
+						// TODO(pat.m): uuuhhhhhh
+					}
+
+					_ => {}
+				}
+			}
 		}
 
 		self.hovered_object = None;
@@ -30,9 +42,12 @@ impl Interactions {
 			}
 
 			// TODO(pat.m): processed_world.distance(player.placement, object.placement)
-			// TODO(pat.m): looking at
 			let diff = object.placement.position - player.placement.position;
-			if diff.length() < 0.5 {
+			let distance = diff.length();
+			let direction = diff / distance;
+
+			// TODO(pat.m): determine distance and angle based on size of object
+			if distance < 0.5 && player.placement.forward().dot(direction) > 0.7071 {
 				self.hovered_object = Some(object_index);
 				break
 			}
@@ -43,3 +58,4 @@ impl Interactions {
 		self.hovered_object.is_some()
 	}
 }
+

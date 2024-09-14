@@ -1249,10 +1249,22 @@
       "name": "Debug Object",
       "room_index": 7,
       "position": [
-        -0.17372485,
-        -0.13001843
+        0.09097204,
+        1.4294497
       ],
       "yaw": 2.6829772,
+      "info": {
+        "kind": "Debug"
+      }
+    },
+    {
+      "name": "Crambus",
+      "room_index": 10,
+      "position": [
+        0.42157876,
+        0.12854277
+      ],
+      "yaw": 0.099265665,
       "info": {
         "kind": "Debug"
       }

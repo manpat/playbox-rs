@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, ProcessedWorld, WallId};
+use model::*;
 
 
 pub struct RoomMeshInfo {
@@ -67,6 +67,13 @@ impl RoomMeshBuilder<'_> {
 		// Walls
 		for wall_index in 0..room.walls.len() {
 			self.build_wall(WallId{room_index, wall_index});
+		}
+
+		// Objects
+		for object in self.world.objects.iter()
+			.filter(|o| o.placement.room_index == room_index)
+		{
+			self.build_object(object);
 		}
 
 		let num_elements = self.indices.len() as u32 - base_index;
@@ -148,5 +155,25 @@ impl RoomMeshBuilder<'_> {
 
 			self.add_convex(verts, wall.color);
 		}
+	}
+
+	pub fn build_object(&mut self, object: &Object) {
+		if !matches!(object.info, ObjectInfo::Debug) {
+			return
+		}
+
+		let forward = object.placement.forward().to_x0y() * 0.1;
+		let right = object.placement.right().to_x0y() * 0.1;
+		let center = object.placement.position.to_xny(0.3);
+
+		let verts = [
+			center + Vec3::from_y(0.2),
+			center + forward,
+			center - forward/2.0 + right,
+			center - forward/2.0 - right,
+			center + forward,
+		];
+
+		self.add_convex(verts, Color::magenta());
 	}
 }
