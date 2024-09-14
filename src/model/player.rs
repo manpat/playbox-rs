@@ -3,6 +3,7 @@ use model::{Placement, WallId, World, ProcessedWorld};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
+pub const PLAYER_HEIGHT: f32 = 0.5;
 pub const PLAYER_RADIUS: f32 = 0.1;
 
 
@@ -17,8 +18,6 @@ pub enum PlayerCmd {
 pub struct Player {
 	pub placement: Placement,
 	pub pitch: f32,
-
-	pub height: f32,
 
 	// TODO(pat.m): these should be separate to player
 	pub free_pos: Vec3,
@@ -179,8 +178,8 @@ impl Player {
 				let intersection_dist_from_center = (aperture_center - distance_along_wall).abs();
 
 				// Target room must be tall enough and the step must not be too steep
-				let can_transition_to_opposing_room = self.height < connection_info.aperture_height
-					&& connection_info.height_difference.abs() < self.height * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
+				let can_transition_to_opposing_room = PLAYER_HEIGHT < connection_info.aperture_height
+					&& connection_info.height_difference.abs() < PLAYER_HEIGHT * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
 
 				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
