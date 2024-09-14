@@ -21,32 +21,27 @@ impl HudView {
 		let screen_size = gfx.backbuffer_size().to_vec2();
 		let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
 
-		let mut usable_area = screen_bounds.shrink(2.0);
+		let usable_area = screen_bounds.shrink(8.0);
 
 		let text_size = self.painter.text_rect(16, "Testing 123").size();
 
 		self.painter.text(usable_area.min, 16, "Testing 123", Color::white());
 		self.painter.text(usable_area.max - text_size, 16, "Testing 123", Color::white());
-		self.painter.text(usable_area.max_min_corner() - Vec2::from_x(text_size.x), 16, "Testing 123", Color::white());
-		self.painter.text(usable_area.min_max_corner() - Vec2::from_y(text_size.y), 16, "Testing 123", Color::white());
+		self.painter.text(usable_area.max_min_corner() - text_size.to_x0(), 16, "Testing 123", Color::white());
+		self.painter.text(usable_area.min_max_corner() - text_size.to_0y(), 16, "Testing 123", Color::white());
 
 
 		if let Some(object) = model.interactions.hovered_object.and_then(|idx| model.world.objects.get(idx)) {
-			self.painter.text(usable_area.center(), 16, format!("{object:#?}"), Color::white());
-		}
+			let interact_message = match &object.info {
+				ObjectInfo::Ladder { target_world, .. } => format!("To {target_world}"),
+				_ => format!("Frob '{}'", object.name),
+			};
 
+			let text_size = self.painter.text_rect(16, &interact_message).size();
 
-		let quads = [
-			usable_area.cut_top(12.0).shrink(2.0),
-			usable_area.cut_bottom(24.0).shrink(2.0),
-			usable_area.cut_left(24.0).shrink(2.0),
-			usable_area.cut_right(24.0).shrink(2.0),
-			usable_area.cut_top(12.0).shrink(2.0),
-		];
-
-		for quad in quads {
-			let color = Color::white().with_alpha(0.02);
-			self.painter.rect(quad, color);
+			self.painter.rect(Aabb2::from_center_extents(usable_area.center(), 8.0), Color::grey(0.5).with_alpha(0.1));
+			// self.painter.text(usable_area.center() - text_size * Vec2::new(0.5, 1.0) - Vec2::from_y(12.0), 16, interact_message, Color::grey(0.5));
+			self.painter.text(usable_area.center() - text_size.to_0y()/2.0 + Vec2::from_x(12.0), 16, interact_message, Color::grey(0.5));
 		}
 
 
@@ -59,7 +54,7 @@ impl HudView {
 
 
 
-
+#[allow(dead_code)]
 trait Aabb2UIExt {
 	fn with_left(&self, new: f32) -> Aabb2;
 	fn with_right(&self, new: f32) -> Aabb2;

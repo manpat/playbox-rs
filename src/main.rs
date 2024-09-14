@@ -36,6 +36,7 @@ pub mod prelude {
 	pub use crate::message_bus::{MessageBus, Subscription};
 
 	pub use std::collections::HashMap;
+	pub use std::borrow::Cow;
 }
 
 use prelude::*;

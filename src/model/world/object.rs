@@ -42,4 +42,3 @@ pub enum ObjectInfo {
 
 	Npc,
 }
-
