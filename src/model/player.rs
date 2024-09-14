@@ -45,18 +45,20 @@ impl Player {
 		}
 
 		{
-			let (dx, dy) = ctx.input.mouse_delta().map_or((0.0, 0.0), Vec2::to_tuple);
-			self.placement.yaw += dx * TAU;
+			let (dyaw, dpitch) = ctx.input.mouse_delta_radians().map_or((0.0, 0.0), Vec2::to_tuple);
+
+			self.placement.yaw += dyaw;
 			self.placement.yaw %= TAU;
 
 			let pitch_limit = PI/2.0;
-			self.pitch = (self.pitch - 3.0*dy).clamp(-pitch_limit, pitch_limit);
+			self.pitch = (self.pitch - dpitch).clamp(-pitch_limit, pitch_limit);
 		}
 
+		let base_speed = 1.0/60.0;
 		let speed = match (ctx.input.button_down(input::keys::Shift), ctx.input.button_down(input::keys::Alt)) {
-			(true, false) => 4.0 / 60.0,
-			(false, true) => 0.5 / 60.0,
-			_ => 2.0 / 60.0,
+			(true, false) => 2.0 * base_speed,
+			(false, true) => 0.25 * base_speed,
+			_ => base_speed,
 		};
 
 		if self.free_cam {
