@@ -27,7 +27,7 @@ impl MainMenuScene {
 
 		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
-			ctx.message_bus.emit(MenuCmd::Play(()));
+			ctx.message_bus.emit(MenuCmd::Play("default".into()));
 		}
 
 		if builder.button("I'm a big long test button and I go AAAAAAAA. lol. lmao? \"!£$%^&{}()[]") {
@@ -48,7 +48,7 @@ impl MainMenuScene {
 
 
 pub enum MenuCmd {
-	Play(()),
+	Play(String),
 	Resume,
 	Settings,
 	QuitToMain,

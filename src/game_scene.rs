@@ -110,11 +110,19 @@ impl GameScene {
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
 		}
 
+		if let Some(argument) = ctx.console.command("load") {
+			if argument.is_empty() {
+				log::error!("'load' requires world name argument");
+			} else {
+				self.message_bus.emit(MenuCmd::Play(argument));
+			}
+		}
+
 		let model::Model { processed_world, world, player, progress, interactions, environment, hud, .. } = &mut self.model;
 
 		processed_world.update(&world, &progress, &self.message_bus);
 
-		if !ctx.show_editor || self.force_game_controls {
+		if !ctx.show_editor && !ctx.console.is_visible() || self.force_game_controls {
 			player.handle_input(ctx, &world, &processed_world, &hud);
 			interactions.update(&player, &world, &processed_world, &self.message_bus);
 		}

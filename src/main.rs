@@ -28,6 +28,7 @@ pub mod prelude {
 	pub use crate::model;
 	pub use crate::view;
 
+	pub use crate::console::Console;
 	pub use crate::editor;
 
 	pub use crate::glyph_cache::GlyphCache;
@@ -75,7 +76,8 @@ impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
 		let message_bus = MessageBus::new();
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
-		let ctx = &mut Context::new(ctx, &audio, &message_bus);
+		let mut console = console::Console::new();
+		let ctx = &mut Context::new(ctx, &audio, &message_bus, &mut console);
 
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
@@ -92,7 +94,7 @@ impl App {
 			pause_menu: PauseMenuScene::new(ctx)?,
 			game_scene,
 
-			console: console::Console::new(message_bus.clone()),
+			console,
 
 			menu_cmd_subscription: message_bus.subscribe(),
 			message_bus,
@@ -120,6 +122,10 @@ impl toybox::App for App {
 
 		self.console.update(ctx);
 
+		if self.console.command("quit").is_some() {
+			self.message_bus.emit(MenuCmd::QuitToDesktop);
+		}
+
 		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
 			&& self.game_scene.is_none()
 		{
@@ -129,7 +135,7 @@ impl toybox::App for App {
 
 		match self.active_scene {
 			ActiveScene::MainMenu => {
-				self.main_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
+				self.main_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
 			}
 
 			ActiveScene::Game => {
@@ -139,27 +145,24 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				if !self.console.is_visible() {
-					game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
-				}
-
+				game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
 				game_scene.draw(&mut ctx.gfx);
 			}
 
 			ActiveScene::PauseMenu => {
 				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
 				let game_scene = self.game_scene.as_mut().unwrap();
-				
-				self.pause_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus));
+
+				self.pause_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
 				game_scene.draw(&mut ctx.gfx);
 			}
 		}
 
 		for menu_msg in self.message_bus.poll_consume(&self.menu_cmd_subscription) {
 			match menu_msg {
-				MenuCmd::Play(..) => {
-					let world = Self::load_world_or_default(&ctx.vfs, "worlds/default.world");
-					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus);
+				MenuCmd::Play(world_name) => {
+					let world = Self::load_world_or_default(&ctx.vfs, format!("worlds/{world_name}.world"));
+					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console);
 					self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
 					self.active_scene = ActiveScene::Game;
 				}
@@ -209,16 +212,17 @@ pub struct Context<'tb> {
 
 	pub message_bus: &'tb MessageBus,
 	pub audio: &'tb MyAudioSystem,
+	pub console: &'tb mut Console,
 
 	pub show_editor: bool,
 }
 
 impl<'tb> Context<'tb> {
-	pub fn new(tb: &'tb mut toybox::Context, audio: &'tb MyAudioSystem, message_bus: &'tb MessageBus) -> Self {
+	pub fn new(tb: &'tb mut toybox::Context, audio: &'tb MyAudioSystem, message_bus: &'tb MessageBus, console: &'tb mut Console) -> Self {
 		let toybox::Context { gfx, input, egui, cfg, vfs, show_debug_menu, .. } = tb;
 		let show_editor = *show_debug_menu;
 
-		Self {gfx, input, egui, cfg, vfs, audio, message_bus, show_editor}
+		Self {gfx, input, egui, cfg, vfs, audio, message_bus, console, show_editor}
 	}
 }
 

@@ -2,19 +2,19 @@ use crate::prelude::*;
 
 
 pub struct Console {
-	message_bus: MessageBus,
 	visible: bool,
 
 	text_buffer: String,
+	ready_cmd_str: Option<(String, String)>,
 }
 
 impl Console {
-	pub fn new(message_bus: MessageBus) -> Console {
+	pub fn new() -> Console {
 		Console {
-			message_bus,
 			visible: false,
 
 			text_buffer: String::new(),
+			ready_cmd_str: None,
 		}
 	}
 
@@ -23,6 +23,10 @@ impl Console {
 	}
 
 	pub fn update(&mut self, ctx: &mut toybox::Context) {
+		if let Some((verb, _)) = self.ready_cmd_str.take() {
+			log::error!("Failed to process command '{verb}'");
+		}
+
 		if ctx.input.button_just_down(input::keys::F12) {
 			self.visible = !self.visible;
 		}
@@ -40,29 +44,27 @@ impl Console {
 
 				// TODO(pat.m): hook into log and show output history here.
 
-				if let Some(command_str) = show_command_line(ui, &mut self.text_buffer)
-					&& let Err(error) = self.process_string(command_str.trim())
-				{
-					log::error!("{error}");
+				if let Some(command_str) = show_command_line(ui, &mut self.text_buffer) {
+					let command_str = command_str.trim();
+					let (verb, arguments_str) = command_str.split_once(&[' ', '\t']).unwrap_or((command_str, ""));
+					if !verb.is_empty() {
+						self.ready_cmd_str = Some((verb.to_string(), arguments_str.trim().to_string()));
+					}
 				}
 			});
 	}
-}
 
-impl Console {
-	fn process_string(&mut self, command_str: &str) -> anyhow::Result<()> {
-		let (verb, _arguments_str) = command_str.split_once(&[' ', '\t']).unwrap_or((command_str, ""));
-
-		match verb {
-			"quit" => self.message_bus.emit(MenuCmd::QuitToDesktop),
-			_ => anyhow::bail!("Failed to process command '{verb}'"),
+	pub fn command(&mut self, verb: &str) -> Option<String> {
+		if let Some((ready_verb, _)) = &self.ready_cmd_str
+			&& ready_verb == verb
+		{
+			self.ready_cmd_str.take().map(|(_, arguments)| arguments)
 		}
-
-		Ok(())
+		else {
+			None
+		}
 	}
 }
-
-
 
 
 fn show_command_line(ui: &mut egui::Ui, text_buffer: &mut String) -> Option<String> {
@@ -74,7 +76,7 @@ fn show_command_line(ui: &mut egui::Ui, text_buffer: &mut String) -> Option<Stri
 		.hint_text("Command time...");
 
 	let response = ui.add(command_line);
-	let confirmed = response.lost_focus();
+	let confirmed = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
 	response.request_focus();
 
 	if confirmed && !text_buffer.trim().is_empty() {
