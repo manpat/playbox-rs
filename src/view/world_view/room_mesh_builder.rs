@@ -158,7 +158,7 @@ impl RoomMeshBuilder<'_> {
 	}
 
 	pub fn build_object(&mut self, object: &Object) {
-		if !matches!(object.info, ObjectInfo::Debug) {
+		if !matches!(object.info, ObjectInfo::Debug | ObjectInfo::Ladder{..}) {
 			return
 		}
 

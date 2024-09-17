@@ -57,7 +57,7 @@ pub struct State {
 
 	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 	undo_cmd_sub: Subscription<UndoCmd>,
-	editor_modal_cmd_sub: Subscription<EditorModalCmd>,
+	// editor_modal_cmd_sub: Subscription<EditorModalCmd>,
 }
 
 #[derive(Debug)]
@@ -83,7 +83,7 @@ impl State {
 			undo_stack: UndoStack::new(message_bus.clone()),
 			editor_world_edit_cmd_sub: message_bus.subscribe(),
 			undo_cmd_sub: message_bus.subscribe(),
-			editor_modal_cmd_sub: message_bus.subscribe(),
+			// editor_modal_cmd_sub: message_bus.subscribe(),
 		}
 	}
 }

@@ -24,10 +24,16 @@ impl Interactions {
 			{
 				log::info!("Interact '{}'", object.name);
 
-				match object.info {
+				match &object.info {
 					ObjectInfo::Debug => {
 						// TODO(pat.m): uuuhhhhhh
 						message_bus.emit(HudCmd::ShowDialog(()));
+					}
+					ObjectInfo::Ladder {target_world, target_object} => {
+						message_bus.emit(HudCmd::TransitionWorld{
+							world_name: target_world.clone(),
+							object_name: target_object.clone(),
+						});
 					}
 
 					_ => {}

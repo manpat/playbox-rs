@@ -186,6 +186,19 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 
 			ctx.message_bus.emit(EditorWorldEditCmd::AddObject(object));
 		}
+
+		if ui.button("Ladder").clicked() {
+			let object = model::Object {
+				name: "ladder".to_string(),
+				placement: ctx.model.player.placement,
+				info: model::ObjectInfo::Ladder {
+					target_world: "world2".into(),
+					target_object: "ladder".into(),
+				},
+			};
+
+			ctx.message_bus.emit(EditorWorldEditCmd::AddObject(object));
+		}
 	});
 
 	egui::ScrollArea::vertical()
@@ -289,7 +302,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 	ui.horizontal(|ui| {
 		ui.label("Color");
-		
+
 		let mut wall_color = wall.color;
 		if ui.color_edit_button_rgb(wall_color.as_mut()).changed() {
 			message_bus.emit(EditorWorldEditCmd::SetWallColor(wall_id, wall_color));
@@ -298,7 +311,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 	ui.horizontal(|ui| {
 		ui.label("horizontal Offset");
-		
+
 		let mut offset = wall.horizontal_offset;
 		if ui.add(Slider::new(&mut offset, -2.0..=2.0).step_by(0.01).clamp_to_range(false))
 			.changed()
@@ -309,7 +322,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 	ui.horizontal(|ui| {
 		ui.label("Vertical Offset");
-		
+
 		let mut offset = wall.vertical_offset;
 		if ui.add(Slider::new(&mut offset, -1.0..=1.0).step_by(0.01).clamp_to_range(false))
 			.changed()

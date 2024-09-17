@@ -3,9 +3,14 @@ use model::*;
 
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum HudCmd {
 	ShowDialog(()),
+	TransitionWorld {
+		world_name: String,
+		object_name: String,
+		// transition kind
+	}
 }
 
 
@@ -31,10 +36,14 @@ impl HudModel {
 			self.in_dialog = false;
 		}
 
-		for msg in message_bus.poll(&self.hud_cmd) {
+		for msg in message_bus.poll_consume(&self.hud_cmd) {
 			match msg {
 				HudCmd::ShowDialog{..} => {
 					self.in_dialog = true;
+				}
+
+				HudCmd::TransitionWorld{world_name, ..} => {
+					message_bus.emit(MenuCmd::Play(world_name));
 				}
 			}
 		}

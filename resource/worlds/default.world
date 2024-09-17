@@ -1280,6 +1280,20 @@
       "info": {
         "kind": "Debug"
       }
+    },
+    {
+      "name": "ladder",
+      "room_index": 0,
+      "position": [
+        0.9168805,
+        -0.15894558
+      ],
+      "yaw": -1.8310523,
+      "info": {
+        "kind": "Ladder",
+        "target_world": "world2",
+        "target_object": "ladder"
+      }
     }
   ],
   "player_spawn": {

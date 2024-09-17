@@ -1,0 +1,116 @@
+{
+  "rooms": [
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          1.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.0
+    }
+  ],
+  "connections": [],
+  "objects": [
+    {
+      "name": "ladder",
+      "room_index": 0,
+      "position": [
+        0.07033072,
+        -0.7730158
+      ],
+      "yaw": 3.175454,
+      "info": {
+        "kind": "Ladder",
+        "target_world": "default",
+        "target_object": "ladder"
+      }
+    }
+  ],
+  "player_spawn": {
+    "room_index": 0,
+    "position": [
+      0.0,
+      0.0
+    ],
+    "yaw": 0.0
+  },
+  "fog": {
+    "color": {
+      "r": 1.0,
+      "g": 1.0,
+      "b": 1.0,
+      "a": 1.0
+    },
+    "start": 0.0,
+    "distance": 30.0,
+    "emission": 1.0,
+    "transparency": 0.5
+  }
+}
