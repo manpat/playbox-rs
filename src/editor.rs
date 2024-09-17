@@ -6,15 +6,13 @@ mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
 
 mod commands;
-use commands::*;
+pub use commands::*;
 
 mod undo;
 use undo::*;
 
 mod world_editor;
 pub use world_editor::draw_world_editor;
-
-pub use commands::{handle_editor_cmds, EditorWorldEditCmd};
 
 use std::borrow::Cow;
 use egui::widgets::Slider;
@@ -59,6 +57,7 @@ pub struct State {
 
 	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 	undo_cmd_sub: Subscription<UndoCmd>,
+	editor_modal_cmd_sub: Subscription<EditorModalCmd>,
 }
 
 #[derive(Debug)]
@@ -84,6 +83,7 @@ impl State {
 			undo_stack: UndoStack::new(message_bus.clone()),
 			editor_world_edit_cmd_sub: message_bus.subscribe(),
 			undo_cmd_sub: message_bus.subscribe(),
+			editor_modal_cmd_sub: message_bus.subscribe(),
 		}
 	}
 }

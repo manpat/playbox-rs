@@ -2,6 +2,14 @@
 use model::{Room, Object, VertexId, WallId, FogParameters};
 use super::*;
 
+#[derive(Debug, Clone)]
+pub enum EditorModalCmd {
+	NewWorld,
+	LoadWorld,
+	SaveWorld,
+	SaveWorldAs,
+}
+
 
 #[derive(Debug)]
 pub enum EditorWorldEditCmd {

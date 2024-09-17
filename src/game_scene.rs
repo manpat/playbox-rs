@@ -218,15 +218,19 @@ impl GameScene {
 	pub fn add_editor_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
 		ui.menu_button("Editor", |ui| {
 			if ui.button("New World").clicked() {
+				// self.message_bus.emit(editor::EditorModalCmd::NewWorld);
+
+				// if changes made to current world, check save
+
 				self.model.world = model::World::new();
 				self.message_bus.emit(model::WorldChangedEvent);
-
-				// TODO(pat.m): switch to Game state
 
 				ui.close_menu();
 			}
 
 			if ui.button("Load World").clicked() {
+				// self.message_bus.emit(editor::EditorModalCmd::LoadWorld);
+
 				let default_world_path = "worlds/default.world";
 
 				match ctx.vfs.load_json_resource::<model::World>(default_world_path) {
@@ -245,19 +249,14 @@ impl GameScene {
 			}
 
 			if ui.button("Save World").clicked() {
+				// self.message_bus.emit(editor::EditorModalCmd::SaveWorld);
+
 				let default_world_path = "worlds/default.world";
 
 				if let Err(error) = ctx.vfs.save_json_resource(default_world_path, &self.model.world) {
 					log::error!("Failed to save world to '{default_world_path}': {error}");
 				}
 
-				ui.close_menu();
-			}
-
-			ui.separator();
-
-			if ui.button("Set Player Spawn").clicked() {
-				self.message_bus.emit(editor::EditorWorldEditCmd::SetPlayerSpawn);
 				ui.close_menu();
 			}
 		});

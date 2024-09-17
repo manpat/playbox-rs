@@ -4,18 +4,23 @@ use model::*;
 
 
 pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
-	let undo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Z);
-	let redo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::Z);
+	// TODO(pat.m): modal world load/save flows
+	let modal_active = false;
 
-	ctx.input_mut(|input| {
-		if input.consume_shortcut(&redo_shortcut) {
-			message_bus.emit(UndoCmd::Redo);
-		}
+	if !modal_active {
+		let undo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Z);
+		let redo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::Z);
 
-		if input.consume_shortcut(&undo_shortcut) {
-			message_bus.emit(UndoCmd::Undo);
-		}
-	});
+		ctx.input_mut(|input| {
+			if input.consume_shortcut(&redo_shortcut) {
+				message_bus.emit(UndoCmd::Redo);
+			}
+
+			if input.consume_shortcut(&undo_shortcut) {
+				message_bus.emit(UndoCmd::Undo);
+			}
+		});
+	}
 
 	let mut context = Context {
 		state: &mut state.inner,
@@ -24,6 +29,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 	};
 
 	egui::Window::new("All Rooms")
+		.enabled(!modal_active)
 		.show(ctx, |ui| {
 			ui.horizontal(|ui| {
 				ui.checkbox(&mut context.state.track_player, "Track Player");
@@ -33,6 +39,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 		});
 
 	egui::Window::new("Focused Room")
+		.enabled(!modal_active)
 		.show(ctx, |ui| {
 			ui.horizontal(|ui| {
 				draw_room_selector(ui, &mut context);
@@ -53,21 +60,24 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 
 	egui::SidePanel::right("Inspector")
 		.show(ctx, |ui| {
-			ui.heading("World Settings");
-			draw_world_settings(ui, &mut context);
+			ui.add_enabled_ui(!modal_active, |ui| {
+				ui.heading("World Settings");
+				draw_world_settings(ui, &mut context);
 
-			ui.separator();
+				ui.separator();
 
-			ui.heading("Objects");
-			draw_object_list(ui, &mut context);
+				ui.heading("Objects");
+				draw_object_list(ui, &mut context);
 
-			ui.separator();
+				ui.separator();
 
-			ui.heading("Inspector");
-			draw_item_inspector(ui, &mut context);
+				ui.heading("Inspector");
+				draw_item_inspector(ui, &mut context);
+			});
 		});
 
 	egui::Window::new("Undo Stack")
+		.enabled(!modal_active)
 		.show(ctx, |ui| {
 			ui.horizontal(|ui| {
 				if ui.button("Undo").clicked() {
