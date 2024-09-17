@@ -22,7 +22,7 @@ pub struct World {
 	pub objects: Vec<Object>,
 
 	pub player_spawn: Placement,
-	
+
 	// TODO(pat.m): split out into 'environment settings'
 	// TODO(pat.m): can this be specified per room?
 	pub fog: FogParameters,

@@ -110,12 +110,8 @@ impl GameScene {
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
 		}
 
-		if let Some(argument) = ctx.console.command("load") {
-			if argument.is_empty() {
-				log::error!("'load' requires world name argument");
-			} else {
-				self.message_bus.emit(MenuCmd::Play(argument));
-			}
+		if let Err(err) = self.handle_console(ctx) {
+			log::error!("{err}");
 		}
 
 		let model::Model { processed_world, world, player, progress, interactions, environment, hud, .. } = &mut self.model;
@@ -268,5 +264,28 @@ impl GameScene {
 				ui.close_menu();
 			}
 		});
+	}
+
+	fn handle_console(&mut self, ctx: &mut Context) -> anyhow::Result<()> {
+		if let Some(world_name) = ctx.console.command("load") {
+			if world_name.is_empty() {
+				anyhow::bail!("'load' requires world name argument");
+			}
+
+			self.message_bus.emit(MenuCmd::Play(world_name));
+		}
+
+		if let Some(world_name) = ctx.console.command("save") {
+			if world_name.is_empty() {
+				anyhow::bail!("'save' requires world name argument");
+			}
+
+			ctx.vfs.save_json_resource(format!("worlds/{world_name}.world"), &self.model.world)
+				.with_context(|| format!("Saving '{world_name}'"))?;
+
+			log::info!("World '{world_name}' saved successfully");
+		}
+
+		Ok(())
 	}
 }
