@@ -158,22 +158,50 @@ impl RoomMeshBuilder<'_> {
 	}
 
 	pub fn build_object(&mut self, object: &Object) {
-		if !matches!(object.info, ObjectInfo::Debug | ObjectInfo::Ladder{..}) {
-			return
+		match &object.info {
+			ObjectInfo::Debug => {
+				let forward = object.placement.forward().to_x0y() * 0.1;
+				let right = object.placement.right().to_x0y() * 0.1;
+				let center = object.placement.position.to_xny(0.3);
+
+				let verts = [
+					center + Vec3::from_y(0.2),
+					center + forward,
+					center - forward/2.0 + right,
+					center - forward/2.0 - right,
+					center + forward,
+				];
+
+				self.add_convex(verts, Color::magenta());
+			}
+
+			ObjectInfo::Ladder{..} => {
+				let up = Vec3::from_y(0.7);
+				let forward = object.placement.forward().to_x0y();
+				let right = object.placement.right().to_x0y();
+				let center = object.placement.position.to_x0y();
+
+				let verts = [
+					center - forward * 0.08 - right * 0.16,
+					center - forward * 0.08 - right * 0.16 + up,
+					center - forward * 0.08 + right * 0.16 + up,
+					center - forward * 0.08 + right * 0.16,
+				];
+
+				self.add_convex(verts, Color::rgb(0.2, 0.08, 0.02));
+
+				let verts = [
+					center - right * 0.2 - forward * 0.2 + Vec3::from_y(0.01),
+					center - right * 0.2 + forward * 0.2 + Vec3::from_y(0.01),
+					center + right * 0.2 + forward * 0.2 + Vec3::from_y(0.01),
+					center + right * 0.2 - forward * 0.2 + Vec3::from_y(0.01),
+				];
+
+				self.add_convex(verts, Color::grey(0.02));
+			}
+
+			_ => {}
 		}
 
-		let forward = object.placement.forward().to_x0y() * 0.1;
-		let right = object.placement.right().to_x0y() * 0.1;
-		let center = object.placement.position.to_xny(0.3);
-
-		let verts = [
-			center + Vec3::from_y(0.2),
-			center + forward,
-			center - forward/2.0 + right,
-			center - forward/2.0 - right,
-			center + forward,
-		];
-
-		self.add_convex(verts, Color::magenta());
 	}
 }
