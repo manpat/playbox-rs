@@ -37,7 +37,7 @@ impl GameScene {
 		let ldr_color_image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
 
 		// let toy_renderer = {
-		// 	let project_path = resource_manager.resource_path().join("toys/basic.toy");
+		// 	let project_path = resource_manager.resource_path("toys/basic.toy")?;
 		// 	let project_data = std::fs::read(&project_path)?;
 		// 	let project = toy::load(&project_data)?;
 
@@ -111,7 +111,7 @@ impl GameScene {
 		}
 
 		if let Err(err) = self.handle_console(ctx) {
-			log::error!("{err}");
+			log::error!("{err:?}");
 		}
 
 		let model::Model { processed_world, world, player, progress, interactions, environment, hud, .. } = &mut self.model;
@@ -281,7 +281,7 @@ impl GameScene {
 			}
 
 			ctx.vfs.save_json_resource(format!("worlds/{world_name}.world"), &self.model.world)
-				.with_context(|| format!("Saving '{world_name}'"))?;
+				.with_context(|| format!("Failed to save world '{world_name}'"))?;
 
 			log::info!("World '{world_name}' saved successfully");
 		}
