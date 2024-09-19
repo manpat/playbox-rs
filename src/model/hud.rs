@@ -6,6 +6,8 @@ use model::*;
 #[derive(Debug, Clone)]
 pub enum HudCmd {
 	ShowDialog(()),
+
+	// TODO(pat.m): why is this here???????
 	TransitionWorld {
 		world_name: String,
 		object_name: String,

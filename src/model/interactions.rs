@@ -30,6 +30,7 @@ impl Interactions {
 						message_bus.emit(HudCmd::ShowDialog(()));
 					}
 					ObjectInfo::Ladder {target_world, target_object} => {
+						// TODO(pat.m): make this not a hudcmd?????
 						message_bus.emit(HudCmd::TransitionWorld{
 							world_name: target_world.clone(),
 							object_name: target_object.clone(),

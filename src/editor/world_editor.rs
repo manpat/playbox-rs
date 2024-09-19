@@ -347,6 +347,34 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 			message_bus.emit(EditorWorldEditCmd::SetObjectName(object_index, object_name.into_owned()));
 		}
 	});
+
+	match &object.info {
+		ObjectInfo::Ladder{target_world, target_object} => {
+			ui.separator();
+
+			let mut target_world = Cow::from(target_world);
+			if ui.text_edit_singleline(&mut target_world).changed() {
+				let new_target_world = target_world.into_owned();
+				message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+					if let ObjectInfo::Ladder{target_world, ..} = &mut object.info {
+						*target_world = new_target_world;
+					}
+				}));
+			}
+
+			let mut target_object = Cow::from(target_object);
+			if ui.text_edit_singleline(&mut target_object).changed() {
+				let new_target_object = target_object.into_owned();
+				message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+					if let ObjectInfo::Ladder{target_object, ..} = &mut object.info {
+						*target_object = new_target_object;
+					}
+				}));
+			}
+		}
+
+		_ => {}
+	}
 }
 
 

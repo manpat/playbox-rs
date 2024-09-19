@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use model::{Room, Object, VertexId, WallId, FogParameters};
+use model::{Model, Room, Object, VertexId, WallId, FogParameters};
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -48,7 +48,47 @@ pub enum EditorWorldEditCmd {
 	RemoveObject(usize),
 
 	SetObjectName(usize, String),
+	EditObject(usize, EditObjectCallback),
 }
+
+
+pub struct EditObjectCallback(Box<dyn FnOnce(&Model, &mut Object) -> anyhow::Result<()> + 'static>);
+
+impl std::fmt::Debug for EditObjectCallback {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "EditObjectCallback")
+	}
+}
+
+impl EditObjectCallback {
+	pub fn new<F>(f: F) -> Self
+		where F: FnOnce(&Model, &mut Object) + 'static
+	{
+		EditObjectCallback(Box::new(move |m, o| {
+			f(m, o);
+			Ok(())
+		}))
+	}
+
+	pub fn new_fallible<F>(f: F) -> Self
+		where F: FnOnce(&Model, &mut Object) -> anyhow::Result<()> + 'static
+	{
+		EditObjectCallback(Box::new(f))
+	}
+}
+
+impl EditorWorldEditCmd {
+	pub fn edit_object<F>(object_index: usize, f: F) -> Self
+		where F: FnOnce(&Model, &mut Object) + 'static
+	{
+		EditorWorldEditCmd::EditObject(
+			object_index,
+			EditObjectCallback::new(f)
+		)
+	}
+}
+
+
 
 
 #[derive(Copy, Clone, Debug)]
@@ -317,7 +357,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 						wall_b.room_index -= 1;
 					}
 				}
-				
+
 				Ok(())
 			})?;
 
@@ -339,7 +379,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				connections.retain(|&(wall_a, wall_b)| {
 					wall_a.room_index != room_index && wall_b.room_index != room_index
 				});
-				
+
 				Ok(())
 			})?;
 			transaction.submit();
@@ -356,7 +396,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				// Connect
 				connections.push((source_wall_id, target_wall_id));
-				
+
 				Ok(())
 			})?;
 			transaction.submit();
@@ -368,7 +408,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				connections.retain(|&(wall_a, wall_b)| {
 					wall_a != wall_id && wall_b != wall_id
 				});
-				
+
 				Ok(())
 			})?;
 			transaction.submit();
@@ -468,6 +508,12 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		EditorWorldEditCmd::SetObjectName(object_index, object_name) => {
 			transaction.describe(format!("Change Object #{object_index}'s name"));
 			transaction.update_object(object_index, |_, object| { object.name = object_name; Ok(()) })?;
+			transaction.submit();
+		}
+
+		EditorWorldEditCmd::EditObject(object_index, func) => {
+			transaction.describe(format!("Edit Object #{object_index}"));
+			transaction.update_object(object_index, func.0)?;
 			transaction.submit();
 		}
 	}
