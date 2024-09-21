@@ -48,19 +48,52 @@ impl Player {
 			}
 		}
 
-		if ctx.input.button_just_down(input::MouseButton::Left) {
+		if ctx.input.button_just_down(input::MouseButton::Left) || ctx.input.button_down(input::keys::KeyF) {
 			ctx.message_bus.emit(PlayerCmd::Interact);
 		}
+
+		let forward_pressed = ctx.input.button_down(input::keys::KeyW);
+		let back_pressed = ctx.input.button_down(input::keys::KeyS);
+		let right_pressed = ctx.input.button_down(input::keys::KeyD);
+		let left_pressed = ctx.input.button_down(input::keys::KeyA);
+
+		let yaw_left_pressed = ctx.input.button_down(input::keys::ArrowLeft) || ctx.input.button_down(input::keys::Numpad4);
+		let yaw_right_pressed = ctx.input.button_down(input::keys::ArrowRight) || ctx.input.button_down(input::keys::Numpad6);
+
+		let pitch_up_pressed = ctx.input.button_down(input::keys::ArrowUp) || ctx.input.button_down(input::keys::Numpad8);
+		let pitch_down_pressed = ctx.input.button_down(input::keys::ArrowDown) || ctx.input.button_down(input::keys::Numpad2);
+
+		let yaw_key_delta = match (yaw_right_pressed, yaw_left_pressed) {
+			(true, false) => 1.0,
+			(false, true) => -1.0,
+			_ => 0.0
+		};
+
+		let pitch_key_delta = match (pitch_up_pressed, pitch_down_pressed) {
+			(true, false) => 1.0,
+			(false, true) => -1.0,
+			_ => 0.0
+		};
 
 		{
 			let (dyaw, dpitch) = ctx.input.mouse_delta_radians().map_or((0.0, 0.0), Vec2::to_tuple);
 
-			self.placement.yaw += dyaw;
+			// https://github.com/id-Software/Quake-III-Arena/blob/dbe4ddb10315479fc00086f08e25d968b4b43c49/code/client/cl_input.c#L293
+			// https://github.com/id-Software/Quake-III-Arena/blob/dbe4ddb10315479fc00086f08e25d968b4b43c49/code/client/cl_main.c#L2300
+			let pitch_yaw_speed = 140.0f32.to_radians();
+			let dt = 1.0/60.0;
+
+			let key_yaw = yaw_key_delta * pitch_yaw_speed * dt;
+			let key_pitch = pitch_key_delta * pitch_yaw_speed * dt;
+
+			self.placement.yaw += dyaw + key_yaw;
 			self.placement.yaw %= TAU;
 
 			let pitch_limit = PI/2.0;
-			self.pitch = (self.pitch - dpitch).clamp(-pitch_limit, pitch_limit);
+			self.pitch = (self.pitch - dpitch - key_pitch).clamp(-pitch_limit, pitch_limit);
 		}
+
+
 
 		let base_speed = 1.0/60.0;
 		let speed = match (ctx.input.button_down(input::keys::Shift), ctx.input.button_down(input::keys::Alt)) {
@@ -78,19 +111,19 @@ impl Player {
 			let right = yaw_orientation.right();
 			let forward = orientation.forward();
 
-			if ctx.input.button_down(input::keys::KeyW) {
+			if forward_pressed {
 				self.free_pos += forward * speed;
 			}
 
-			if ctx.input.button_down(input::keys::KeyS) {
+			if back_pressed {
 				self.free_pos -= forward * speed;
 			}
 
-			if ctx.input.button_down(input::keys::KeyD) {
+			if right_pressed {
 				self.free_pos += right * speed;
 			}
 
-			if ctx.input.button_down(input::keys::KeyA) {
+			if left_pressed {
 				self.free_pos -= right * speed;
 			}
 
@@ -100,19 +133,19 @@ impl Player {
 
 			let mut delta = Vec2::zero();
 
-			if ctx.input.button_down(input::keys::KeyW) {
+			if forward_pressed {
 				delta += forward * speed;
 			}
 
-			if ctx.input.button_down(input::keys::KeyS) {
+			if back_pressed {
 				delta -= forward * speed;
 			}
 
-			if ctx.input.button_down(input::keys::KeyD) {
+			if right_pressed {
 				delta += right * speed;
 			}
 
-			if ctx.input.button_down(input::keys::KeyA) {
+			if left_pressed {
 				delta -= right * speed;
 			}
 
