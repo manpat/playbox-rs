@@ -10,7 +10,6 @@ pub const PLAYER_RADIUS: f32 = 0.1;
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerCmd {
 	Interact,
-	DismissDialog,
 }
 
 
@@ -32,9 +31,11 @@ impl Player {
 	pub fn handle_input(&mut self, ctx: &mut Context<'_>, world: &World, processed_world: &ProcessedWorld, hud: &HudModel) {
 		self.hack_height_change = None;
 
+		let interact_pressed = ctx.input.button_just_down(input::MouseButton::Left) || ctx.input.button_just_down(input::keys::KeyF);
+
 		if hud.in_dialog {
-			if ctx.input.button_just_down(input::MouseButton::Left) {
-				ctx.message_bus.emit(PlayerCmd::DismissDialog);
+			if interact_pressed {
+				ctx.message_bus.emit(HudCmd::DismissDialog);
 			}
 
 			return;
@@ -48,7 +49,7 @@ impl Player {
 			}
 		}
 
-		if ctx.input.button_just_down(input::MouseButton::Left) || ctx.input.button_down(input::keys::KeyF) {
+		if interact_pressed {
 			ctx.message_bus.emit(PlayerCmd::Interact);
 		}
 
