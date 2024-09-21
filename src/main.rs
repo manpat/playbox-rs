@@ -163,7 +163,14 @@ impl toybox::App for App {
 				MenuCmd::Play(world_name) => {
 					let world = Self::load_world_or_default(&ctx.vfs, format!("worlds/{world_name}.world"));
 					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console);
-					self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
+
+					// Reuse scene if we can, to avoid reloading common stuff
+					if let Some(game_scene) = &mut self.game_scene {
+						game_scene.switch_world(ctx, world)
+					} else {
+						self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
+					}
+
 					self.active_scene = ActiveScene::Game;
 				}
 

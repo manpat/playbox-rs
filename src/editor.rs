@@ -53,7 +53,7 @@ impl Item {
 #[derive(Debug)]
 pub struct State {
 	inner: InnerState,
-	undo_stack: UndoStack,
+	pub undo_stack: UndoStack,
 
 	editor_world_edit_cmd_sub: Subscription<EditorWorldEditCmd>,
 	undo_cmd_sub: Subscription<UndoCmd>,
@@ -85,6 +85,13 @@ impl State {
 			undo_cmd_sub: message_bus.subscribe(),
 			// editor_modal_cmd_sub: message_bus.subscribe(),
 		}
+	}
+
+	pub fn reset(&mut self) {
+		self.undo_stack.clear();
+		self.inner.focused_room_index = 0;
+		self.inner.hovered = None;
+		self.inner.selection = None;
 	}
 }
 

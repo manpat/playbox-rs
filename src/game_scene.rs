@@ -98,6 +98,14 @@ impl GameScene {
 		})
 	}
 
+	pub fn switch_world(&mut self, _ctx: &mut Context<'_>, new_world: model::World) {
+		self.model.player.placement = new_world.player_spawn;
+		self.model.world = new_world;
+		self.message_bus.emit(model::WorldChangedEvent);
+
+		self.editor_state.reset();
+	}
+
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		if ctx.input.button_just_down(input::keys::F1) {
 			self.force_game_controls = !self.force_game_controls;
@@ -235,20 +243,7 @@ impl GameScene {
 			if ui.button("Load World").clicked() {
 				// self.message_bus.emit(editor::EditorModalCmd::LoadWorld);
 
-				let default_world_path = "worlds/default.world";
-
-				match ctx.vfs.load_json_resource::<model::World>(default_world_path) {
-					Ok(new_world) => {
-						self.model.world = new_world;
-						self.message_bus.emit(model::WorldChangedEvent);
-						// TODO(pat.m): switch to Game state
-					}
-
-					Err(error) => {
-						log::error!("Failed to load world '{default_world_path}': {error}");
-					}
-				}
-
+				self.message_bus.emit(MenuCmd::Play("default".into()));
 				ui.close_menu();
 			}
 

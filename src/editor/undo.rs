@@ -36,6 +36,11 @@ impl UndoStack {
 		}
 	}
 
+	pub fn clear(&mut self) {
+		self.groups.clear();
+		self.disabled_change_index = 0;
+	}
+
 	fn push_group(&mut self, group: UndoGroup) {
 		let in_merge_window = self.last_command_time.elapsed() < UNDO_ENTRY_MERGE_WINDOW;
 

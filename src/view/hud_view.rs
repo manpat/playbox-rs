@@ -25,7 +25,6 @@ impl HudView {
 
 		if model.hud.in_dialog {
 			self.draw_dialog(usable_area, model);
-
 		} else {
 			self.draw_playing(usable_area, model);
 		}
@@ -56,7 +55,7 @@ impl HudView {
 		}
 	}
 
-	fn draw_dialog(&mut self, usable_area: Aabb2, model: &Model) {
+	fn draw_dialog(&mut self, usable_area: Aabb2, _model: &Model) {
 		let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque vulputate nunc orci.
 Proin varius a neque vel ultrices. Nulla facilisi. Praesent eget dictum ante.
 In blandit diam quis nibh convallis ultricies. Donec facilisis enim a mauris scelerisque,
