@@ -19,6 +19,9 @@ pub struct Player {
 	pub placement: Placement,
 	pub pitch: f32,
 
+	pub blood: u32,
+	pub salt: u32,
+
 	// TODO(pat.m): these should be separate to player
 	pub free_pos: Vec3,
 	pub free_cam: bool,

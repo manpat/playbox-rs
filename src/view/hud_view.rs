@@ -21,7 +21,7 @@ impl HudView {
 		let screen_size = gfx.backbuffer_size().to_vec2();
 		let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
 
-		let usable_area = screen_bounds.shrink(8.0);
+		let usable_area = screen_bounds.shrink(16.0);
 
 		if model.hud.in_dialog {
 			self.draw_dialog(usable_area, model);
@@ -33,12 +33,14 @@ impl HudView {
 	}
 
 	fn draw_playing(&mut self, usable_area: Aabb2, model: &Model) {
-		let text_size = self.painter.text_rect(16, "Testing 123").size();
+		let Player { blood, salt, .. } = model.player;
 
-		self.painter.text(usable_area.min, 16, "Testing 123", Color::white());
-		self.painter.text(usable_area.max - text_size, 16, "Testing 123", Color::white());
-		self.painter.text(usable_area.max_min_corner() - text_size.to_x0(), 16, "Testing 123", Color::white());
-		self.painter.text(usable_area.min_max_corner() - text_size.to_0y(), 16, "Testing 123", Color::white());
+		let text_width = self.painter.text_rect(16, "Blood: 000").width();
+
+		self.painter.rect(Aabb2::from_min_size(usable_area.min, Vec2::new(text_width, 32.0)).grow(4.0), Color::black().with_alpha(0.5));
+
+		self.painter.text(usable_area.min + Vec2::from_y(0.0), 16, format!("Blood: {blood}"), Color::white());
+		self.painter.text(usable_area.min + Vec2::from_y(16.0), 16, format!("Salt: {salt}"), Color::white());
 
 		if let Some(hud_text) = &model.hud.hud_text {
 			let fade_in = (hud_text.elapsed_visible_time/HUD_TEXT_FADE_IN_TIME).ease_quad_inout();
@@ -63,11 +65,17 @@ impl HudView {
 				_ => format!("Frob '{}'", object.name),
 			};
 
-			let text_size = self.painter.text_rect(16, &interact_message).size();
+			let text_rect = self.painter.text_rect(16, &interact_message);
+			let text_size = text_rect.size();
 
+			let text_pos = usable_area.center() - text_size.to_0y()/2.0 + Vec2::from_x(14.0);
+			// let text_pos = usable_area.center() - text_size * Vec2::new(0.5, 1.0) - Vec2::from_y(12.0);
+
+			// TODO(pat.m): interaction icon
 			self.painter.rect(Aabb2::from_center_extents(usable_area.center(), 8.0), Color::grey(0.5).with_alpha(0.1));
-			// self.painter.text(usable_area.center() - text_size * Vec2::new(0.5, 1.0) - Vec2::from_y(12.0), 16, interact_message, Color::grey(0.5));
-			self.painter.text(usable_area.center() - text_size.to_0y()/2.0 + Vec2::from_x(12.0), 16, interact_message, Color::grey(0.5));
+
+			self.painter.rect(text_rect.translate(text_pos).grow(2.0), Color::black().with_alpha(0.5));
+			self.painter.text(text_pos, 16, interact_message, Color::grey(0.5));
 		}
 	}
 

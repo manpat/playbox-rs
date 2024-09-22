@@ -74,6 +74,9 @@ impl GameScene {
 					placement: world.player_spawn,
 					pitch: 0.0,
 
+					blood: 100,
+					salt: 100,
+
 					free_pos: Vec3::zero(),
 					free_cam: false,
 
