@@ -13,16 +13,23 @@ game ui
 	- health/blood bar
 	- interaction prompts
 	- dialogue popup
+	- hand
 
 stuff to interact with
 
 editor
-	- undo/redo
 	- make saving/loading a dialog, don't just always save over default
 
+spooky segmented worm
 
-TODO
-====
+textured walls
+
+snap vertices to integer positions
+
+
+
+MISC TODO
+=========
 
 particle system
 

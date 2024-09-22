@@ -40,6 +40,22 @@ impl HudView {
 		self.painter.text(usable_area.max_min_corner() - text_size.to_x0(), 16, "Testing 123", Color::white());
 		self.painter.text(usable_area.min_max_corner() - text_size.to_0y(), 16, "Testing 123", Color::white());
 
+		if let Some(hud_text) = &model.hud.hud_text {
+			let fade_in = (hud_text.elapsed_visible_time/HUD_TEXT_FADE_IN_TIME).ease_quad_inout();
+			let fade_out = ((HUD_TEXT_SHOW_TIME - hud_text.elapsed_visible_time)/HUD_TEXT_FADE_OUT_TIME).ease_quad_inout();
+			let alpha = fade_in.min(fade_out).clamp(0.0, 1.0).powi(2);
+
+			let text_rect = self.painter.text_rect(16, &hud_text.text);
+			let text_extents = text_rect.size() / 2.0;
+
+			let usable_center = usable_area.center();
+			let text_center = usable_center - Vec2::from_y(16.0 + 16.0);
+			let text_pos = text_center - text_extents;
+
+			self.painter.rect(text_rect.translate(text_pos).grow(4.0), Color::black().with_alpha(0.7 * alpha));
+			self.painter.text(text_pos, 16, &hud_text.text, Color::white().with_alpha(alpha));
+		}
+
 
 		if let Some(object) = model.interactions.hovered_object.and_then(|idx| model.world.objects.get(idx)) {
 			let interact_message = match &object.info {

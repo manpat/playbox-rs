@@ -35,7 +35,7 @@ impl Player {
 
 		if hud.in_dialog {
 			if interact_pressed {
-				ctx.message_bus.emit(HudCmd::DismissDialog);
+				ctx.message_bus.emit(model::HudCmd::DismissDialog);
 			}
 
 			return;

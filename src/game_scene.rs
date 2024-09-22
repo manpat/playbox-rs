@@ -281,6 +281,8 @@ impl GameScene {
 			log::info!("World '{world_name}' saved successfully");
 		}
 
+		model::handle_hud_commands(ctx, &self.model)?;
+
 		Ok(())
 	}
 }
