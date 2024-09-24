@@ -22,11 +22,16 @@ impl MainMenuScene {
 
 		let size = ctx.gfx.backbuffer_size()/2;
 		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
-		let content_rect = screen_rect.shrink(32.0);
+		let mut content_rect = screen_rect.shrink(32.0); // pad edge
 
-		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect));
+		// Cap size to 150px x 200px
+		{
+			let Vec2{x, y} = content_rect.size() - Vec2::new(150.0, 200.0);
+			content_rect = content_rect.shrink(Vec2::new(x.max(0.0)/2.0, y.max(0.0)/2.0));
+		}
 
-		builder.painter.rect(content_rect, Color::grey_a(0.0, 0.3));
+		self.painter.rect(content_rect, Color::grey_a(0.0, 0.3));
+		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect.shrink(8.0)));
 
 		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
@@ -74,11 +79,17 @@ impl PauseMenuScene {
 
 		let size = ctx.gfx.backbuffer_size()/2;
 		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
-		let content_rect = screen_rect.shrink(32.0);
+		let mut content_rect = screen_rect.shrink(32.0); // pad edge
 
-		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect));
+		// Cap size to 200px x 200px
+		{
+			let Vec2{x, y} = content_rect.size() - Vec2::new(200.0, 200.0);
+			content_rect = content_rect.shrink(Vec2::new(x.max(0.0)/2.0, y.max(0.0)/2.0));
+		}
 
-		builder.painter.rect(content_rect, Color::grey_a(0.0, 0.8));
+		self.painter.rect(content_rect, Color::grey_a(0.0, 0.8));
+
+		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect.shrink(8.0)));
 
 		if builder.button("Resume") || ctx.input.button_just_down(input::keys::Escape) {
 			ctx.message_bus.emit(MenuCmd::Resume);

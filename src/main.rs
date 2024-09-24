@@ -1,5 +1,7 @@
 #![feature(let_chains)]
 
+pub mod aabb2_ext;
+
 pub mod audio;
 pub mod ui;
 pub mod sprites;
@@ -17,6 +19,7 @@ pub mod editor;
 
 pub mod prelude {
 	pub use toybox::prelude::*;
+	pub use crate::aabb2_ext::*;
 
 	pub use crate::audio::MyAudioSystem;
 	pub use crate::game_scene::GameScene;
