@@ -20,10 +20,13 @@ impl MainMenuScene {
 
 		ctx.input.set_capture_mouse(false);
 
-		let mut builder = self.painter.builder(ctx);
-		let screen_bounds = builder.screen_rect;
+		let size = ctx.gfx.backbuffer_size()/2;
+		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
+		let content_rect = screen_rect.shrink(32.0);
 
-		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.3));
+		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect));
+
+		builder.painter.rect(content_rect, Color::grey_a(0.0, 0.3));
 
 		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
@@ -38,7 +41,7 @@ impl MainMenuScene {
 			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
 		}
 
-		self.painter.submit(&mut ctx.gfx, screen_bounds);
+		self.painter.submit(&mut ctx.gfx, screen_rect);
 	}
 }
 
@@ -69,10 +72,13 @@ impl PauseMenuScene {
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		ctx.input.set_capture_mouse(false);
 
-		let mut builder = self.painter.builder(ctx);
-		let screen_bounds = builder.screen_rect;
+		let size = ctx.gfx.backbuffer_size()/2;
+		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
+		let content_rect = screen_rect.shrink(32.0);
 
-		builder.painter.rect(builder.content_rect, Color::grey_a(0.0, 0.8));
+		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect));
+
+		builder.painter.rect(content_rect, Color::grey_a(0.0, 0.8));
 
 		if builder.button("Resume") || ctx.input.button_just_down(input::keys::Escape) {
 			ctx.message_bus.emit(MenuCmd::Resume);
@@ -86,6 +92,6 @@ impl PauseMenuScene {
 			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
 		}
 
-		self.painter.submit(&mut ctx.gfx, screen_bounds);
+		self.painter.submit(&mut ctx.gfx, screen_rect);
 	}
 }

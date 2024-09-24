@@ -1,35 +1,26 @@
 use crate::prelude::*;
 
-use super::UiPainter;
+use super::{UiPainter, Layout};
 
 
-pub struct UiBuilder<'mp, 'ctx> {
+pub struct UiBuilder<'mp, 'ctx, L: Layout> {
 	input: &'ctx input::System,
 
 	pub painter: &'mp mut UiPainter,
-	pub screen_rect: Aabb2,
-	pub content_rect: Aabb2,
-
-	pub cursor: Vec2,
-	pub item_spacing: f32,
 	pub font_size: u32,
+
+	pub layout: L,
 }
 
-impl<'mp, 'ctx> UiBuilder<'mp, 'ctx> {
-	pub fn new(painter: &'mp mut UiPainter, ctx: &'ctx Context<'_>) -> Self {
-		let size = ctx.gfx.backbuffer_size()/2;
-		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
-		let content_rect = screen_rect.shrink(32.0);
-
+impl<'mp, 'ctx, L: Layout> UiBuilder<'mp, 'ctx, L> {
+	pub fn new(painter: &'mp mut UiPainter, ctx: &'ctx Context<'_>, layout: L) -> Self {
 		UiBuilder {
 			painter,
 			input: &ctx.input,
-			screen_rect,
-			content_rect,
 
-			cursor: content_rect.min_max_corner() + Vec2::new(8.0, -8.0),
-			item_spacing: 8.0,
 			font_size: 16,
+
+			layout,
 		}
 	}
 
@@ -39,17 +30,12 @@ impl<'mp, 'ctx> UiBuilder<'mp, 'ctx> {
 		let text_rect = self.painter.text_rect(self.font_size, label);
 
 		let button_size = Vec2::new(text_rect.width(), self.font_size as f32) + padding*2.0;
-		let button_rect = Aabb2::new(Vec2::zero(), button_size);
+		let button_rect = self.layout.allocate(button_size);
 
-		self.cursor.y -= button_size.y;
-
-		let button_rect = button_rect.translate(self.cursor);
-		let text_origin = self.cursor + padding;
-
-		self.cursor.y -= self.item_spacing;
+		let text_origin = button_rect.min + padding;
 
 		let is_hovered = self.input.mouse_position_pixels()
-			.map(|pos| button_rect.contains_point(pos/2.0))
+			.map(|pos| button_rect.contains_point(pos/2.0)) // TODO(pat.m): magic scaling number!
 			.unwrap_or(false);
 
 		let is_pressed = is_hovered

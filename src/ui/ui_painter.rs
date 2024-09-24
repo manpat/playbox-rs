@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{UiBuilder};
+use super::{UiBuilder, Layout};
 
 // TODO(pat.m): try ab_glyph. variable fonts??
 
@@ -75,8 +75,8 @@ impl UiPainter {
 		}
 	}
 
-	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx Context<'_>) -> UiBuilder<'mp, 'ctx> {
-		UiBuilder::new(self, ctx)
+	pub fn builder<'mp, 'ctx, L: Layout>(&'mp mut self, ctx: &'ctx Context<'_>, layout: L) -> UiBuilder<'mp, 'ctx, L> {
+		UiBuilder::new(self, ctx, layout)
 	}
 }
 
