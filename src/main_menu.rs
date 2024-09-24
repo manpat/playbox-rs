@@ -20,15 +20,17 @@ impl MainMenuScene {
 
 		ctx.input.set_capture_mouse(false);
 
-		let size = ctx.gfx.backbuffer_size()/2;
-		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
-		let mut content_rect = screen_rect.shrink(32.0); // pad edge
+		let size = ctx.gfx.backbuffer_size().to_vec2()/2.0;
+		let screen_rect = Aabb2::new(Vec2::zero(), size);
+		let mut content_rect = screen_rect.shrink(8.0); // pad edge
 
 		// Cap size to 150px x 200px
 		{
 			let Vec2{x, y} = content_rect.size() - Vec2::new(150.0, 200.0);
 			content_rect = content_rect.shrink(Vec2::new(x.max(0.0)/2.0, y.max(0.0)/2.0));
 		}
+
+		content_rect = content_rect.floor();
 
 		self.painter.rect(content_rect, Color::grey_a(0.0, 0.3));
 		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect.shrink(8.0)));
@@ -77,15 +79,17 @@ impl PauseMenuScene {
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		ctx.input.set_capture_mouse(false);
 
-		let size = ctx.gfx.backbuffer_size()/2;
-		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
-		let mut content_rect = screen_rect.shrink(32.0); // pad edge
+		let size = ctx.gfx.backbuffer_size().to_vec2()/2.0;
+		let screen_rect = Aabb2::new(Vec2::zero(), size);
+		let mut content_rect = screen_rect.shrink(8.0); // pad edge
 
 		// Cap size to 200px x 200px
 		{
 			let Vec2{x, y} = content_rect.size() - Vec2::new(200.0, 200.0);
 			content_rect = content_rect.shrink(Vec2::new(x.max(0.0)/2.0, y.max(0.0)/2.0));
 		}
+
+		content_rect = content_rect.floor();
 
 		self.painter.rect(content_rect, Color::grey_a(0.0, 0.8));
 

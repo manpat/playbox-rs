@@ -12,7 +12,7 @@ pub struct DumbLayout {
 impl DumbLayout {
 	pub fn new(content_rect: Aabb2) -> Self {
 		DumbLayout {
-			available_rect: content_rect,
+			available_rect: content_rect.floor(),
 			item_spacing: 8.0,
 		}
 	}
