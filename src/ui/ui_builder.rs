@@ -1,12 +1,12 @@
 use crate::prelude::*;
 
-use super::MenuPainter;
+use super::UiPainter;
 
 
-pub struct MenuBuilder<'mp, 'ctx> {
+pub struct UiBuilder<'mp, 'ctx> {
 	input: &'ctx input::System,
 
-	pub painter: &'mp mut MenuPainter,
+	pub painter: &'mp mut UiPainter,
 	pub screen_rect: Aabb2,
 	pub content_rect: Aabb2,
 
@@ -15,13 +15,13 @@ pub struct MenuBuilder<'mp, 'ctx> {
 	pub font_size: u32,
 }
 
-impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
-	pub fn new(painter: &'mp mut MenuPainter, ctx: &'ctx Context<'_>) -> Self {
+impl<'mp, 'ctx> UiBuilder<'mp, 'ctx> {
+	pub fn new(painter: &'mp mut UiPainter, ctx: &'ctx Context<'_>) -> Self {
 		let size = ctx.gfx.backbuffer_size()/2;
 		let screen_rect = Aabb2::new(Vec2::zero(), size.to_vec2());
 		let content_rect = screen_rect.shrink(32.0);
 
-		MenuBuilder {
+		UiBuilder {
 			painter,
 			input: &ctx.input,
 			screen_rect,
@@ -55,11 +55,12 @@ impl<'mp, 'ctx> MenuBuilder<'mp, 'ctx> {
 		let is_pressed = is_hovered
 			&& self.input.button_down(input::MouseButton::Left);
 
-		let bg_color = Color::grey_a(0.1, 0.3);
+		// TODO(pat.m): style
+		let bg_color = Color::grey_a(0.05, 0.3);
 
 		let text_color = match (is_pressed, is_hovered) {
-			(true, true) => Color::black().with_alpha(0.2),
-			(false, true) => Color::black().with_alpha(0.5),
+			(true, true) => Color::rgb(0.5, 0.05, 0.05),
+			(false, true) => Color::rgb(0.4, 0.01, 0.01),
 			(_, false) => Color::white(),
 		};
 

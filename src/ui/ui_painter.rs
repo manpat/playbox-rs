@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{MenuBuilder};
+use super::{UiBuilder};
 
 // TODO(pat.m): try ab_glyph. variable fonts??
 
@@ -9,9 +9,9 @@ const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
 // const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Outflank 9.ttf");
 
 
-pub struct MenuPainter {
-	pub shape_layer: MenuPainterLayer,
-	pub text_layer: MenuPainterLayer,
+pub struct UiPainter {
+	pub shape_layer: UiPainterLayer,
+	pub text_layer: UiPainterLayer,
 
 	// TODO(pat.m): pull these out into a shared place so they can be reused for diff menus
 	pub font: fontdue::Font,
@@ -21,14 +21,14 @@ pub struct MenuPainter {
 	f_text_shader: gfx::ShaderHandle,
 }
 
-impl MenuPainter {
-	pub fn new(gfx: &mut gfx::System, frame_stage: gfx::FrameStage) -> anyhow::Result<MenuPainter> {
+impl UiPainter {
+	pub fn new(gfx: &mut gfx::System, frame_stage: gfx::FrameStage) -> anyhow::Result<UiPainter> {
 		let font = fontdue::Font::from_bytes(FONT_DATA, fontdue::FontSettings::default())
 			.map_err(|err| anyhow::anyhow!("{err}"))?;
 
-		Ok(MenuPainter {
-			shape_layer: MenuPainterLayer::new(),
-			text_layer: MenuPainterLayer::new(),
+		Ok(UiPainter {
+			shape_layer: UiPainterLayer::new(),
+			text_layer: UiPainterLayer::new(),
 
 			font,
 			glyph_atlas: GlyphCache::new(gfx),
@@ -75,12 +75,12 @@ impl MenuPainter {
 		}
 	}
 
-	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx Context<'_>) -> MenuBuilder<'mp, 'ctx> {
-		MenuBuilder::new(self, ctx)
+	pub fn builder<'mp, 'ctx>(&'mp mut self, ctx: &'ctx Context<'_>) -> UiBuilder<'mp, 'ctx> {
+		UiBuilder::new(self, ctx)
 	}
 }
 
-impl MenuPainter {
+impl UiPainter {
 	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
 		self.shape_layer.draw_quad(geom, Aabb2::zero(), color);
 	}
@@ -105,14 +105,14 @@ impl MenuPainter {
 
 
 
-pub struct MenuPainterLayer {
+pub struct UiPainterLayer {
 	pub vertices: Vec<gfx::StandardVertex>,
 	pub indices: Vec<u32>,
 }
 
-impl MenuPainterLayer {
-	pub fn new() -> MenuPainterLayer {
-		MenuPainterLayer {
+impl UiPainterLayer {
+	pub fn new() -> UiPainterLayer {
+		UiPainterLayer {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 		}

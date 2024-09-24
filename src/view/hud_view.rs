@@ -6,14 +6,14 @@ pub const HUD_FRAME_STAGE: gfx::FrameStage = gfx::FrameStage::Ui(0);
 
 pub struct HudView {
 	_message_bus: MessageBus,
-	painter: menu::MenuPainter,
+	painter: ui::UiPainter,
 }
 
 impl HudView {
 	pub fn new(gfx: &mut gfx::System, message_bus: MessageBus) -> anyhow::Result<Self> {
 		Ok(HudView {
 			_message_bus: message_bus,
-			painter: menu::MenuPainter::new(gfx, HUD_FRAME_STAGE)?,
+			painter: ui::UiPainter::new(gfx, HUD_FRAME_STAGE)?,
 		})
 	}
 

@@ -1,7 +1,7 @@
 #![feature(let_chains)]
 
 pub mod audio;
-pub mod menu;
+pub mod ui;
 pub mod sprites;
 pub mod toy_draw;
 pub mod game_scene;
@@ -23,7 +23,7 @@ pub mod prelude {
 	pub use crate::main_menu::{MainMenuScene, MenuCmd, PauseMenuScene};
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
-	pub use crate::menu;
+	pub use crate::ui;
 
 	pub use crate::model;
 	pub use crate::view;
@@ -82,7 +82,7 @@ impl App {
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
 
-		if true /*ctx.cfg.read_bool("skip-main-menu")*/ {
+		if false /*ctx.cfg.read_bool("skip-main-menu")*/ {
 			active_scene = ActiveScene::Game;
 			let world = Self::load_world_or_default(&ctx.vfs, "worlds/default.world");
 			game_scene = Some(GameScene::new(ctx, world)?);
