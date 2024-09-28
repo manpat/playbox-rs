@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::cell::{Cell, RefCell, Ref};
+use std::cell::{UnsafeCell, Cell, RefCell, Ref};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 use std::marker::PhantomData;
@@ -78,7 +78,9 @@ impl MessageBus {
 			}
 		}
 
-		let queue = self.inner.get_store::<T>().queue.cast::<TypedMessageQueue<T>>();
+		// SAFETY: get_store is guaranteed to return a RawBusStore holding a TypedMessageQueue<T>
+		// so this cast is safe
+		let queue = self.inner.get_store::<T>().queue.get().cast::<TypedMessageQueue<T>>();
 
 		Iter {
 			subscription: subscription.inner.clone(),
@@ -120,7 +122,9 @@ impl MessageBus {
 			}
 		}
 
-		let queue = self.inner.get_store::<T>().queue.cast::<TypedMessageQueue<T>>();
+		// SAFETY: get_store is guaranteed to return a RawBusStore holding a TypedMessageQueue<T>
+		// so this cast is safe
+		let queue = self.inner.get_store::<T>().queue.get().cast::<TypedMessageQueue<T>>();
 
 		Iter {
 			subscription: subscription.inner.clone(),
@@ -132,11 +136,10 @@ impl MessageBus {
 
 	pub fn emit<T: 'static>(&self, message: T) {
 		let store = self.inner.get_store::<T>();
-		
-		unsafe {
-			(*store.queue).to_concrete_mut().emit(message)
-		}
 
+		unsafe {
+			(*store.queue.get()).to_concrete_mut().emit(message)
+		}
 	}
 
 	pub fn garbage_collect(&self) {
@@ -178,16 +181,16 @@ impl MessageBusInner {
 struct RawBusStore {
 	// Borrows are always shortlived so this won't cause any problems
 	subscriptions: RefCell<SubscriptionList>,
-	queue: *mut dyn MessageQueue,
+	queue: Box<UnsafeCell<dyn MessageQueue>>,
 }
 
 impl RawBusStore {
 	pub fn new<T: 'static>() -> RawBusStore {
-		let queue = Box::new(TypedMessageQueue::<T>::default());
+		let queue = Box::new(UnsafeCell::new(TypedMessageQueue::<T>::default()));
 
 		RawBusStore {
 			subscriptions: Default::default(),
-			queue: Box::into_raw(queue),
+			queue,
 		}
 	}
 
@@ -207,7 +210,7 @@ impl RawBusStore {
 
 	fn queued_message_count(&self) -> usize {
 		// SAFETY: Borrows of queue never escape the functions they exist in, so this is fine.
-		unsafe { (*self.queue).queued_message_count() }
+		unsafe { (*self.queue.get()).queued_message_count() }
 	}
 
 	fn garbage_collect(&mut self) {
@@ -217,17 +220,7 @@ impl RawBusStore {
 		// _and also_ self.queue.lock_for_poll must be false. So we can guarantee that both:
 		// 	- Noone else is borrowing self or subscriptions.
 		// 	- Noone has a pointer to queue that would attempt to read through it.
-		unsafe {
-			(*self.queue).garbage_collect(subscriptions);
-		}
-	}
-}
-
-impl Drop for RawBusStore {
-	fn drop(&mut self) {
-		// SAFETY: References into queue will always be tied to MessageBus, and so Drop cannot be called
-		// while references are active.
-		let _ = unsafe { Box::from_raw(self.queue) };
+		self.queue.get_mut().garbage_collect(subscriptions);
 	}
 }
 
