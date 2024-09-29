@@ -153,7 +153,6 @@ impl toybox::App for App {
 			}
 
 			ActiveScene::PauseMenu => {
-				// TODO(pat.m): fullscreen quad vignette/transparent backdrop
 				let game_scene = self.game_scene.as_mut().unwrap();
 
 				self.pause_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
