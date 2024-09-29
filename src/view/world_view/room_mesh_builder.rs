@@ -40,7 +40,7 @@ impl<'w> RoomMeshBuilder<'w> {
 }
 
 impl RoomMeshBuilder<'_> {
-	fn add_convex_uvs<VS, UVS>(&mut self, vs: VS, uvs: UVS, color: impl Into<Color>)
+	fn add_convex<VS, UVS>(&mut self, vs: VS, uvs: UVS, color: impl Into<Color>)
 		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
 			, UVS: IntoIterator<Item=Vec2>
 	{
@@ -57,10 +57,10 @@ impl RoomMeshBuilder<'_> {
 		self.indices.extend(indices);
 	}
 
-	fn add_convex<VS>(&mut self, vs: VS, color: impl Into<Color>)
+	fn add_convex_untextured<VS>(&mut self, vs: VS, color: impl Into<Color>)
 		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
 	{
-		self.add_convex_uvs(vs, std::iter::repeat(Vec2::zero()), color);
+		self.add_convex(vs, std::iter::repeat(Vec2::zero()), color);
 	}
 
 	pub fn build_room(&mut self, room_index: usize) -> RoomMeshInfo {
@@ -78,11 +78,11 @@ impl RoomMeshBuilder<'_> {
 
 		// Floor/Ceiling
 		self.set_texture_index(3);
-		self.add_convex_uvs(floor_verts, floor_uvs, room.floor_color);
-		self.add_convex_uvs(ceiling_verts, ceiling_uvs, room.ceiling_color);
+		self.add_convex(floor_verts, floor_uvs, room.floor_color);
+		self.add_convex(ceiling_verts, ceiling_uvs, room.ceiling_color);
 
 		// Walls
-		self.set_texture_index(1);
+		self.set_texture_index(2);
 		for wall_index in 0..room.walls.len() {
 			self.build_wall(WallId{room_index, wall_index});
 		}
@@ -127,7 +127,7 @@ impl RoomMeshBuilder<'_> {
 				Vec2::new(length, 0.0),
 			];
 
-			self.add_convex_uvs(verts, uvs, wall.color);
+			self.add_convex(verts, uvs, wall.color);
 
 			return
 		};
@@ -157,7 +157,7 @@ impl RoomMeshBuilder<'_> {
 			Vec2::new(left_length, 0.0),
 		];
 
-		self.add_convex_uvs(verts, uvs, wall.color);
+		self.add_convex(verts, uvs, wall.color);
 
 		let verts = [
 			right_vertex_3d,
@@ -173,7 +173,7 @@ impl RoomMeshBuilder<'_> {
 			Vec2::new(length, 0.0),
 		];
 
-		self.add_convex_uvs(verts, uvs, wall.color);
+		self.add_convex(verts, uvs, wall.color);
 
 		// Add quads above and below the aperture
 		if connection_info.height_difference > 0.0 {
@@ -193,7 +193,7 @@ impl RoomMeshBuilder<'_> {
 				Vec2::new(right_uv_start, 0.0),
 			];
 
-			self.add_convex_uvs(verts, uvs, wall.color);
+			self.add_convex(verts, uvs, wall.color);
 		}
 
 		if connection_info.height_difference + opposing_room.height < room.height {
@@ -213,7 +213,7 @@ impl RoomMeshBuilder<'_> {
 				Vec2::new(right_uv_start, aperture_top.y),
 			];
 
-			self.add_convex_uvs(verts, uvs, wall.color);
+			self.add_convex(verts, uvs, wall.color);
 		}
 	}
 
@@ -232,7 +232,7 @@ impl RoomMeshBuilder<'_> {
 					center + forward,
 				];
 
-				self.add_convex(verts, Color::magenta());
+				self.add_convex_untextured(verts, Color::magenta());
 			}
 
 			ObjectInfo::Ladder{..} => {
@@ -248,7 +248,7 @@ impl RoomMeshBuilder<'_> {
 					center - forward * 0.08 + right * 0.16,
 				];
 
-				self.add_convex(verts, Color::rgb(0.2, 0.08, 0.02));
+				self.add_convex_untextured(verts, Color::rgb(0.2, 0.08, 0.02));
 
 				let verts = [
 					center - right * 0.2 - forward * 0.2 + Vec3::from_y(0.01),
@@ -257,7 +257,7 @@ impl RoomMeshBuilder<'_> {
 					center + right * 0.2 - forward * 0.2 + Vec3::from_y(0.01),
 				];
 
-				self.add_convex(verts, Color::grey(0.02));
+				self.add_convex_untextured(verts, Color::grey(0.02));
 			}
 
 			_ => {}
