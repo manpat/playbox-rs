@@ -47,9 +47,17 @@ impl WorldView {
 			room_mesh_infos,
 			vbo, ebo,
 
-			v_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/standard-room.vs.glsl")?),
+			v_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/room.vs.glsl")?),
 			f_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/room.fs.glsl")?),
-			texture: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+			texture: gfx.resource_manager.request(gfx::LoadImageArrayRequest::from("World Textures", &[
+				"images/dumb-brick.png",
+				"images/dumb-brick2.png",
+				"images/dumb-tile.png",
+				// "images/coolcat.png",
+				// "images/coolcat.png",
+				// "images/coolcat.png",
+				// "images/coolcat.png",
+			])),
 			visible_rooms: Vec::new(),
 
 			change_subscription: message_bus.subscribe(),

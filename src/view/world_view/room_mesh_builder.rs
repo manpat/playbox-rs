@@ -11,9 +11,10 @@ pub struct RoomMeshInfo {
 pub struct RoomMeshBuilder<'w> {
 	world: &'w World,
 	processed_world: &'w ProcessedWorld,
-	vertices: Vec<gfx::StandardVertex>,
+	vertices: Vec<RoomVertex>,
 	indices: Vec<u32>,
 	base_vertex: u32,
+	current_texture_index: u32,
 }
 
 impl<'w> RoomMeshBuilder<'w> {
@@ -24,7 +25,12 @@ impl<'w> RoomMeshBuilder<'w> {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 			base_vertex: 0,
+			current_texture_index: 0,
 		}
+	}
+
+	pub fn set_texture_index(&mut self, texture_index: u32) {
+		self.current_texture_index = texture_index;
 	}
 
 	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName) {
@@ -45,7 +51,7 @@ impl RoomMeshBuilder<'_> {
 			.flat_map(|i| [start_index, start_index + i, start_index + i + 1]);
 
 		let color = color.into();
-		let vertices = vs.zip(uvs).map(|(pos, uv)| gfx::StandardVertex::new(pos, uv, color));
+		let vertices = vs.zip(uvs).map(|(pos, uv)| RoomVertex::new(pos, uv, color, self.current_texture_index));
 
 		self.vertices.extend(vertices);
 		self.indices.extend(indices);
@@ -66,18 +72,23 @@ impl RoomMeshBuilder<'_> {
 
 		// ASSUME: rooms are always convex
 		let floor_verts = room.wall_vertices.iter().map(|&v| v.to_x0y());
+		let floor_uvs = room.wall_vertices.iter().cloned();
 		let ceiling_verts = floor_verts.clone().rev().map(|v| v + up);
+		let ceiling_uvs = room.wall_vertices.iter().rev().cloned();
 
 		// Floor/Ceiling
-		self.add_convex(floor_verts, room.floor_color);
-		self.add_convex(ceiling_verts, room.ceiling_color);
+		self.set_texture_index(3);
+		self.add_convex_uvs(floor_verts, floor_uvs, room.floor_color);
+		self.add_convex_uvs(ceiling_verts, ceiling_uvs, room.ceiling_color);
 
 		// Walls
+		self.set_texture_index(1);
 		for wall_index in 0..room.walls.len() {
 			self.build_wall(WallId{room_index, wall_index});
 		}
 
 		// Objects
+		self.set_texture_index(0);
 		for object in self.world.objects.iter()
 			.filter(|o| o.placement.room_index == room_index)
 		{
@@ -95,6 +106,7 @@ impl RoomMeshBuilder<'_> {
 
 		let (start_vertex, end_vertex) = room.wall_vertices(wall_id.wall_index);
 
+		let length = (start_vertex - end_vertex).length();
 		let start_vertex_3d = start_vertex.to_x0y();
 		let end_vertex_3d = end_vertex.to_x0y();
 
@@ -109,10 +121,10 @@ impl RoomMeshBuilder<'_> {
 			];
 
 			let uvs = [
-				Vec2::new(0.0, 0.0) / 8.0,
-				Vec2::new(0.0, room.height) / 8.0,
-				Vec2::new(1.0, room.height) / 8.0,
-				Vec2::new(1.0, 0.0) / 8.0,
+				Vec2::new(0.0, 0.0),
+				Vec2::new(0.0, room.height),
+				Vec2::new(length, room.height),
+				Vec2::new(length, 0.0),
 			];
 
 			self.add_convex_uvs(verts, uvs, wall.color);
@@ -121,6 +133,11 @@ impl RoomMeshBuilder<'_> {
 		};
 
 		let opposing_room = &self.world.rooms[connection_info.target_id.room_index];
+
+		let left_length = (start_vertex - connection_info.aperture_start).length();
+		let right_length = (end_vertex - connection_info.aperture_end).length();
+
+		let right_uv_start = length - right_length;
 
 		let left_vertex_3d = connection_info.aperture_start.to_x0y();
 		let right_vertex_3d = connection_info.aperture_end.to_x0y();
@@ -133,7 +150,14 @@ impl RoomMeshBuilder<'_> {
 			left_vertex_3d,
 		];
 
-		self.add_convex(verts, wall.color);
+		let uvs = [
+			Vec2::new(0.0, 0.0),
+			Vec2::new(0.0, room.height),
+			Vec2::new(left_length, room.height),
+			Vec2::new(left_length, 0.0),
+		];
+
+		self.add_convex_uvs(verts, uvs, wall.color);
 
 		let verts = [
 			right_vertex_3d,
@@ -142,7 +166,14 @@ impl RoomMeshBuilder<'_> {
 			end_vertex_3d,
 		];
 
-		self.add_convex(verts, wall.color);
+		let uvs = [
+			Vec2::new(right_uv_start, 0.0),
+			Vec2::new(right_uv_start, room.height),
+			Vec2::new(length, room.height),
+			Vec2::new(length, 0.0),
+		];
+
+		self.add_convex_uvs(verts, uvs, wall.color);
 
 		// Add quads above and below the aperture
 		if connection_info.height_difference > 0.0 {
@@ -155,7 +186,14 @@ impl RoomMeshBuilder<'_> {
 				right_vertex_3d,
 			];
 
-			self.add_convex(verts, wall.color);
+			let uvs = [
+				Vec2::new(left_length, 0.0),
+				Vec2::new(left_length, aperture_bottom.y),
+				Vec2::new(right_uv_start, aperture_bottom.y),
+				Vec2::new(right_uv_start, 0.0),
+			];
+
+			self.add_convex_uvs(verts, uvs, wall.color);
 		}
 
 		if connection_info.height_difference + opposing_room.height < room.height {
@@ -168,7 +206,14 @@ impl RoomMeshBuilder<'_> {
 				right_vertex_3d + aperture_top,
 			];
 
-			self.add_convex(verts, wall.color);
+			let uvs = [
+				Vec2::new(left_length, aperture_top.y),
+				Vec2::new(left_length, room.height),
+				Vec2::new(right_uv_start, room.height),
+				Vec2::new(right_uv_start, aperture_top.y),
+			];
+
+			self.add_convex_uvs(verts, uvs, wall.color);
 		}
 	}
 
@@ -219,4 +264,48 @@ impl RoomMeshBuilder<'_> {
 		}
 
 	}
+}
+
+
+
+
+#[derive(Debug, Copy, Clone)]
+#[repr(C)]
+pub struct RoomVertex {
+	pub pos: Vec3,
+	pub uv_packed: [i16; 2],
+	pub color_packed: [u16; 4],
+	pub texture_index: u32,
+
+	pub _padding: [u32; 1],
+}
+
+pub const PIXEL_DENSITY: f32 = 128.0;
+
+impl RoomVertex {
+	pub fn new(pos: Vec3, uv: Vec2, color: impl Into<Color>, texture_index: u32) -> RoomVertex {
+		let [u, v] = (uv*8.0 * PIXEL_DENSITY).to_vec2i().into();
+		let [r, g, b, a] = color.into().to_array();
+
+		RoomVertex {
+			pos,
+			uv_packed: [u as i16, v as i16],
+
+			color_packed: [
+				unorm_to_u16(r),
+				unorm_to_u16(g),
+				unorm_to_u16(b),
+				unorm_to_u16(a),
+			],
+
+			texture_index,
+
+			_padding: Default::default(),
+		}
+	}
+}
+
+fn unorm_to_u16(o: f32) -> u16 {
+	let umax_f = u16::MAX as f32;
+	(o * umax_f).clamp(0.0, umax_f) as u16
 }

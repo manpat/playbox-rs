@@ -2,3 +2,6 @@
 *.blend?
 desktop.ini
 Cargo.lock
+
+# Krita backups
+*.*~
