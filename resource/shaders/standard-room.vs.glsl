@@ -43,6 +43,6 @@ void main() {
 		unpackUnorm2x16(vertex.color_packed.x),
 		unpackUnorm2x16(vertex.color_packed.y)
 	);
-	
+
 	v_uv = unpackUnorm2x16(vertex.uv_packed);
 }

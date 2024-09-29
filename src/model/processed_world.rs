@@ -51,13 +51,15 @@ impl ProcessedWorld {
 		for (room_index, room) in world.rooms.iter().enumerate() {
 			for wall_index in 0..room.walls.len() {
 				let wall_id = WallId{room_index, wall_index};
-				let connection_info = world.wall_target(wall_id).map(|target_id| ConnectionInfo::new(world, wall_id, target_id));
+				let connection_info = world.wall_target(wall_id)
+					.map(|target_id| ConnectionInfo::new(world, wall_id, target_id));
 
-				let normal = world.wall_vector(wall_id).normalize().perp();
+				let direction = world.wall_vector(wall_id).normalize();
+				let normal = direction.perp();
 
 				let wall_info = WallInfo {
-					connection_info,
 					normal,
+					connection_info,
 				};
 
 				self.wall_infos.insert(wall_id, wall_info);

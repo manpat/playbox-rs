@@ -34,19 +34,27 @@ impl<'w> RoomMeshBuilder<'w> {
 }
 
 impl RoomMeshBuilder<'_> {
-	fn add_convex<VS>(&mut self, vs: VS, color: impl Into<Color>)
+	fn add_convex_uvs<VS, UVS>(&mut self, vs: VS, uvs: UVS, color: impl Into<Color>)
 		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
+			, UVS: IntoIterator<Item=Vec2>
 	{
 		let vs = vs.into_iter();
+		let uvs = uvs.into_iter();
 		let start_index = self.vertices.len() as u32 - self.base_vertex;
 		let indices = (1..vs.len() as u32 - 1)
 			.flat_map(|i| [start_index, start_index + i, start_index + i + 1]);
 
 		let color = color.into();
-		let vertices = vs.map(|pos| gfx::StandardVertex::new(pos, Vec2::zero(), color));
+		let vertices = vs.zip(uvs).map(|(pos, uv)| gfx::StandardVertex::new(pos, uv, color));
 
 		self.vertices.extend(vertices);
 		self.indices.extend(indices);
+	}
+
+	fn add_convex<VS>(&mut self, vs: VS, color: impl Into<Color>)
+		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
+	{
+		self.add_convex_uvs(vs, std::iter::repeat(Vec2::zero()), color);
 	}
 
 	pub fn build_room(&mut self, room_index: usize) -> RoomMeshInfo {
@@ -100,7 +108,14 @@ impl RoomMeshBuilder<'_> {
 				end_vertex_3d,
 			];
 
-			self.add_convex(verts, wall.color);
+			let uvs = [
+				Vec2::new(0.0, 0.0) / 8.0,
+				Vec2::new(0.0, room.height) / 8.0,
+				Vec2::new(1.0, room.height) / 8.0,
+				Vec2::new(1.0, 0.0) / 8.0,
+			];
+
+			self.add_convex_uvs(verts, uvs, wall.color);
 
 			return
 		};

@@ -18,6 +18,8 @@ pub struct WorldView {
 	ebo: gfx::BufferName,
 
 	v_shader: gfx::ShaderHandle,
+	f_shader: gfx::ShaderHandle,
+	texture: gfx::ImageHandle,
 
 	// Every visible instance of each room
 	visible_rooms: Vec<RoomInstance>,
@@ -46,6 +48,8 @@ impl WorldView {
 			vbo, ebo,
 
 			v_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/standard-room.vs.glsl")?),
+			f_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::from("shaders/room.fs.glsl")?),
+			texture: gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 			visible_rooms: Vec::new(),
 
 			change_subscription: message_bus.subscribe(),
@@ -129,8 +133,9 @@ impl WorldView {
 				None => (Vec4::from_w(-1.0), Vec4::from_w(-1.0), Vec4::from_w(-1.0)),
 			};
 
-			group.draw(self.v_shader, gfx::CommonShader::FlatTexturedFragment)
+			group.draw(self.v_shader, self.f_shader)
 				.elements(room_mesh.num_elements)
+				.sampled_image(0, self.texture, gfx::CommonSampler::NearestRepeat)
 				.ssbo(0, self.vbo)
 				.ubo(1, &[RoomUniforms {
 					transform,

@@ -45,12 +45,12 @@
       ],
       "wall_vertices": [
         [
-          1.0,
-          -1.0
+          1.0449449,
+          -1.1259186
         ],
         [
-          -1.0,
-          -1.0
+          -0.9550551,
+          -1.1259186
         ],
         [
           -1.0,
@@ -74,9 +74,435 @@
         "a": 1.0
       },
       "height": 1.0
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          1.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          -1.0
+        ],
+        [
+          -1.0178319,
+          -0.5606446
+        ],
+        [
+          0.982168,
+          -0.5606446
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.2
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          1.0,
+          -1.0
+        ],
+        [
+          -1.0,
+          -1.0
+        ],
+        [
+          -0.99714404,
+          -0.4999047
+        ],
+        [
+          1.0028559,
+          -0.4999047
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.3
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          1.0,
+          -1.0
+        ],
+        [
+          -0.34644514,
+          -0.9990798
+        ],
+        [
+          -0.34620088,
+          -0.51340353
+        ],
+        [
+          1.0002444,
+          -0.51432353
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.5
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          0.6732228,
+          -0.6732228
+        ],
+        [
+          -0.14317106,
+          -0.6726627
+        ],
+        [
+          -0.14845197,
+          -0.24037538
+        ],
+        [
+          0.66794187,
+          -0.24093549
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.2
+    },
+    {
+      "walls": [
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        },
+        {
+          "color": {
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0,
+            "a": 1.0
+          },
+          "vertical_offset": 0.0,
+          "horizontal_offset": 0.0
+        }
+      ],
+      "wall_vertices": [
+        [
+          0.10351427,
+          -0.42288858
+        ],
+        [
+          -0.40819702,
+          -0.40819702
+        ],
+        [
+          -0.39894274,
+          0.08147306
+        ],
+        [
+          0.11276856,
+          0.06678151
+        ]
+      ],
+      "floor_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "ceiling_color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      },
+      "height": 1.0
     }
   ],
-  "connections": [],
+  "connections": [
+    [
+      {
+        "room_index": 1,
+        "wall_index": 0
+      },
+      {
+        "room_index": 0,
+        "wall_index": 2
+      }
+    ],
+    [
+      {
+        "room_index": 2,
+        "wall_index": 0
+      },
+      {
+        "room_index": 1,
+        "wall_index": 2
+      }
+    ],
+    [
+      {
+        "room_index": 3,
+        "wall_index": 0
+      },
+      {
+        "room_index": 2,
+        "wall_index": 2
+      }
+    ],
+    [
+      {
+        "room_index": 4,
+        "wall_index": 0
+      },
+      {
+        "room_index": 3,
+        "wall_index": 2
+      }
+    ],
+    [
+      {
+        "room_index": 5,
+        "wall_index": 0
+      },
+      {
+        "room_index": 4,
+        "wall_index": 2
+      }
+    ]
+  ],
   "objects": [
     {
       "name": "ladder",
@@ -103,14 +529,14 @@
   },
   "fog": {
     "color": {
-      "r": 1.0,
-      "g": 1.0,
-      "b": 1.0,
+      "r": 0.14873981,
+      "g": 0.14873981,
+      "b": 0.14873981,
       "a": 1.0
     },
-    "start": 0.0,
-    "distance": 30.0,
-    "emission": 1.0,
-    "transparency": 0.5
+    "start": 1.4,
+    "distance": 12.0,
+    "emission": 0.3243606,
+    "transparency": 0.35
   }
 }
