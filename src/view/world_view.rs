@@ -176,7 +176,10 @@ impl WorldView {
 
 			for wall_index in 0..num_walls {
 				let wall_id = WallId{room_index, wall_index};
-				let Some(connection_info) = processed_world.connection_for(wall_id) else {
+				let Some(wall_info) = processed_world.wall_info(wall_id) else {
+					continue
+				};
+				let Some(connection_info) = &wall_info.connection_info else {
 					continue
 				};
 
@@ -213,7 +216,7 @@ impl WorldView {
 
 				// TODO(pat.m): this is kind of a mess, and wouldn't really be necessary if clip_wall_segment actually clipped things.
 				// but it works
-				let aperture_normal = connection_info.source_to_target * connection_info.wall_normal.extend(0.0);
+				let aperture_normal = connection_info.source_to_target * wall_info.normal.extend(0.0);
 				let aperture_plane = aperture_normal.extend(aperture_normal.dot(connection_info.source_to_target * unclipped_left_aperture));
 
 				self.visible_rooms.push(RoomInstance {

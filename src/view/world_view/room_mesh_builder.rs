@@ -92,7 +92,7 @@ impl RoomMeshBuilder<'_> {
 
 		let up = Vec3::from_y(room.height);
 
-		let Some(connection_info) = self.processed_world.connection_for(wall_id) else {
+		let Some(connection_info) = self.processed_world.connection_info(wall_id) else {
 			let verts = [
 				start_vertex_3d,
 				start_vertex_3d + up,

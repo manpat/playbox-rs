@@ -215,7 +215,7 @@ impl Player {
 			// We have some kind of intersection here - figure out if we need to transition to another room
 			// or if we need to slide against the wall
 			let wall_id = WallId{room_index: self.placement.room_index, wall_index};
-			if let Some(connection_info) = processed_world.connection_for(wall_id) {
+			if let Some(connection_info) = processed_world.connection_info(wall_id) {
 				// Collide with the virtual aperture verts
 				collide_vertex(&mut desired_position, connection_info.aperture_start, PLAYER_RADIUS);
 				collide_vertex(&mut desired_position, connection_info.aperture_end, PLAYER_RADIUS);

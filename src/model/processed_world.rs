@@ -5,7 +5,7 @@ use model::*;
 
 #[derive(Debug)]
 pub struct ProcessedWorld {
-	wall_connections: HashMap<WallId, ConnectionInfo>,
+	wall_infos: HashMap<WallId, WallInfo>,
 	active_objects: Vec<usize>,
 
 	world_change_sub: Subscription<WorldChangedEvent>,
@@ -14,7 +14,7 @@ pub struct ProcessedWorld {
 impl ProcessedWorld {
 	pub fn new(world: &World, message_bus: &MessageBus) -> Self {
 		let mut this = Self {
-			wall_connections: HashMap::default(),
+			wall_infos: HashMap::default(),
 
 			// TODO(pat.m): some objects might be disabled on first spawn - this should take ProgressModel into account
 			active_objects: (0..world.objects.len()).collect(),
@@ -32,8 +32,13 @@ impl ProcessedWorld {
 		}
 	}
 
-	pub fn connection_for(&self, wall_id: WallId) -> Option<&ConnectionInfo> {
-		self.wall_connections.get(&wall_id)
+	pub fn wall_info(&self, wall_id: WallId) -> Option<&WallInfo> {
+		self.wall_infos.get(&wall_id)
+	}
+
+	pub fn connection_info(&self, wall_id: WallId) -> Option<&ConnectionInfo> {
+		self.wall_infos.get(&wall_id)
+			.and_then(|wall| wall.connection_info.as_ref())
 	}
 
 	pub fn is_object_active(&self, object_index: usize) -> bool {
@@ -41,16 +46,21 @@ impl ProcessedWorld {
 	}
 
 	fn rebuild_world(&mut self, world: &World) {
-		self.wall_connections.clear();
+		self.wall_infos.clear();
 
 		for (room_index, room) in world.rooms.iter().enumerate() {
 			for wall_index in 0..room.walls.len() {
 				let wall_id = WallId{room_index, wall_index};
+				let connection_info = world.wall_target(wall_id).map(|target_id| ConnectionInfo::new(world, wall_id, target_id));
 
-				if let Some(target_id) = world.wall_target(wall_id) {
-					self.wall_connections.entry(wall_id)
-						.or_insert_with(|| ConnectionInfo::new(world, wall_id, target_id));
-				}
+				let normal = world.wall_vector(wall_id).normalize().perp();
+
+				let wall_info = WallInfo {
+					connection_info,
+					normal,
+				};
+
+				self.wall_infos.insert(wall_id, wall_info);
 			}
 		}
 	}
@@ -59,10 +69,13 @@ impl ProcessedWorld {
 
 
 
-// #[derive(Default, Debug)]
-// pub struct ProcessedWallInfo {
-// 	pub connection: Option<ProcessedWallInfo>,
-// }
+#[derive(Default, Debug)]
+pub struct WallInfo {
+	// Points out of the room
+	pub normal: Vec2,
+
+	pub connection_info: Option<ConnectionInfo>,
+}
 
 #[derive(Debug)]
 pub struct ConnectionInfo {
@@ -72,10 +85,6 @@ pub struct ConnectionInfo {
 	pub source_to_target: Mat2x3,
 
 	pub yaw_delta: f32,
-
-	// Points out of the room
-	// TODO(pat.m): maybe this should just be in wall info?
-	pub wall_normal: Vec2,
 
 	pub aperture_start: Vec2,
 	pub aperture_end: Vec2,
@@ -107,7 +116,6 @@ impl ConnectionInfo {
 		let start_vertex = source_room.wall_vertices[source_id.wall_index];
 		let wall_vector = world.wall_vector(source_id);
 		let wall_direction = wall_vector / source_wall_length;
-		let wall_normal = wall_direction.perp();
 
 		let aperture_extent = source_wall_length.min(target_wall_length) / 2.0;
 		let aperture_offset = source_wall.horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
@@ -134,7 +142,6 @@ impl ConnectionInfo {
 			target_to_source,
 			source_to_target,
 			yaw_delta,
-			wall_normal,
 
 			aperture_start,
 			aperture_end,

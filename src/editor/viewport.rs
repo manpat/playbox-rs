@@ -223,11 +223,15 @@ impl<'c> Viewport<'c> {
 		for wall_index in 0..num_walls {
 			let src_wall_id = WallId{room_index, wall_index};
 
-			let Some(connection_info) = self.processed_world.connection_for(src_wall_id) else {
+			let Some(wall_info) = self.processed_world.wall_info(src_wall_id) else {
 				continue
 			};
 
-			let visual_separation = connection_info.wall_normal * 0.1;
+			let Some(connection_info) = &wall_info.connection_info else {
+				continue
+			};
+
+			let visual_separation = wall_info.normal * 0.1;
 			let aperture_start = connection_info.aperture_start + visual_separation;
 			let aperture_end = connection_info.aperture_end + visual_separation;
 

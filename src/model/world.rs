@@ -181,7 +181,7 @@ pub fn calculate_portal_transform(world: &World, from: WallId, to: WallId) -> Ma
 
 	let from_wall_length = (from_wall_end - from_wall_start).length();
 	let to_wall_length = (to_wall_end - to_wall_start).length();
-	
+
 	let from_wall_dir = (from_wall_end - from_wall_start) / from_wall_length;
 	let to_wall_dir = (to_wall_end - to_wall_start) / to_wall_length;
 

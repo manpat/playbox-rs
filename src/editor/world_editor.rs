@@ -411,12 +411,13 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 	for wall_index in 0..context.model.world.rooms[focused_room_index].walls.len() {
 		let src_wall_id = WallId{room_index: focused_room_index, wall_index};
-		let Some(connection_info) = context.model.processed_world.connection_for(src_wall_id)
-			else { continue };
+		if let Some(wall_info) = context.model.processed_world.wall_info(src_wall_id)
+			&& let Some(connection_info) = &wall_info.connection_info
+		{
+			let offset_transform = Mat2x3::translate(wall_info.normal * neighbouring_room_margin) * connection_info.target_to_source;
 
-		let offset_transform = Mat2x3::translate(connection_info.wall_normal * neighbouring_room_margin) * connection_info.target_to_source;
-
-		neighbouring_rooms.push((connection_info.target_id.room_index, offset_transform));
+			neighbouring_rooms.push((connection_info.target_id.room_index, offset_transform));
+		}
 	}
 
 	let player = &context.model.player;
