@@ -9,6 +9,19 @@ out vec4 o_color;
 
 layout(binding=0) uniform sampler2DArray u_texture;
 
+
+// TODO(pat.m): use an atlas instead of a fixed size texture array
+// struct TextureData {
+// 	uvec2 offset;
+// 	uvec2 size;
+// 	uint layer;
+// };
+
+// layout(binding=5) readonly buffer TD {
+// 	TextureData s_textures[];
+// };
+
+
 void main() {
 	ivec2 image_size = textureSize(u_texture, 0).xy;
 	// vec2 texel_size = 1.0 / vec2(image_size);

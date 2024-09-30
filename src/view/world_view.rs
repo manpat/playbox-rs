@@ -41,6 +41,8 @@ impl WorldView {
 		let vbo = gfx.core.create_buffer();
 		let ebo = gfx.core.create_buffer();
 
+		gfx.core.set_debug_label(vbo, "Room Vertices");
+
 		room_builder.upload(gfx, vbo, ebo);
 
 		Ok(Self {

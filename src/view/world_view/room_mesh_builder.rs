@@ -34,8 +34,9 @@ impl<'w> RoomMeshBuilder<'w> {
 	}
 
 	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName) {
-		gfx.core.upload_immutable_buffer_immediate(vbo, &self.vertices);
 		gfx.core.upload_immutable_buffer_immediate(ebo, &self.indices);
+		gfx.core.upload_immutable_buffer_immediate(vbo, &self.vertices);
+		gfx.core.debug_marker("Uploaded Room Vertices");
 	}
 }
 
