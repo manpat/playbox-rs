@@ -41,7 +41,8 @@ impl WorldView {
 		let vbo = gfx.core.create_buffer();
 		let ebo = gfx.core.create_buffer();
 
-		gfx.core.set_debug_label(vbo, "Room Vertices");
+		gfx.core.set_debug_label(vbo, "Room vertex buffer");
+		gfx.core.set_debug_label(ebo, "Room index buffer");
 
 		room_builder.upload(gfx, vbo, ebo);
 
@@ -89,6 +90,9 @@ impl WorldView {
 
 			self.vbo = gfx.core.create_buffer();
 			self.ebo = gfx.core.create_buffer();
+
+			gfx.core.set_debug_label(self.vbo, "Room vertex buffer");
+			gfx.core.set_debug_label(self.ebo, "Room index buffer");
 
 			room_builder.upload(gfx, self.vbo, self.ebo);
 		}

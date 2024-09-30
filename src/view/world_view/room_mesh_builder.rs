@@ -34,8 +34,8 @@ impl<'w> RoomMeshBuilder<'w> {
 	}
 
 	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName) {
-		gfx.core.upload_immutable_buffer_immediate(ebo, &self.indices);
 		gfx.core.upload_immutable_buffer_immediate(vbo, &self.vertices);
+		gfx.core.upload_immutable_buffer_immediate(ebo, &self.indices);
 		gfx.core.debug_marker("Uploaded Room Vertices");
 	}
 }
@@ -83,7 +83,6 @@ impl RoomMeshBuilder<'_> {
 		self.add_convex(ceiling_verts, ceiling_uvs, room.ceiling_color);
 
 		// Walls
-		self.set_texture_index(2);
 		for wall_index in 0..room.walls.len() {
 			self.build_wall(WallId{room_index, wall_index});
 		}
@@ -104,6 +103,8 @@ impl RoomMeshBuilder<'_> {
 	pub fn build_wall(&mut self, wall_id: WallId) {
 		let room = &self.world.rooms[wall_id.room_index];
 		let wall = &room.walls[wall_id.wall_index];
+
+		self.set_texture_index(wall_id.wall_index as u32 % 2 + 1);
 
 		let (start_vertex, end_vertex) = room.wall_vertices(wall_id.wall_index);
 
