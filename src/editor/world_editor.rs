@@ -3,6 +3,7 @@ use crate::editor::{Context, *};
 use model::*;
 
 
+#[instrument(skip_all, name="editor draw_world_editor")]
 pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
 	// TODO(pat.m): modal world load/save flows
 	let modal_active = false;

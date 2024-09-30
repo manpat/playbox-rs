@@ -68,6 +68,7 @@ impl WorldView {
 		})
 	}
 
+	#[instrument(skip_all, name="world_view draw")]
 	pub fn draw(&mut self, gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
 		// Draw room you're in
 		// then for each wall,
@@ -167,6 +168,7 @@ impl WorldView {
 		}
 	}
 
+	#[instrument(skip_all, name="world_view build_visibility_graph")]
 	fn build_visibility_graph(&mut self, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
 		self.visible_rooms.clear();
 		self.visible_rooms.push(RoomInstance {
