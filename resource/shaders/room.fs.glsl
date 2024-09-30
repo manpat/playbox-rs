@@ -23,13 +23,19 @@ layout(binding=0) uniform sampler2DArray u_texture;
 
 
 void main() {
-	ivec2 image_size = textureSize(u_texture, 0).xy;
-	// vec2 texel_size = 1.0 / vec2(image_size);
-	// o_color = texture(u_texture, vec3(texel_size*v_uv, float(v_texture_index))) * v_color;
+	ivec3 image_dimensions = textureSize(u_texture, 0);
+	ivec2 image_size = image_dimensions.xy;
+	uint num_textures = uint(image_dimensions.z);
 
 	if (v_texture_index > 0) {
 		ivec2 texel_coord = ivec2(v_uv) % image_size;
-		o_color = texelFetch(u_texture, ivec3(texel_coord, v_texture_index-1), 0) * v_color;
+
+		// Cheeky texture variation. should be configurable 
+		ivec2 chunk_coord = ivec2(v_uv) / image_size;
+		uint texture_index = v_texture_index + (chunk_coord.x + chunk_coord.y) % 2;
+		uint real_texture_index = min(texture_index, num_textures)-1;
+
+		o_color = texelFetch(u_texture, ivec3(texel_coord, real_texture_index), 0) * v_color;
 	} else {
 		o_color = v_color;
 	}

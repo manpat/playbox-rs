@@ -41,7 +41,7 @@ impl<'w> RoomMeshBuilder<'w> {
 }
 
 impl RoomMeshBuilder<'_> {
-	fn add_convex<VS, UVS>(&mut self, vs: VS, uvs: UVS, color: impl Into<Color>)
+	fn add_convex_textured<VS, UVS>(&mut self, vs: VS, uvs: UVS, color: impl Into<Color>, texture_index: u32)
 		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
 			, UVS: IntoIterator<Item=Vec2>
 	{
@@ -52,16 +52,23 @@ impl RoomMeshBuilder<'_> {
 			.flat_map(|i| [start_index, start_index + i, start_index + i + 1]);
 
 		let color = color.into();
-		let vertices = vs.zip(uvs).map(|(pos, uv)| RoomVertex::new(pos, uv, color, self.current_texture_index));
+		let vertices = vs.zip(uvs).map(|(pos, uv)| RoomVertex::new(pos, uv, color, texture_index));
 
 		self.vertices.extend(vertices);
 		self.indices.extend(indices);
 	}
 
+	fn add_convex<VS, UVS>(&mut self, vs: VS, uvs: UVS, color: impl Into<Color>)
+		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
+			, UVS: IntoIterator<Item=Vec2>
+	{
+		self.add_convex_textured(vs, uvs, color, self.current_texture_index);
+	}
+
 	fn add_convex_untextured<VS>(&mut self, vs: VS, color: impl Into<Color>)
 		where VS: IntoIterator<Item=Vec3, IntoIter: ExactSizeIterator>
 	{
-		self.add_convex(vs, std::iter::repeat(Vec2::zero()), color);
+		self.add_convex_textured(vs, std::iter::repeat(Vec2::zero()), color, 0);
 	}
 
 	pub fn build_room(&mut self, room_index: usize) -> RoomMeshInfo {
@@ -104,7 +111,8 @@ impl RoomMeshBuilder<'_> {
 		let room = &self.world.rooms[wall_id.room_index];
 		let wall = &room.walls[wall_id.wall_index];
 
-		self.set_texture_index(wall_id.wall_index as u32 % 2 + 1);
+		// self.set_texture_index(wall_id.wall_index as u32 % 2 + 1);
+		self.set_texture_index(1);
 
 		let (start_vertex, end_vertex) = room.wall_vertices(wall_id.wall_index);
 
