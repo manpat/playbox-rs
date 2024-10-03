@@ -3,7 +3,7 @@ use crate::prelude::*;
 use std::collections::HashMap;
 
 pub struct GlyphCache {
-	pub font_atlas: gfx::ImageName,
+	pub font_atlas: gfx::ImageHandle,
 	atlas_size: Vec2i,
 
 	glyphs: HashMap<(char, usize, u32), GlyphInfo>,
@@ -16,11 +16,11 @@ pub struct GlyphCache {
 
 impl GlyphCache {
 	pub fn new(gfx: &mut gfx::System) -> GlyphCache {
-		let atlas_size = Vec2i::new(2048, 2048);
+		let atlas_size = Vec2i::splat(512);
 		let format = gfx::ImageFormat::unorm8();
 
-		let font_atlas = gfx.core.create_image_2d(format, atlas_size);
-		gfx.core.set_debug_label(font_atlas, "Glyph Atlas");
+		let font_atlas = gfx.resource_manager.request(
+			gfx::CreateImageRequest::fixed_2d("Glyph Atlas", atlas_size, format));
 
 		GlyphCache {
 			font_atlas,
@@ -35,9 +35,16 @@ impl GlyphCache {
 	}
 
 	pub fn update_atlas(&mut self, gfx: &mut gfx::System) {
+		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Start).annotate("Update Font Atlas");
+		let atlas_handle = self.font_atlas;
+
 		for insertion in self.to_insert.drain(..) {
-			let range = gfx::ImageRange::from_2d_range(insertion.pos_px, insertion.size_px);
-			gfx.core.upload_image(self.font_atlas, range, gfx::ImageFormat::unorm8(), &insertion.data);
+			group.execute(move |core, rm| {
+				let atlas_name = rm.images.get_name(atlas_handle).unwrap();
+
+				let range = gfx::ImageRange::from_2d_range(insertion.pos_px, insertion.size_px);
+				core.upload_image(atlas_name, range, gfx::ImageFormat::unorm8(), &insertion.data);
+			});
 		}
 	}
 
