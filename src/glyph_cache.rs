@@ -39,11 +39,16 @@ impl GlyphCache {
 		let atlas_handle = self.font_atlas;
 
 		for insertion in self.to_insert.drain(..) {
+			let range = gfx::ImageRange::from_2d_range(insertion.pos_px, insertion.size_px);
+			let staged_upload = group.upload(&insertion.data);
+
 			group.execute(move |core, rm| {
 				let atlas_name = rm.images.get_name(atlas_handle).unwrap();
+				let upload_buffer = rm.upload_heap.buffer_name();
+				let upload_range = rm.upload_heap.resolve_allocation(staged_upload);
 
-				let range = gfx::ImageRange::from_2d_range(insertion.pos_px, insertion.size_px);
-				core.upload_image(atlas_name, range, gfx::ImageFormat::unorm8(), &insertion.data);
+				// core.upload_image(atlas_name, range, gfx::ImageFormat::unorm8(), &insertion.data);
+				core.copy_image_from_buffer(atlas_name, range, gfx::ImageFormat::unorm8(), upload_buffer, upload_range);
 			});
 		}
 	}
