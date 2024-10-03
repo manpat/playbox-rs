@@ -54,8 +54,8 @@ impl GameScene {
 		let processed_world = model::ProcessedWorld::new(&world, &ctx.message_bus);
 
 		Ok(GameScene {
-			fog_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/fog.cs.glsl")?),
-			hdr_to_ldr_shader: resource_manager.request(gfx::LoadShaderRequest::from("shaders/hdr_to_ldr.cs.glsl")?),
+			fog_shader: resource_manager.load_compute_shader("shaders/fog.cs.glsl"),
+			hdr_to_ldr_shader: resource_manager.load_compute_shader("shaders/hdr_to_ldr.cs.glsl"),
 
 			hdr_color_rt,
 			depth_rt,

@@ -22,6 +22,12 @@ layout(binding=0) uniform sampler2DArray u_texture;
 // };
 
 
+// https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83
+float hash(float n) { return fract(sin(n) * 1e4); }
+float hash(vec2 p) { return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x)))); }
+
+
+
 void main() {
 	ivec3 image_dimensions = textureSize(u_texture, 0);
 	ivec2 image_size = image_dimensions.xy;
@@ -32,7 +38,7 @@ void main() {
 
 		// Cheeky texture variation. should be configurable 
 		ivec2 chunk_coord = ivec2(v_uv) / image_size;
-		uint texture_index = v_texture_index + (chunk_coord.x + chunk_coord.y) % 2;
+		uint texture_index = v_texture_index + uint(hash(vec2(chunk_coord) * 3.123) * 2.0);
 		uint real_texture_index = min(texture_index, num_textures)-1;
 
 		o_color = texelFetch(u_texture, ivec3(texel_coord, real_texture_index), 0) * v_color;

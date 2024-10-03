@@ -34,7 +34,7 @@ impl UiPainter {
 			glyph_atlas: GlyphCache::new(gfx),
 
 			frame_stage,
-			f_text_shader: gfx.resource_manager.request(gfx::LoadShaderRequest::fragment("shaders/text.fs.glsl")),
+			f_text_shader: gfx.resource_manager.load_fragment_shader("shaders/text.fs.glsl"),
 		})
 	}
 

@@ -15,14 +15,10 @@ game ui
 	- dialogue popup
 	- hand
 
-stuff to interact with
-
 editor
 	- make saving/loading a dialog, don't just always save over default
 
 spooky segmented worm
-
-textured walls
 
 snap vertices to integer positions
 
@@ -39,12 +35,6 @@ preference/settings system
 
 flesh out texture support
 	- async? like streamed audio playback?
-
-basic text rendering/layout
-	- use a crate obvs
-	- dependent on texture support - maybe?
-	- could use vector fonts + mesh builder interface
-
 
 procedural sound sources
 
