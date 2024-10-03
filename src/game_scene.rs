@@ -10,7 +10,7 @@ pub struct GameScene {
 	ldr_color_image: gfx::ImageHandle,
 
 	// toy_renderer: ToyRenderer,
-	sprites: Sprites,
+	// sprites: Sprites,
 
 	world_view: view::WorldView,
 	hud_view: view::HudView,
@@ -63,7 +63,7 @@ impl GameScene {
 			ldr_color_image,
 
 			// toy_renderer,
-			sprites: Sprites::new(&mut ctx.gfx)?,
+			// sprites: Sprites::new(&mut ctx.gfx)?,
 			world_view: view::WorldView::new(&mut ctx.gfx, &world, &processed_world, ctx.message_bus.clone())?,
 			hud_view: view::HudView::new(&mut ctx.gfx, ctx.message_bus.clone())?,
 
@@ -138,7 +138,7 @@ impl GameScene {
 
 		environment.update(&world, &self.message_bus);
 
-		self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
+		// self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
 	}
 
 	pub fn draw(&mut self, gfx: &mut gfx::System) {
@@ -179,7 +179,7 @@ impl GameScene {
 		self.hud_view.draw(gfx, &self.model);
 
 		// self.toy_renderer.draw(gfx);
-		self.sprites.draw(gfx);
+		// self.sprites.draw(gfx);
 
 		self.dispatch_postprocess(gfx);
 	}
