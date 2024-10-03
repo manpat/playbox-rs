@@ -213,11 +213,40 @@ impl GameScene {
 
 		// TODO(pat.m): bloom
 
+		#[repr(C)]
+		#[derive(Copy, Clone)]
+		struct ToneMapParameters {
+			dither_time: f32,
+			dither_quantise: f32,
+
+			tonemap_contrast: f32,
+			tonemap_exposure: f32,
+
+			tonemap_algorithm: ToneMapAlgorithm,
+		}
+
+		#[allow(dead_code)]
+		#[repr(u32)]
+		#[derive(Copy, Clone)]
+		enum ToneMapAlgorithm {
+			None,
+			Reinhardt,
+			AcesFilmic,
+		}
+
 		// Tonemap, gamma correct and dither.
 		group.compute(self.hdr_to_ldr_shader)
 			.image(0, self.hdr_color_rt)
 			.image_rw(1, self.ldr_color_image)
-			.ssbo(0, &[self.time])
+			.ssbo(0, &[ToneMapParameters {
+				dither_time: self.time,
+				dither_quantise: 256.0,
+
+				tonemap_contrast: 1.5,
+				tonemap_exposure: 5.0,
+
+				tonemap_algorithm: ToneMapAlgorithm::AcesFilmic,
+			}])
 			.groups_from_image_size(self.hdr_color_rt);
 
 		// Scale and blit to screen

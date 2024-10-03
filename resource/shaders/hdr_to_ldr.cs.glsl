@@ -5,7 +5,13 @@ layout(binding=1, rgba8) writeonly uniform image2D u_ldr_image;
 
 
 layout(binding = 0, std430) readonly buffer A {
-	float u_time;
+	float u_dither_time;
+	float u_dither_quantise;
+
+	float u_tonemap_contrast;
+	float u_tonemap_exposure;
+
+	uint u_tonemap_algorithm;
 };
 
 
@@ -53,29 +59,31 @@ void main() {
 
 	const vec3 middle_grey = vec3(0.5);
 
-	float contrast = 1.2;
-	float exposure = 0.8;
-	float quantise = 256.0;
-
 	// Apply contrast
-	// color = (color - 0.5) * 1.09 + 0.5;
 	vec3 log_color = log(color);
-	log_color = (log_color - middle_grey) * contrast + middle_grey;
+	log_color = (log_color - middle_grey) * u_tonemap_contrast + middle_grey;
 	color = exp(log_color);
 
-	color = max(color, 0.0) * exposure;
+	color = max(color, 0.0) * u_tonemap_exposure;
 
 	// Tonemap
-	// color = tonemap_reinhardt(color);
-	color = tonemap_aces_filmic(color);
+	switch (u_tonemap_algorithm) {
+	case 1: 
+		color = tonemap_reinhardt(color);
+		break;
+	case 2: 
+		color = tonemap_aces_filmic(color);
+		break;
+	default: break; 
+	};
 
 	// linear_to_gamma required because u_ldr_image is in an srgb format, so we have to do the conversion ourselves
 	color = saturate(color);
 	color = linear_to_gamma(color);
 
 	// Dither and quantize
-	float noise = hash(vec2(texel_uv) / vec2(image_size) + fract(u_time/1000000.0) - 0.5) * 2.0;
-	color = round(color*quantise + noise - 0.5)/quantise;
+	float noise = hash(vec2(texel_uv) / vec2(image_size) + fract(u_dither_time/1000000.0) - 0.5) * 2.0;
+	color = round(color*u_dither_quantise + noise - 0.5)/u_dither_quantise;
 
 	imageStore(u_ldr_image, texel_uv, vec4(color, 1.0));
 }
