@@ -12,11 +12,6 @@ serde_json = "1.0"
 bitflags = "2.6"
 
 
-[dependencies.tokio]
-version = "1.33.0"
-features = ["sync", "time", "rt", "rt-multi-thread", "macros"]
-
-
 
 [dependencies.toybox]
 git = "https://github.com/manpat/toybox-rs.git"
