@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct GlyphCache {
 	pub font_atlas: gfx::ImageHandle,
@@ -14,13 +15,20 @@ pub struct GlyphCache {
 	cursor_y: usize,
 }
 
+
 impl GlyphCache {
 	pub fn new(gfx: &mut gfx::System) -> GlyphCache {
 		let atlas_size = Vec2i::splat(512);
 		let format = gfx::ImageFormat::unorm8();
 
+		// TODO(pat.m): This sucks massively. This is largely only needed for two reasons:
+		// - ResourceManager currently doesn't have a way to cope with 'unique' resources, and
+		// - I'm currently too lazy to share GlyphCache.
+		static HACK_ATLAS_INSTANCE_COUNTER: AtomicU32 = AtomicU32::new(0);
+		let instance = HACK_ATLAS_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
+
 		let font_atlas = gfx.resource_manager.request(
-			gfx::CreateImageRequest::fixed_2d("Glyph Atlas", atlas_size, format));
+			gfx::CreateImageRequest::fixed_2d(format!("Glyph Atlas #{instance}"), atlas_size, format));
 
 		GlyphCache {
 			font_atlas,
