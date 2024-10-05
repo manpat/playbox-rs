@@ -42,6 +42,7 @@ impl GlyphCache {
 		}
 	}
 
+	#[instrument(skip_all, name="GlyphCache::update_atlas")]
 	pub fn update_atlas(&mut self, gfx: &mut gfx::System) {
 		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Start).annotate("Update Font Atlas");
 		let atlas_handle = self.font_atlas;
@@ -70,6 +71,7 @@ impl GlyphCache {
 		match self.glyphs.entry(key) {
 			Entry::Occupied(entry) => entry.into_mut(),
 			Entry::Vacant(slot) => {
+				let _span = tracing::info_span!("Rasterize glyph", %ch).entered();
 				let (metrics, mut data) = font.rasterize(ch, font_size as f32);
 				invert_bitmap(&mut data, metrics.width);
 
@@ -105,6 +107,7 @@ impl GlyphCache {
 		}
 	}
 
+	#[instrument(skip_all, name="GlyphCache::layout")]
 	pub fn layout(&mut self, font: &fontdue::Font, font_size: u32, s: impl AsRef<str>, mut f: impl FnMut(Aabb2, Aabb2)) {
 		use fontdue::layout::{Layout, TextStyle, CoordinateSystem, LayoutSettings};
 		let mut layout = Layout::new(CoordinateSystem::PositiveYUp);
