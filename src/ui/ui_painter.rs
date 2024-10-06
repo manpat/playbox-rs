@@ -1,48 +1,32 @@
 use crate::prelude::*;
-use super::{UiBuilder, Layout};
+use super::{UiBuilder, UiShared, Layout};
+
 
 // TODO(pat.m): try ab_glyph. variable fonts??
-
-// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Tuffy.otf");
-// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Quicksand-Light.ttf");
-const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
-// const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Outflank 9.ttf");
 
 
 pub struct UiPainter {
 	pub shape_layer: UiPainterLayer,
 	pub text_layer: UiPainterLayer,
 
-	// TODO(pat.m): pull these out into a shared place so they can be reused for diff menus
-	pub font: fontdue::Font,
-	pub glyph_atlas: GlyphCache,
-
 	frame_stage: gfx::FrameStage,
 	f_text_shader: gfx::ShaderHandle,
 }
 
 impl UiPainter {
-	pub fn new(gfx: &mut gfx::System, frame_stage: gfx::FrameStage) -> anyhow::Result<UiPainter> {
-		let font = fontdue::Font::from_bytes(FONT_DATA, fontdue::FontSettings::default())
-			.map_err(|err| anyhow::anyhow!("{err}"))?;
-
-		Ok(UiPainter {
+	pub fn new(gfx: &mut gfx::System, frame_stage: gfx::FrameStage) -> UiPainter {
+		UiPainter {
 			shape_layer: UiPainterLayer::new(),
 			text_layer: UiPainterLayer::new(),
 
-			font,
-			glyph_atlas: GlyphCache::new(gfx),
-
 			frame_stage,
 			f_text_shader: gfx.resource_manager.load_fragment_shader("shaders/text.fs.glsl"),
-		})
+		}
 	}
 
-	pub fn submit(&mut self, gfx: &mut gfx::System, bounds: Aabb2) {
+	pub fn submit(&mut self, gfx: &mut gfx::System, ui_shared: &UiShared, bounds: Aabb2) {
 		let projection = Mat4::ortho(bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, -1.0, 1.0);
 		let projection = gfx.frame_encoder.upload(&[projection]);
-
-		self.glyph_atlas.update_atlas(gfx);
 
 		if !self.shape_layer.is_empty() {
 			gfx.frame_encoder.command_group(self.frame_stage)
@@ -67,11 +51,18 @@ impl UiPainter {
 				.indexed(&self.text_layer.indices)
 				.ssbo(0, &self.text_layer.vertices)
 				.ubo(0, projection)
-				.sampled_image(0, self.glyph_atlas.font_atlas, gfx::CommonSampler::Nearest)
+				.sampled_image(0, ui_shared.glyph_atlas.borrow().font_atlas, gfx::CommonSampler::Nearest)
 				.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
 				.depth_test(false);
 
 			self.text_layer.clear();
+		}
+	}
+
+	pub fn with_shared<'p, 's>(&'p mut self, shared: &'s UiShared) -> UiPainterWithShared<'p, 's> {
+		UiPainterWithShared {
+			painter: self,
+			shared,
 		}
 	}
 
@@ -84,24 +75,48 @@ impl UiPainter {
 	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
 		self.shape_layer.draw_quad(geom, Aabb2::zero(), color);
 	}
+}
 
+
+
+pub struct UiPainterWithShared<'p, 's> {
+	painter: &'p mut UiPainter,
+	shared: &'s UiShared,
+}
+
+impl<'p, 's> UiPainterWithShared<'p, 's> {
 	pub fn text(&mut self, origin: Vec2, font_size: u32, s: impl AsRef<str>, color: impl Into<Color>) {
 		let origin = origin.floor();
 		let color = color.into();
 
-		self.glyph_atlas.layout(&self.font, font_size, s, |geom_rect, uv_rect| {
-			self.text_layer.draw_quad(geom_rect.translate(origin), uv_rect, color);
+		self.shared.glyph_atlas.borrow_mut().layout(&self.shared.font, font_size, s, |geom_rect, uv_rect| {
+			self.painter.text_layer.draw_quad(geom_rect.translate(origin), uv_rect, color);
 		});
 	}
 
 	pub fn text_rect(&mut self, font_size: u32, s: impl AsRef<str>) -> Aabb2 {
 		let mut full = Aabb2::zero();
-		self.glyph_atlas.layout(&self.font, font_size, s, |geom_rect, _| {
+		self.shared.glyph_atlas.borrow_mut().layout(&self.shared.font, font_size, s, |geom_rect, _| {
 			full = full.include_rect(geom_rect);
 		});
 		full
 	}
 }
+
+impl<'p, 's> std::ops::Deref for UiPainterWithShared<'p, 's> {
+	type Target = UiPainter;
+
+	fn deref(&self) -> &UiPainter {
+		self.painter
+	}
+}
+
+impl<'p, 's> std::ops::DerefMut for UiPainterWithShared<'p, 's> {
+	fn deref_mut(&mut self) -> &mut UiPainter {
+		self.painter
+	}
+}
+
 
 
 

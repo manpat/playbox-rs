@@ -11,7 +11,7 @@ pub struct MainMenuScene {
 impl MainMenuScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<MainMenuScene> {
 		Ok(MainMenuScene{
-			painter: ui::UiPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE)?,
+			painter: ui::UiPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE),
 		})
 	}
 
@@ -48,7 +48,7 @@ impl MainMenuScene {
 			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
 		}
 
-		self.painter.submit(&mut ctx.gfx, screen_rect);
+		self.painter.submit(&mut ctx.gfx, ctx.ui_shared, screen_rect);
 	}
 }
 
@@ -72,7 +72,7 @@ pub struct PauseMenuScene {
 impl PauseMenuScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<PauseMenuScene> {
 		Ok(PauseMenuScene{
-			painter: ui::UiPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE)?,
+			painter: ui::UiPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE),
 		})
 	}
 
@@ -107,6 +107,6 @@ impl PauseMenuScene {
 			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
 		}
 
-		self.painter.submit(&mut ctx.gfx, screen_rect);
+		self.painter.submit(&mut ctx.gfx, ctx.ui_shared, screen_rect);
 	}
 }

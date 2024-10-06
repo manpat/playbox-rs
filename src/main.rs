@@ -67,20 +67,39 @@ struct App {
 	pause_menu: PauseMenuScene,
 	game_scene: Option<GameScene>,
 
-	console: console::Console,
-
-	message_bus: MessageBus,
 	menu_cmd_subscription: Subscription<MenuCmd>,
+
+	shared: AppShared,
+}
+
+
+struct AppShared {
+	message_bus: MessageBus,
+
+	console: console::Console,
+	ui_shared: ui::UiShared,
 
 	audio: MyAudioSystem,
 }
 
+
 impl App {
 	fn new(ctx: &mut toybox::Context) -> anyhow::Result<App> {
 		let message_bus = MessageBus::new();
+		let menu_cmd_subscription = message_bus.subscribe();
+
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
-		let mut console = console::Console::new();
-		let ctx = &mut Context::new(ctx, &audio, &message_bus, &mut console);
+		let ui_shared = ui::UiShared::new(&mut ctx.gfx)?;
+		let console = console::Console::new();
+
+		let mut shared = AppShared {
+			message_bus,
+			console,
+			ui_shared,
+			audio,
+		};
+
+		let ctx = &mut Context::new(ctx, &mut shared);
 
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
@@ -97,12 +116,9 @@ impl App {
 			pause_menu: PauseMenuScene::new(ctx)?,
 			game_scene,
 
-			console,
+			menu_cmd_subscription,
 
-			menu_cmd_subscription: message_bus.subscribe(),
-			message_bus,
-
-			audio,
+			shared,
 		})
 	}
 
@@ -121,12 +137,12 @@ impl App {
 
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
-		self.message_bus.garbage_collect();
+		self.shared.message_bus.garbage_collect();
 
-		self.console.update(ctx);
+		self.shared.console.update(ctx);
 
-		if self.console.command("quit").is_some() {
-			self.message_bus.emit(MenuCmd::QuitToDesktop);
+		if self.shared.console.command("quit").is_some() {
+			self.shared.message_bus.emit(MenuCmd::QuitToDesktop);
 		}
 
 		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
@@ -138,7 +154,7 @@ impl toybox::App for App {
 
 		match self.active_scene {
 			ActiveScene::MainMenu => {
-				self.main_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
+				self.main_menu.update(&mut Context::new(ctx, &mut self.shared));
 			}
 
 			ActiveScene::Game => {
@@ -148,23 +164,26 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::PauseMenu;
 				}
 
-				game_scene.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
-				game_scene.draw(&mut ctx.gfx);
+				let mut ctx = Context::new(ctx, &mut self.shared);
+				game_scene.update(&mut ctx);
+				game_scene.draw(&mut ctx);
 			}
 
 			ActiveScene::PauseMenu => {
 				let game_scene = self.game_scene.as_mut().unwrap();
 
-				self.pause_menu.update(&mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console));
-				game_scene.draw(&mut ctx.gfx);
+				let mut ctx = Context::new(ctx, &mut self.shared);
+				self.pause_menu.update(&mut ctx);
+				game_scene.draw(&mut ctx);
 			}
 		}
 
-		for menu_msg in self.message_bus.poll_consume(&self.menu_cmd_subscription) {
+		let message_bus = self.shared.message_bus.clone();
+		for menu_msg in message_bus.poll_consume(&self.menu_cmd_subscription) {
 			match menu_msg {
 				MenuCmd::Play(world_name) => {
 					let world = Self::load_world_or_default(&ctx.vfs, format!("worlds/{world_name}.world"));
-					let ctx = &mut Context::new(ctx, &self.audio, &self.message_bus, &mut self.console);
+					let ctx = &mut Context::new(ctx, &mut self.shared);
 
 					// Reuse scene if we can, to avoid reloading common stuff
 					if let Some(game_scene) = &mut self.game_scene {
@@ -196,6 +215,8 @@ impl toybox::App for App {
 				MenuCmd::Settings => {}
 			}
 		}
+
+		self.shared.ui_shared.glyph_atlas.get_mut().update_atlas(&mut ctx.gfx);
 	}
 
 	fn customise_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
@@ -222,16 +243,18 @@ pub struct Context<'tb> {
 	pub message_bus: &'tb MessageBus,
 	pub audio: &'tb MyAudioSystem,
 	pub console: &'tb mut Console,
+	pub ui_shared: &'tb mut ui::UiShared,
 
 	pub show_editor: bool,
 }
 
 impl<'tb> Context<'tb> {
-	pub fn new(tb: &'tb mut toybox::Context, audio: &'tb MyAudioSystem, message_bus: &'tb MessageBus, console: &'tb mut Console) -> Self {
+	fn new(tb: &'tb mut toybox::Context, shared: &'tb mut AppShared) -> Self {
 		let toybox::Context { gfx, input, egui, cfg, vfs, show_debug_menu, .. } = tb;
+		let AppShared { message_bus, audio, console, ui_shared } = shared;
 		let show_editor = *show_debug_menu;
 
-		Self {gfx, input, egui, cfg, vfs, audio, message_bus, console, show_editor}
+		Self {gfx, input, egui, cfg, vfs, audio, message_bus, ui_shared, console, show_editor}
 	}
 }
 

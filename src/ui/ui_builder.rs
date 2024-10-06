@@ -1,12 +1,12 @@
 use crate::prelude::*;
 
-use super::{UiPainter, Layout};
+use super::{UiPainter, UiPainterWithShared, Layout};
 
 
 pub struct UiBuilder<'mp, 'ctx, L: Layout> {
 	input: &'ctx input::System,
 
-	pub painter: &'mp mut UiPainter,
+	pub painter: UiPainterWithShared<'mp, 'ctx>,
 	pub font_size: u32,
 
 	pub layout: L,
@@ -15,7 +15,7 @@ pub struct UiBuilder<'mp, 'ctx, L: Layout> {
 impl<'mp, 'ctx, L: Layout> UiBuilder<'mp, 'ctx, L> {
 	pub fn new(painter: &'mp mut UiPainter, ctx: &'ctx Context<'_>, layout: L) -> Self {
 		UiBuilder {
-			painter,
+			painter: painter.with_shared(ctx.ui_shared),
 			input: &ctx.input,
 
 			font_size: 16,

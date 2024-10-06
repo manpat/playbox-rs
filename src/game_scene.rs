@@ -141,7 +141,9 @@ impl GameScene {
 		// self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System) {
+	pub fn draw(&mut self, ctx: &mut Context<'_>) {
+		let Context{gfx, ui_shared, ..} = ctx;
+
 		self.time += 1.0/60.0;
 
 		let player = &self.model.player;
@@ -176,7 +178,7 @@ impl GameScene {
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 
 		self.world_view.draw(gfx, &self.model.world, &self.model.processed_world, player.placement);
-		self.hud_view.draw(gfx, &self.model);
+		self.hud_view.draw(gfx, ui_shared, &self.model);
 
 		// self.toy_renderer.draw(gfx);
 		// self.sprites.draw(gfx);
