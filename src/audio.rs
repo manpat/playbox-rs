@@ -1,70 +1,142 @@
 use toybox::prelude::*;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 
 #[derive(Clone)]
 pub struct MyAudioSystem {
-	trigger: Arc<AtomicBool>,
+	control: Arc<Control>,
 }
 
 impl MyAudioSystem {
 	pub fn start(audio: &mut audio::System) -> anyhow::Result<MyAudioSystem> {
-		let trigger = Arc::new(AtomicBool::new(false));
+		let control = Arc::new(Control::new());
 
 		let provider = MyAudioProvider {
-			trigger: trigger.clone(),
-			sample_dt: 0.0,
-			osc_phase: 0.0,
-			env_phase: 1.0,
+			control: control.clone(),
+
+			music: MusicProvider::default(),
+			sfx: SfxProvider::new(),
 		};
 
 		audio.set_provider(provider)?;
 
-		Ok(MyAudioSystem {
-			trigger
-		})
+		Ok(MyAudioSystem { control })
 	}
 
 	pub fn trigger(&self) {
-		self.trigger.store(true, Ordering::Relaxed);
+		self.control.trigger_sfx.store(true, Ordering::Relaxed);
 	}
 }
 
 
-#[derive(Default)]
-struct MyAudioProvider {
-	trigger: Arc<AtomicBool>,
-	sample_dt: f64,
+struct Control {
+	trigger_sfx: AtomicBool,
 
-	osc_phase: f64,
-	env_phase: f64,
+	music_volume: AtomicU32,
+	sfx_volume: AtomicU32,
+}
+
+impl Control {
+	fn new() -> Self {
+		let initial_volume = linear_to_db(0.3);
+
+		Control {
+			trigger_sfx: AtomicBool::new(false),
+			music_volume: AtomicU32::new(initial_volume.to_bits()),
+			sfx_volume: AtomicU32::new(initial_volume.to_bits()),
+		}
+	}
+}
+
+
+
+struct MyAudioProvider {
+	control: Arc<Control>,
+
+	music: MusicProvider,
+	sfx: SfxProvider,
 }
 
 impl audio::Provider for MyAudioProvider {
 	fn on_configuration_changed(&mut self, config: Option<audio::Configuration>) {
 		let Some(config) = config else { return };
 
-		self.sample_dt = 1.0/config.sample_rate as f64;
+		self.sfx.sample_dt = 1.0/config.sample_rate as f64;
+		log::info!("Configuration change! dt = {}", self.sfx.sample_dt);
+
 		assert!(config.channels == 2);
 	}
 
 	fn fill_buffer(&mut self, buffer: &mut [f32]) {
-		let mut osc_phase = self.osc_phase * 220.0 * std::f64::consts::TAU;
-		let osc_dt = self.sample_dt * 220.0 * std::f64::consts::TAU;
+		buffer.fill(0.0);
 
-		if self.trigger.fetch_and(false, Ordering::Relaxed) {
+		self.sfx.update(&self.control);
+		self.sfx.fill(buffer);
+	}
+}
+
+
+#[derive(Default)]
+struct MusicProvider {}
+
+struct SfxProvider {
+	target_volume: f32,
+	volume: f32,
+
+	sample_dt: f64,
+
+	osc_phase: f64,
+	env_phase: f64,
+}
+
+impl SfxProvider {
+	fn new() -> Self {
+		Self {
+			// TODO(pat.m): not db - too weird
+			target_volume: linear_to_db(0.3),
+			volume: linear_to_db(DC_OFFSET),
+
+			sample_dt: 0.0,
+			osc_phase: 0.0,
+			env_phase: 1.0,
+		}
+	}
+
+	fn update(&mut self, ctl: &Control) {
+		if ctl.trigger_sfx.fetch_and(false, Ordering::Relaxed) {
 			self.env_phase = 0.0;
 		}
 
+		self.target_volume = f32::from_bits(ctl.sfx_volume.load(Ordering::Relaxed));
+	}
+
+	fn fill(&mut self, buffer: &mut [f32]) {
+		let mut osc_phase = self.osc_phase * 220.0 * std::f64::consts::TAU;
+		let osc_dt = self.sample_dt * 220.0 * std::f64::consts::TAU;
+
+		let mut gain = db_to_linear(self.volume);
+
 		for frame in buffer.chunks_exact_mut(2) {
+			if self.volume != self.target_volume {
+				let diff = self.target_volume - self.volume;
+
+				self.volume += diff * self.sample_dt as f32 * 1000.0;
+
+				if diff.abs() < 0.1 {
+					self.volume = self.target_volume;
+				}
+
+				gain = db_to_linear(self.volume);
+			}
+
 			let osc = osc_phase.sin();
-			let amp = (1.0 - self.env_phase).max(0.0).powi(2) * 0.3;
+			let amp = (1.0 - self.env_phase).max(0.0).powi(2) * gain as f64;
 
 			let value = (amp * osc) as f32;
 
-			frame[0] = value;
-			frame[1] = value;
+			frame[0] += value;
+			frame[1] += value;
 
 			self.osc_phase += self.sample_dt;
 			self.env_phase += self.sample_dt * 2.0;
@@ -73,4 +145,15 @@ impl audio::Provider for MyAudioProvider {
 
 		self.osc_phase %= std::f64::consts::TAU;
 	}
+}
+
+
+const DC_OFFSET: f32 = 1.0E-25;
+
+fn linear_to_db(lin: f32) -> f32 {
+	lin.ln() * 20.0 / std::f32::consts::LN_10
+}
+
+fn db_to_linear(db: f32) -> f32 {
+	(db * std::f32::consts::LN_10 / 20.0).exp()
 }
