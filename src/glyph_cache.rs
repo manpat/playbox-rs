@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct GlyphCache {
 	pub font_atlas: gfx::ImageHandle,
@@ -113,12 +112,11 @@ impl GlyphCache {
 		layout.append(&[font], &TextStyle::new(s.as_ref(), font_size as f32, 0));
 
 		for glyph in layout.glyphs() {
-			let ch = glyph.parent;
-
-			if ch.is_whitespace() || ch.is_control() {
+			if !glyph.char_data.rasterize() {
 				continue;
 			}
 
+			let ch = glyph.parent;
 			let info = self.get(font, font_size, ch);
 
 			let offset = Vec2::new(glyph.x, glyph.y);
