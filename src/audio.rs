@@ -33,18 +33,18 @@ impl MyAudioSystem {
 struct Control {
 	trigger_sfx: AtomicBool,
 
-	music_volume: AtomicU32,
-	sfx_volume: AtomicU32,
+	music_volume: AtomicF32,
+	sfx_volume: AtomicF32,
 }
 
 impl Control {
 	fn new() -> Self {
-		let initial_volume = linear_to_db(0.3);
+		let initial_volume = linear_to_db(0.1);
 
 		Control {
 			trigger_sfx: AtomicBool::new(false),
-			music_volume: AtomicU32::new(initial_volume.to_bits()),
-			sfx_volume: AtomicU32::new(initial_volume.to_bits()),
+			music_volume: AtomicF32::new(initial_volume),
+			sfx_volume: AtomicF32::new(initial_volume),
 		}
 	}
 }
@@ -108,12 +108,12 @@ impl SfxProvider {
 			self.env_phase = 0.0;
 		}
 
-		self.target_volume = f32::from_bits(ctl.sfx_volume.load(Ordering::Relaxed));
+		self.target_volume = ctl.sfx_volume.load(Ordering::Relaxed);
 	}
 
 	fn fill(&mut self, buffer: &mut [f32]) {
-		let mut osc_phase = self.osc_phase * 220.0 * std::f64::consts::TAU;
-		let osc_dt = self.sample_dt * 220.0 * std::f64::consts::TAU;
+		let mut osc_phase = self.osc_phase * 110.0 * std::f64::consts::TAU;
+		let osc_dt = self.sample_dt * 110.0 * std::f64::consts::TAU;
 
 		let mut gain = db_to_linear(self.volume);
 
@@ -121,7 +121,7 @@ impl SfxProvider {
 			if self.volume != self.target_volume {
 				let diff = self.target_volume - self.volume;
 
-				self.volume += diff * self.sample_dt as f32 * 1000.0;
+				self.volume += diff * self.sample_dt as f32 * 100.0;
 
 				if diff.abs() < 0.1 {
 					self.volume = self.target_volume;
@@ -156,4 +156,22 @@ fn linear_to_db(lin: f32) -> f32 {
 
 fn db_to_linear(db: f32) -> f32 {
 	(db * std::f32::consts::LN_10 / 20.0).exp()
+}
+
+
+
+struct AtomicF32(AtomicU32);
+
+impl AtomicF32 {
+	fn new(f: f32) -> Self {
+		AtomicF32(AtomicU32::new(f.to_bits()))
+	}
+
+	fn store(&self, f: f32, ordering: Ordering) {
+		self.0.store(f.to_bits(), ordering)
+	}
+
+	fn load(&self, ordering: Ordering) -> f32 {
+		f32::from_bits(self.0.load(ordering))
+	}
 }
