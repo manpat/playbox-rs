@@ -26,7 +26,7 @@ pub mod prelude {
 	pub use crate::main_menu::{MainMenuScene, MenuCmd, PauseMenuScene};
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
-	pub use crate::ui;
+	pub use crate::ui::{self, UiLayout};
 
 	pub use crate::model;
 	pub use crate::view;

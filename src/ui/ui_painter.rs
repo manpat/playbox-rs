@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use super::{UiBuilder, UiShared, Layout};
+use super::{UiBuilder, UiShared};
 
 
 // TODO(pat.m): try ab_glyph. variable fonts??
@@ -66,7 +66,7 @@ impl UiPainter {
 		}
 	}
 
-	pub fn builder<'mp, 'ctx, L: Layout>(&'mp mut self, ctx: &'ctx Context<'_>, layout: L) -> UiBuilder<'mp, 'ctx, L> {
+	pub fn builder<'mp, 'ctx, L: UiLayout>(&'mp mut self, ctx: &'ctx Context<'_>, layout: L) -> UiBuilder<'mp, 'ctx, L> {
 		UiBuilder::new(self, ctx, layout)
 	}
 }
@@ -80,8 +80,8 @@ impl UiPainter {
 
 
 pub struct UiPainterWithShared<'p, 's> {
-	painter: &'p mut UiPainter,
-	shared: &'s UiShared,
+	pub painter: &'p mut UiPainter,
+	pub shared: &'s UiShared,
 }
 
 impl<'p, 's> UiPainterWithShared<'p, 's> {

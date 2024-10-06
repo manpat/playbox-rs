@@ -20,7 +20,9 @@ impl MainMenuScene {
 
 		ctx.input.set_capture_mouse(false);
 
-		let size = ctx.gfx.backbuffer_size().to_vec2()/2.0;
+		let scale_factor = 0.5;
+
+		let size = ctx.gfx.backbuffer_size().to_vec2() * scale_factor;
 		let screen_rect = Aabb2::new(Vec2::zero(), size);
 		let mut content_rect = screen_rect.shrink(8.0); // pad edge
 
@@ -34,6 +36,8 @@ impl MainMenuScene {
 
 		self.painter.rect(content_rect, Color::grey_a(0.0, 0.3));
 		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect.shrink(8.0)));
+		builder.font_size = 16;
+		builder.input_scale_factor = scale_factor;
 
 		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
@@ -43,6 +47,17 @@ impl MainMenuScene {
 		if builder.button("Settings") {
 			// ctx.message_bus.emit(MenuCmd::Settings);
 		}
+
+		{
+			let sub_rect = builder.layout.allocate(Vec2::new(f32::INFINITY, 16.0 + 4.0));
+			let mut builder = builder.with_layout(ui::HorizontalLayout::new(sub_rect));
+
+			builder.button("Weh");
+			builder.button("Womp");
+			builder.button("Woo");
+		}
+
+
 
 		if builder.button("Quit") {
 			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
@@ -79,7 +94,9 @@ impl PauseMenuScene {
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
 		ctx.input.set_capture_mouse(false);
 
-		let size = ctx.gfx.backbuffer_size().to_vec2()/2.0;
+		let scale_factor = 0.5;
+
+		let size = ctx.gfx.backbuffer_size().to_vec2() * scale_factor;
 		let screen_rect = Aabb2::new(Vec2::zero(), size);
 		let mut content_rect = screen_rect.shrink(8.0); // pad edge
 
@@ -94,6 +111,7 @@ impl PauseMenuScene {
 		self.painter.rect(content_rect, Color::grey_a(0.0, 0.8));
 
 		let mut builder = self.painter.builder(ctx, ui::DumbLayout::new(content_rect.shrink(8.0)));
+		builder.input_scale_factor = scale_factor;
 
 		if builder.button("Resume") || ctx.input.button_just_down(input::keys::Escape) {
 			ctx.message_bus.emit(MenuCmd::Resume);

@@ -1,10 +1,11 @@
 use crate::prelude::*;
 
-use super::{UiPainter, UiPainterWithShared, Layout};
+use super::{UiPainter, UiPainterWithShared};
 
 
-pub struct UiBuilder<'mp, 'ctx, L: Layout> {
+pub struct UiBuilder<'mp, 'ctx, L: UiLayout> {
 	input: &'ctx input::System,
+	pub input_scale_factor: f32,
 
 	pub painter: UiPainterWithShared<'mp, 'ctx>,
 	pub font_size: u32,
@@ -12,15 +13,28 @@ pub struct UiBuilder<'mp, 'ctx, L: Layout> {
 	pub layout: L,
 }
 
-impl<'mp, 'ctx, L: Layout> UiBuilder<'mp, 'ctx, L> {
+impl<'mp, 'ctx, L: UiLayout> UiBuilder<'mp, 'ctx, L> {
 	pub fn new(painter: &'mp mut UiPainter, ctx: &'ctx Context<'_>, layout: L) -> Self {
 		UiBuilder {
 			painter: painter.with_shared(ctx.ui_shared),
 			input: &ctx.input,
+			input_scale_factor: 1.0,
 
 			font_size: 16,
 
 			layout,
+		}
+	}
+
+	pub fn with_layout<'s, L2: UiLayout>(&'s mut self, new_layout: L2) -> UiBuilder<'s, 'ctx, L2> {
+		UiBuilder {
+			input: self.input,
+			input_scale_factor: self.input_scale_factor,
+
+			painter: self.painter.painter.with_shared(self.painter.shared),
+			font_size: self.font_size,
+
+			layout: new_layout,
 		}
 	}
 
@@ -35,7 +49,7 @@ impl<'mp, 'ctx, L: Layout> UiBuilder<'mp, 'ctx, L> {
 		let text_origin = button_rect.min + padding;
 
 		let is_hovered = self.input.mouse_position_pixels()
-			.map(|pos| button_rect.contains_point(pos/2.0)) // TODO(pat.m): magic scaling number!
+			.map(|pos| button_rect.contains_point(pos * self.input_scale_factor))
 			.unwrap_or(false);
 
 		let is_pressed = is_hovered
