@@ -27,7 +27,7 @@ impl Console {
 			log::error!("Failed to process command '{verb}'");
 		}
 
-		if ctx.input.button_just_down(input::keys::F12) {
+		if ctx.input.button_just_down(input::keys::Backquote) {
 			self.visible = !self.visible;
 		}
 
@@ -38,8 +38,9 @@ impl Console {
 				ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
 
 				// Command line consumes all keyboard input, so we have to ask through egui about input
-				if ui.input(|input| input.key_pressed(egui::Key::F12) || input.key_pressed(egui::Key::Escape)) {
+				if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Backtick) || input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
 					self.visible = false;
+					return;
 				}
 
 				// TODO(pat.m): hook into log and show output history here.

@@ -110,7 +110,7 @@ impl GameScene {
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
-		if ctx.input.button_just_down(input::keys::F1) {
+		if ctx.input.button_just_down(input::keys::F2) {
 			self.force_game_controls = !self.force_game_controls;
 		}
 
