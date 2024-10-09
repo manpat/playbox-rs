@@ -4,6 +4,12 @@ pub struct GameScene {
 	fog_shader: gfx::ShaderHandle,
 	hdr_to_ldr_shader: gfx::ShaderHandle,
 
+	downsample_shader: gfx::ShaderHandle,
+	upsample_shader: gfx::ShaderHandle,
+
+	downsample_chain: Vec<gfx::ImageHandle>,
+	upsample_chain: Vec<gfx::ImageHandle>,
+
 	hdr_color_rt: gfx::ImageHandle,
 	depth_rt: gfx::ImageHandle,
 
@@ -31,10 +37,25 @@ impl GameScene {
 		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
 
 		let rt_fraction = 4;
-		let hdr_color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::hdr_color(), rt_fraction));
+		let hdr_color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction));
 		let depth_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction));
 
 		let ldr_color_image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
+
+		let mut downsample_chain = Vec::new();
+		let mut upsample_chain = Vec::new();
+
+		let num_mips = 6;
+
+		for mip in 0..num_mips {
+			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
+			downsample_chain.push(image);
+		}
+
+		for mip in (0..num_mips).rev() {
+			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip));
+			upsample_chain.push(image);
+		}
 
 		// let toy_renderer = {
 		// 	let project_path = resource_manager.resource_path("toys/basic.toy")?;
@@ -57,8 +78,14 @@ impl GameScene {
 			fog_shader: resource_manager.load_compute_shader("shaders/fog.cs.glsl"),
 			hdr_to_ldr_shader: resource_manager.load_compute_shader("shaders/hdr_to_ldr.cs.glsl"),
 
+			downsample_shader: resource_manager.load_compute_shader("shaders/downsample.cs.glsl"),
+			upsample_shader: resource_manager.load_compute_shader("shaders/upsample.cs.glsl"),
+
 			hdr_color_rt,
 			depth_rt,
+
+			downsample_chain,
+			upsample_chain,
 
 			ldr_color_image,
 
@@ -201,6 +228,9 @@ impl GameScene {
 			fog_transparency: f32,
 		}
 
+		group.debug_marker("Fog");
+
+		// Apply fog
 		group.compute(self.fog_shader)
 			.image_rw(0, self.hdr_color_rt)
 			.sampled_image(1, self.depth_rt, gfx::CommonSampler::Nearest)
@@ -213,7 +243,34 @@ impl GameScene {
 			}])
 			.groups_from_image_size(self.hdr_color_rt);
 
-		// TODO(pat.m): bloom
+
+		// Apply bloom
+
+		let mut source_mip = self.hdr_color_rt;
+
+		{
+			group.debug_marker("Downsample");
+			for &target_mip in self.downsample_chain.iter() {
+				group.compute(self.downsample_shader)
+					.sampled_image(0, source_mip, gfx::CommonSampler::Linear)
+					.image_rw(1, target_mip)
+					.groups_from_image_size(target_mip);
+
+				source_mip = target_mip;
+			}
+
+			group.debug_marker("Upsample");
+			for &target_mip in self.upsample_chain.iter() {
+				group.compute(self.upsample_shader)
+					.sampled_image(0, source_mip, gfx::CommonSampler::Linear)
+					.image_rw(1, target_mip)
+					.groups_from_image_size(target_mip);
+
+				source_mip = target_mip;
+			}
+		}
+
+
 
 		#[repr(C)]
 		#[derive(Copy, Clone)]
@@ -236,9 +293,11 @@ impl GameScene {
 			AcesFilmic,
 		}
 
+		group.debug_marker("Tonemap");
+
 		// Tonemap, gamma correct and dither.
 		group.compute(self.hdr_to_ldr_shader)
-			.image(0, self.hdr_color_rt)
+			.image(0, source_mip)
 			.image_rw(1, self.ldr_color_image)
 			.ssbo(0, &[ToneMapParameters {
 				dither_time: self.time,
