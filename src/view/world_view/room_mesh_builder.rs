@@ -15,9 +15,9 @@ pub struct RoomMeshInfo {
 #[derive(Copy, Clone)]
 pub struct RoomLight {
 	pub local_pos: Vec3,
-	pub power: f32,
+	pub radius: f32,
 	pub color: Vec3,
-	pub _pad: f32,
+	pub power: f32,
 }
 
 pub struct RoomMeshBuilder<'w> {
@@ -137,9 +137,9 @@ impl RoomMeshBuilder<'_> {
 
 				self.lights.push(RoomLight {
 					local_pos: transform * object.placement.position.to_xny(light.height),
-					power: light.power,
+					radius: light.radius,
 					color: light.color.into(),
-					_pad: 0.0,
+					power: light.power,
 				});
 			}
 		}
@@ -322,12 +322,12 @@ impl RoomMeshBuilder<'_> {
 				self.add_convex_untextured(verts, Color::grey(0.02));
 			}
 
-			&ObjectInfo::Light(LightObject{color, height, power}) => {
+			&ObjectInfo::Light(LightObject{color, height, radius, power}) => {
 				self.lights.push(RoomLight {
 					local_pos: object.placement.position.to_xny(height),
-					power,
+					radius,
 					color: color.into(),
-					_pad: 0.0,
+					power,
 				});
 			}
 

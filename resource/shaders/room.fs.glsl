@@ -24,9 +24,9 @@ layout(binding=0) uniform sampler2DArray u_texture;
 
 struct Light {
 	vec3 local_pos;
-	float power;
+	float radius;
 	vec3 color;
-	float _pad;
+	float power;
 };
 
 layout(binding=2) readonly buffer RoomInfo {
@@ -66,11 +66,13 @@ void main() {
 	for (uint light_idx = u_first_light; light_idx < u_first_light + u_num_lights; light_idx++) {
 		Light light = s_lights[light_idx];
 
-		float attenuation = max(light.power - length(light.local_pos - v_local_pos), 0.0);
+		float value = max(1.0 - length(light.local_pos - v_local_pos) / light.radius, 0.0);
 
-		attenuation = floor(attenuation*4.0)/4.0;
-		attenuation *= attenuation;
+		value *= light.power;
 
-		o_color.rgb += light.color * attenuation;
+		value = ceil(value*4.0)/4.0;
+		value *= value;
+
+		o_color.rgb += light.color * value;
 	}
 }

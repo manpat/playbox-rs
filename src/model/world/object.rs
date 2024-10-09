@@ -67,4 +67,5 @@ pub struct LightObject {
 	pub color: Color,
 	pub height: f32,
 	pub power: f32,
+	pub radius: f32,
 }

@@ -209,6 +209,7 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 					color: Color::white(),
 					height: 0.5,
 					power: 1.0,
+					radius: 1.0,
 				}),
 			};
 
@@ -388,7 +389,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 			}
 		}
 
-		&ObjectInfo::Light(LightObject{color, height, power}) => {
+		&ObjectInfo::Light(LightObject{color, height, power, radius}) => {
 			ui.separator();
 
 			ui.horizontal(|ui| {
@@ -418,10 +419,23 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 			});
 
 			ui.horizontal(|ui| {
+				ui.label("Radius");
+
+				let mut new_radius = radius;
+				if ui.add(Slider::new(&mut new_radius, 0.1..=20.0).logarithmic(false)).changed() {
+					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+						if let Some(LightObject{radius, ..}) = object.as_light_mut() {
+							*radius = new_radius;
+						}
+					}));
+				}
+			});
+
+			ui.horizontal(|ui| {
 				ui.label("Power");
 
 				let mut new_power = power;
-				if ui.add(Slider::new(&mut new_power, 0.0..=10.0).step_by(0.01).logarithmic(true)).changed() {
+				if ui.add(Slider::new(&mut new_power, 0.1..=100.0).step_by(0.01).logarithmic(true)).changed() {
 					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
 						if let Some(LightObject{power, ..}) = object.as_light_mut() {
 							*power = new_power;
