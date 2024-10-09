@@ -49,6 +49,8 @@ void main() {
 	ivec2 image_size = image_dimensions.xy;
 	uint num_textures = uint(image_dimensions.z);
 
+	vec3 diffuse = vec3(0.0);
+
 	if (v_texture_index > 0) {
 		ivec2 texel_coord = ivec2(v_uv) % image_size;
 
@@ -57,10 +59,12 @@ void main() {
 		uint texture_index = v_texture_index + uint(hash(vec2(chunk_coord) * 3.123) * 2.0);
 		uint real_texture_index = min(texture_index, num_textures)-1;
 
-		o_color = texelFetch(u_texture, ivec3(texel_coord, real_texture_index), 0) * v_color;
+		diffuse = texelFetch(u_texture, ivec3(texel_coord, real_texture_index), 0).rgb * v_color.rgb;
 	} else {
-		o_color = v_color;
+		diffuse = v_color.rgb;
 	}
+
+	vec3 lighting = vec3(0.0);
 
 	// Collect lighting
 	for (uint light_idx = u_first_light; light_idx < u_first_light + u_num_lights; light_idx++) {
@@ -73,6 +77,9 @@ void main() {
 		value = ceil(value*4.0)/4.0;
 		value *= value;
 
-		o_color.rgb += light.color * value;
+		lighting += diffuse * light.color * value;
 	}
+
+	o_color.rgb = diffuse.rgb + lighting;
+	o_color.a = 1.0;
 }

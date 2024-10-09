@@ -45,14 +45,14 @@ impl GameScene {
 		let mut downsample_chain = Vec::new();
 		let mut upsample_chain = Vec::new();
 
-		let num_mips = 6;
+		let num_mips = 4;
 
-		for mip in 0..num_mips {
+		for mip in 0..num_mips + 1 {
 			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
 			downsample_chain.push(image);
 		}
 
-		for mip in (0..num_mips).rev() {
+		for mip in 0..num_mips {
 			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip));
 			upsample_chain.push(image);
 		}
@@ -245,7 +245,6 @@ impl GameScene {
 
 
 		// Apply bloom
-
 		let mut source_mip = self.hdr_color_rt;
 
 		{
@@ -260,9 +259,10 @@ impl GameScene {
 			}
 
 			group.debug_marker("Upsample");
-			for &target_mip in self.upsample_chain.iter() {
+			for (&target_mip, &downsample_mip) in self.upsample_chain.iter().zip(&self.downsample_chain).rev() {
 				group.compute(self.upsample_shader)
 					.sampled_image(0, source_mip, gfx::CommonSampler::Linear)
+					.sampled_image(2, downsample_mip, gfx::CommonSampler::Linear)
 					.image_rw(1, target_mip)
 					.groups_from_image_size(target_mip);
 
@@ -301,10 +301,11 @@ impl GameScene {
 			.image_rw(1, self.ldr_color_image)
 			.ssbo(0, &[ToneMapParameters {
 				dither_time: self.time,
-				dither_quantise: 256.0,
+				// dither_quantise: 256.0,
+				dither_quantise: 128.0,
 
 				tonemap_contrast: 1.5,
-				tonemap_exposure: 5.0,
+				tonemap_exposure: 2.0,
 
 				tonemap_algorithm: ToneMapAlgorithm::AcesFilmic,
 			}])
