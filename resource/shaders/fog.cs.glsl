@@ -36,13 +36,14 @@ void main() {
 	float distance = length(view.xyz);
 	float fog_distance = max(distance - u_fog_start, 0.0) / u_fog_distance;
 
-	float fog_factor = 1.0 - pow(clamp(1.0 - fog_distance, 0.0, 1.0), 10.0);
+	float fog_factor = clamp(1.0 - exp(-fog_distance * 4.0), 0.0, 1.0);
 
 	vec3 fog_color = u_fog_color.rgb;
 
 
 	// Initial linear fade
-	texel.rgb = mix(texel.rgb, fog_color, fog_factor);
+	texel.rgb = mix(texel.rgb, fog_color, fog_factor); // + max(texel.rgb - 1.0, 0.0) * (1.0 - fog_factor);
+	// texel.rgb -= (1.0 - texel.rgb) * (1.0 - fog_color) * max(fog_factor, 0.0);
 
 	// Second multiplicative fade???
 	texel.rgb *= mix(vec3(1.0), fog_color * fog_factor, fog_factor * u_fog_transparency);

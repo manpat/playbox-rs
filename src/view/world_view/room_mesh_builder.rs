@@ -131,6 +131,7 @@ impl RoomMeshBuilder<'_> {
 				w.to_x0y() + Vec3::from_y(connection.height_difference)
 			]);
 
+			// TODO(pat.m): recurse into all rooms touched by light
 			for object in self.processed_world.objects_in_room(target_room, self.world) {
 				let Some(light) = object.as_light() else { continue };
 
