@@ -2,6 +2,7 @@
 in Vertex {
 	vec4 v_color;
 	vec2 v_uv;
+	vec3 v_local_pos;
 	flat uint v_texture_index;
 };
 
@@ -21,6 +22,21 @@ layout(binding=0) uniform sampler2DArray u_texture;
 // 	TextureData s_textures[];
 // };
 
+struct Light {
+	vec3 local_pos;
+	float power;
+	vec3 color;
+	float _pad;
+};
+
+layout(binding=2) readonly buffer RoomInfo {
+	uint u_first_light;
+	uint u_num_lights;
+};
+
+layout(binding=3) readonly buffer LightInfo {
+	Light s_lights[];
+};
 
 // https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83
 float hash(float n) { return fract(sin(n) * 1e4); }
@@ -44,5 +60,17 @@ void main() {
 		o_color = texelFetch(u_texture, ivec3(texel_coord, real_texture_index), 0) * v_color;
 	} else {
 		o_color = v_color;
+	}
+
+	// Collect lighting
+	for (uint light_idx = u_first_light; light_idx < u_first_light + u_num_lights; light_idx++) {
+		Light light = s_lights[light_idx];
+
+		float attenuation = max(light.power - length(light.local_pos - v_local_pos), 0.0);
+
+		attenuation = floor(attenuation*4.0)/4.0;
+		attenuation *= attenuation;
+
+		o_color.rgb += light.color * attenuation;
 	}
 }

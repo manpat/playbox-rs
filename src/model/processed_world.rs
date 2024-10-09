@@ -6,6 +6,8 @@ use model::*;
 #[derive(Debug)]
 pub struct ProcessedWorld {
 	wall_infos: HashMap<WallId, WallInfo>,
+	room_infos: Vec<RoomInfo>,
+
 	active_objects: Vec<usize>,
 
 	world_change_sub: Subscription<WorldChangedEvent>,
@@ -15,6 +17,7 @@ impl ProcessedWorld {
 	pub fn new(world: &World, message_bus: &MessageBus) -> Self {
 		let mut this = Self {
 			wall_infos: HashMap::default(),
+			room_infos: Vec::new(),
 
 			// TODO(pat.m): some objects might be disabled on first spawn - this should take ProgressModel into account
 			active_objects: (0..world.objects.len()).collect(),
@@ -36,9 +39,37 @@ impl ProcessedWorld {
 		self.wall_infos.get(&wall_id)
 	}
 
+	pub fn room_info(&self, room_index: usize) -> Option<&RoomInfo> {
+		self.room_infos.get(room_index)
+	}
+
 	pub fn connection_info(&self, wall_id: WallId) -> Option<&ConnectionInfo> {
 		self.wall_infos.get(&wall_id)
 			.and_then(|wall| wall.connection_info.as_ref())
+	}
+
+	pub fn connections_for_room(&self, room_index: usize) -> impl Iterator<Item=&'_ ConnectionInfo> + '_ {
+		let connecting_walls = match self.room_info(room_index) {
+			Some(info) => info.connecting_walls.as_slice(),
+			None => &[]
+		};
+
+		connecting_walls.into_iter()
+			.filter_map(move |&wall_index| self.connection_info(WallId{room_index, wall_index}))
+	}
+
+	pub fn object_indices_for_room(&self, room_index: usize) -> impl Iterator<Item=usize> + '_ {
+		let object_indices = match self.room_info(room_index) {
+			Some(info) => info.object_indices.as_slice(),
+			None => &[]
+		};
+
+		object_indices.iter().cloned()
+	}
+
+	pub fn objects_in_room<'w, 's: 'w>(&'s self, room_index: usize, world: &'w World) -> impl Iterator<Item=&'w Object> + 'w {
+		self.object_indices_for_room(room_index)
+			.map(move |idx| &world.objects[idx])
 	}
 
 	pub fn is_object_active(&self, object_index: usize) -> bool {
@@ -46,13 +77,21 @@ impl ProcessedWorld {
 	}
 
 	fn rebuild_world(&mut self, world: &World) {
+		self.room_infos.clear();
 		self.wall_infos.clear();
 
 		for (room_index, room) in world.rooms.iter().enumerate() {
+			let mut connecting_walls = Vec::new();
+
+			// Collect walls
 			for wall_index in 0..room.walls.len() {
 				let wall_id = WallId{room_index, wall_index};
 				let connection_info = world.wall_target(wall_id)
 					.map(|target_id| ConnectionInfo::new(world, wall_id, target_id));
+
+				if connection_info.is_some() {
+					connecting_walls.push(wall_index);
+				}
 
 				let direction = world.wall_vector(wall_id).normalize();
 				let normal = direction.perp();
@@ -64,6 +103,17 @@ impl ProcessedWorld {
 
 				self.wall_infos.insert(wall_id, wall_info);
 			}
+
+			// Collect objects
+			let object_indices = world.objects.iter().enumerate()
+				.filter(|(_, o)| o.placement.room_index == room_index)
+				.map(|(index, _)| index)
+				.collect();
+
+			self.room_infos.push(RoomInfo {
+				object_indices,
+				connecting_walls,
+			});
 		}
 	}
 }
@@ -155,4 +205,12 @@ impl ConnectionInfo {
 			height_difference: vertical_offset,
 		}
 	}
+}
+
+
+
+#[derive(Default, Debug)]
+pub struct RoomInfo {
+	pub object_indices: Vec<usize>,
+	pub connecting_walls: Vec<usize>,
 }

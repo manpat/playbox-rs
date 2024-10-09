@@ -16,6 +16,7 @@ pub struct WorldView {
 	room_mesh_infos: Vec<RoomMeshInfo>,
 	vbo: gfx::BufferName,
 	ebo: gfx::BufferName,
+	light_buffer: gfx::BufferName,
 
 	v_shader: gfx::ShaderHandle,
 	f_shader: gfx::ShaderHandle,
@@ -30,25 +31,20 @@ pub struct WorldView {
 
 impl WorldView {
 	pub fn new(gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld, message_bus: MessageBus) -> anyhow::Result<Self> {
-		let mut room_builder = RoomMeshBuilder::new(world, processed_world);
-		let mut room_mesh_infos = Vec::new();
-
-		for room_idx in 0..world.rooms.len() {
-			let info = room_builder.build_room(room_idx);
-			room_mesh_infos.push(info);
-		}
-
 		let vbo = gfx.core.create_buffer();
 		let ebo = gfx.core.create_buffer();
+		let light_buffer = gfx.core.create_buffer();
 
 		gfx.core.set_debug_label(vbo, "Room vertex buffer");
 		gfx.core.set_debug_label(ebo, "Room index buffer");
+		gfx.core.set_debug_label(light_buffer, "Room light buffer");
 
-		room_builder.upload(gfx, vbo, ebo);
+		let room_mesh_infos = build_room_buffers(gfx, world, processed_world, vbo, ebo, light_buffer);
 
 		Ok(Self {
 			room_mesh_infos,
 			vbo, ebo,
+			light_buffer,
 
 			v_shader: gfx.resource_manager.load_vertex_shader("shaders/room.vs.glsl"),
 			f_shader: gfx.resource_manager.load_fragment_shader("shaders/room.fs.glsl"),
@@ -77,25 +73,19 @@ impl WorldView {
 		// 	using wall intersection to calculate a frustum to cull by
 
 		if self.message_bus.any(&self.change_subscription) {
-			let mut room_builder = RoomMeshBuilder::new(world, processed_world);
-
-			self.room_mesh_infos.clear();
-
-			for room_idx in 0..world.rooms.len() {
-				let info = room_builder.build_room(room_idx);
-				self.room_mesh_infos.push(info);
-			}
-
 			gfx.core.destroy_buffer(self.vbo);
 			gfx.core.destroy_buffer(self.ebo);
+			gfx.core.destroy_buffer(self.light_buffer);
 
 			self.vbo = gfx.core.create_buffer();
 			self.ebo = gfx.core.create_buffer();
+			self.light_buffer = gfx.core.create_buffer();
 
 			gfx.core.set_debug_label(self.vbo, "Room vertex buffer");
 			gfx.core.set_debug_label(self.ebo, "Room index buffer");
+			gfx.core.set_debug_label(self.light_buffer, "Room light buffer");
 
-			room_builder.upload(gfx, self.vbo, self.ebo);
+			self.room_mesh_infos = build_room_buffers(gfx, world, processed_world, self.vbo, self.ebo, self.light_buffer);
 		}
 
 
@@ -150,6 +140,11 @@ impl WorldView {
 
 			group.draw(self.v_shader, self.f_shader)
 				.elements(room_mesh.num_elements)
+				.indexed(self.ebo.with_offset_size(
+					room_mesh.base_index * index_size,
+					room_mesh.num_elements * index_size
+				))
+				.base_vertex(room_mesh.base_vertex)
 				.sampled_image(0, self.texture, gfx::CommonSampler::NearestRepeat)
 				.ssbo(0, self.vbo)
 				.ubo(1, &[RoomUniforms {
@@ -158,11 +153,8 @@ impl WorldView {
 					plane_1,
 					plane_2,
 				}])
-				.indexed(self.ebo.with_offset_size(
-					room_mesh.base_index * index_size,
-					room_mesh.num_elements * index_size
-				))
-				.base_vertex(room_mesh.base_vertex);
+				.ssbo(2, &[room_mesh.base_light, room_mesh.num_lights])
+				.ssbo(3, self.light_buffer);
 		}
 	}
 
@@ -314,4 +306,23 @@ struct RoomInstance {
 	room_to_world: Mat2x3,
 	height_offset: f32,
 	clip_by: Option<ClipState>,
+}
+
+
+
+fn build_room_buffers(gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld,
+	vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) -> Vec<RoomMeshInfo>
+{
+	let mut room_builder = RoomMeshBuilder::new(world, processed_world);
+
+	let mut room_mesh_infos = Vec::new();
+
+	for room_idx in 0..world.rooms.len() {
+		let info = room_builder.build_room(room_idx);
+		room_mesh_infos.push(info);
+	}
+
+	room_builder.upload(gfx, vbo, ebo, light_buffer);
+
+	room_mesh_infos
 }

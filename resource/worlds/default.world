@@ -1249,8 +1249,8 @@
       "name": "Debug Object",
       "room_index": 7,
       "position": [
-        0.09097204,
-        1.4294497
+        0.047403675,
+        1.4424746
       ],
       "yaw": 2.6829772,
       "info": {
@@ -1294,6 +1294,46 @@
         "target_world": "world2",
         "target_object": "ladder"
       }
+    },
+    {
+      "name": "light",
+      "room_index": 1,
+      "position": [
+        1.6427529,
+        0.22056264
+      ],
+      "yaw": -1.6022112,
+      "info": {
+        "kind": "Light",
+        "color": {
+          "r": 0.10689913,
+          "g": 0.6603865,
+          "b": 0.062370867,
+          "a": 1.0
+        },
+        "height": 0.9,
+        "power": 4.0
+      }
+    },
+    {
+      "name": "light",
+      "room_index": 7,
+      "position": [
+        0.067901336,
+        1.476799
+      ],
+      "yaw": -0.5224019,
+      "info": {
+        "kind": "Light",
+        "color": {
+          "r": 0.9474466,
+          "g": 0.17308396,
+          "b": 0.59322,
+          "a": 1.0
+        },
+        "height": 0.35,
+        "power": 1.2
+      }
     }
   ],
   "player_spawn": {
@@ -1306,14 +1346,14 @@
   },
   "fog": {
     "color": {
-      "r": 0.1773557,
-      "g": 0.104478665,
-      "b": 0.0,
+      "r": 0.051802203,
+      "g": 0.041978598,
+      "b": 0.027895194,
       "a": 1.0
     },
     "start": 0.0,
-    "distance": 25.0,
-    "emission": 0.3666265,
-    "transparency": 1.0
+    "distance": 11.0,
+    "emission": 0.0,
+    "transparency": 0.0
   }
 }

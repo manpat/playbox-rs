@@ -6,6 +6,18 @@ pub struct RoomMeshInfo {
 	pub base_vertex: u32,
 	pub base_index: u32,
 	pub num_elements: u32,
+
+	pub base_light: u32,
+	pub num_lights: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct RoomLight {
+	pub local_pos: Vec3,
+	pub power: f32,
+	pub color: Vec3,
+	pub _pad: f32,
 }
 
 pub struct RoomMeshBuilder<'w> {
@@ -15,6 +27,8 @@ pub struct RoomMeshBuilder<'w> {
 	indices: Vec<u32>,
 	base_vertex: u32,
 	current_texture_index: u32,
+
+	lights: Vec<RoomLight>,
 }
 
 impl<'w> RoomMeshBuilder<'w> {
@@ -26,6 +40,8 @@ impl<'w> RoomMeshBuilder<'w> {
 			indices: Vec::new(),
 			base_vertex: 0,
 			current_texture_index: 0,
+
+			lights: Vec::new(),
 		}
 	}
 
@@ -33,10 +49,11 @@ impl<'w> RoomMeshBuilder<'w> {
 		self.current_texture_index = texture_index;
 	}
 
-	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName) {
+	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) {
 		gfx.core.upload_immutable_buffer_immediate(vbo, &self.vertices);
 		gfx.core.upload_immutable_buffer_immediate(ebo, &self.indices);
-		gfx.core.debug_marker("Uploaded Room Vertices");
+		gfx.core.upload_immutable_buffer_immediate(light_buffer, &self.lights);
+		gfx.core.debug_marker("Uploaded Room Data");
 	}
 }
 
@@ -95,16 +112,26 @@ impl RoomMeshBuilder<'_> {
 		}
 
 		// Objects
+		let base_light = self.lights.len() as u32;
+
 		self.set_texture_index(0);
-		for object in self.world.objects.iter()
-			.filter(|o| o.placement.room_index == room_index)
-		{
+		for object in self.processed_world.objects_in_room(room_index, self.world) {
 			self.build_object(object);
 		}
 
+		// TODO(pat.m): check neighboring rooms for nearby lights
+
+		let num_lights = self.lights.len() as u32 - base_light;
 		let num_elements = self.indices.len() as u32 - base_index;
 
-		RoomMeshInfo {base_vertex: self.base_vertex, base_index, num_elements}
+		RoomMeshInfo {
+			base_vertex: self.base_vertex,
+			base_index,
+			num_elements,
+
+			base_light,
+			num_lights,
+		}
 	}
 
 	pub fn build_wall(&mut self, wall_id: WallId) {
@@ -270,9 +297,17 @@ impl RoomMeshBuilder<'_> {
 				self.add_convex_untextured(verts, Color::grey(0.02));
 			}
 
+			&ObjectInfo::Light{color, height, power} => {
+				self.lights.push(RoomLight {
+					local_pos: object.placement.position.to_xny(height),
+					power,
+					color: color.into(),
+					_pad: 0.0,
+				});
+			}
+
 			_ => {}
 		}
-
 	}
 }
 

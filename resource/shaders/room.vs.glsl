@@ -27,6 +27,7 @@ layout(binding=0) readonly buffer V {
 out OutVertex {
 	vec4 v_color;
 	vec2 v_uv;
+	vec3 v_local_pos;
 	flat uint v_texture_index;
 };
 
@@ -40,6 +41,8 @@ void main() {
 	gl_ClipDistance[1] = dot(u_plane_1.xyz, vertex.pos) - u_plane_1.w;
 	gl_ClipDistance[2] = dot(u_plane_2.xyz, vertex.pos) - u_plane_2.w;
 	gl_ClipDistance[3] = 1.0;
+
+	v_local_pos = vertex.pos;
 
 	v_color = vec4(
 		unpackUnorm2x16(vertex.color_packed.x),

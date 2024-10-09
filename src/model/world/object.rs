@@ -36,6 +36,12 @@ pub enum ObjectInfo {
 		target_object: String,
 	},
 
+	Light {
+		color: Color,
+		height: f32,
+		power: f32,
+	},
+
 	Chest {
 		// content: Item,
 	},
