@@ -205,11 +205,11 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 			let object = model::Object {
 				name: "light".to_string(),
 				placement: ctx.model.player.placement,
-				info: model::ObjectInfo::Light {
+				info: model::ObjectInfo::Light(LightObject{
 					color: Color::white(),
 					height: 0.5,
 					power: 1.0,
-				},
+				}),
 			};
 
 			ctx.message_bus.emit(EditorWorldEditCmd::AddObject(object));
@@ -388,7 +388,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 			}
 		}
 
-		&ObjectInfo::Light{color, height, power} => {
+		&ObjectInfo::Light(LightObject{color, height, power}) => {
 			ui.separator();
 
 			ui.horizontal(|ui| {
@@ -397,7 +397,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 				let mut light_color = color;
 				if ui.color_edit_button_rgb(light_color.as_mut()).changed() {
 					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
-						if let ObjectInfo::Light{color, ..} = &mut object.info {
+						if let Some(LightObject{color, ..}) = object.as_light_mut() {
 							*color = light_color;
 						}
 					}));
@@ -410,7 +410,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 				let mut new_height = height;
 				if ui.add(Slider::new(&mut new_height, 0.0..=5.0).step_by(0.01)).changed() {
 					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
-						if let ObjectInfo::Light{height, ..} = &mut object.info {
+						if let Some(LightObject{height, ..}) = object.as_light_mut() {
 							*height = new_height;
 						}
 					}));
@@ -423,7 +423,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 				let mut new_power = power;
 				if ui.add(Slider::new(&mut new_power, 0.0..=10.0).step_by(0.01).logarithmic(true)).changed() {
 					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
-						if let ObjectInfo::Light{power, ..} = &mut object.info {
+						if let Some(LightObject{power, ..}) = object.as_light_mut() {
 							*power = new_power;
 						}
 					}));

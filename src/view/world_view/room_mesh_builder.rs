@@ -119,6 +119,30 @@ impl RoomMeshBuilder<'_> {
 			self.build_object(object);
 		}
 
+		// Lights in neighboring rooms
+		for connection in self.processed_world.connections_for_room(room_index) {
+			let target_room = connection.target_id.room_index;
+
+			let [x,z,w] = connection.target_to_source.columns();
+			let transform = Mat3x4::from_columns([
+				x.to_x0y(),
+				Vec3::from_y(1.0),
+				z.to_x0y(),
+				w.to_x0y() + Vec3::from_y(connection.height_difference)
+			]);
+
+			for object in self.processed_world.objects_in_room(target_room, self.world) {
+				let Some(light) = object.as_light() else { continue };
+
+				self.lights.push(RoomLight {
+					local_pos: transform * object.placement.position.to_xny(light.height),
+					power: light.power,
+					color: light.color.into(),
+					_pad: 0.0,
+				});
+			}
+		}
+
 		// TODO(pat.m): check neighboring rooms for nearby lights
 
 		let num_lights = self.lights.len() as u32 - base_light;
@@ -297,7 +321,7 @@ impl RoomMeshBuilder<'_> {
 				self.add_convex_untextured(verts, Color::grey(0.02));
 			}
 
-			&ObjectInfo::Light{color, height, power} => {
+			&ObjectInfo::Light(LightObject{color, height, power}) => {
 				self.lights.push(RoomLight {
 					local_pos: object.placement.position.to_xny(height),
 					power,

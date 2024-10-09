@@ -36,15 +36,35 @@ pub enum ObjectInfo {
 		target_object: String,
 	},
 
-	Light {
-		color: Color,
-		height: f32,
-		power: f32,
-	},
+	Light(LightObject),
 
 	Chest {
 		// content: Item,
 	},
 
 	Npc,
+}
+
+impl Object {
+	pub fn as_light(&self) -> Option<&LightObject> {
+		match &self.info {
+			ObjectInfo::Light(light) => Some(light),
+			_ => None
+		}
+	}
+
+	pub fn as_light_mut(&mut self) -> Option<&mut LightObject> {
+		match &mut self.info {
+			ObjectInfo::Light(light) => Some(light),
+			_ => None
+		}
+	}
+}
+
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LightObject {
+	pub color: Color,
+	pub height: f32,
+	pub power: f32,
 }
