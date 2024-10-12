@@ -104,9 +104,9 @@ impl App {
 		let mut active_scene = ActiveScene::MainMenu;
 		let mut game_scene = None;
 
-		if true /*ctx.cfg.read_bool("skip-main-menu")*/ {
+		if let Some(world_name) = ctx.cfg.get_string("start.load-world") {
 			active_scene = ActiveScene::Game;
-			let world = Self::load_world_or_default(&ctx.vfs, "worlds/default.world");
+			let world = Self::load_world_or_default(&ctx.vfs, world_name);
 			game_scene = Some(GameScene::new(ctx, world)?);
 		}
 
@@ -122,13 +122,14 @@ impl App {
 		})
 	}
 
-	fn load_world_or_default(vfs: &vfs::Vfs, path: impl AsRef<std::path::Path>) -> model::World {
-		let path = path.as_ref();
+	fn load_world_or_default(vfs: &vfs::Vfs, world_name: impl AsRef<str>) -> model::World {
+		let world_name = world_name.as_ref();
+		let path = format!("worlds/{world_name}.world");
 
 		match vfs.load_json_resource(path) {
 			Ok(world) => world,
 			Err(err) => {
-				log::error!("Failed to load world at '{}', creating empty world. {err}", path.display());
+				log::error!("Failed to load world '{world_name}', creating empty world. {err}");
 				model::World::new()
 			},
 		}
@@ -182,7 +183,7 @@ impl toybox::App for App {
 		for menu_msg in message_bus.poll_consume(&self.menu_cmd_subscription) {
 			match menu_msg {
 				MenuCmd::Play(world_name) => {
-					let world = Self::load_world_or_default(&ctx.vfs, format!("worlds/{world_name}.world"));
+					let world = Self::load_world_or_default(&ctx.vfs, world_name);
 					let ctx = &mut Context::new(ctx, &mut self.shared);
 
 					// Reuse scene if we can, to avoid reloading common stuff
