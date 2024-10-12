@@ -132,49 +132,48 @@ fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
 	});
 
 	let mut fog = ctx.model.world.fog;
+	let mut changed = false;
 
-	ui.horizontal(|ui| {
+	egui::Grid::new("world_settings").show(ui, |ui| {
 		ui.label("Fog Color");
+		changed |= ui.color_edit_button_rgb(fog.color.as_mut()).changed();
 
-		if ui.color_edit_button_rgb(fog.color.as_mut()).changed() {
-			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
-		}
-	});
+		ui.end_row();
 
-	ui.horizontal(|ui| {
 		ui.label("Fog Start");
+		changed |= slider_widget(ui, &mut fog.start, 0.0..=5.0);
+		ui.end_row();
 
-		if ui.add(Slider::new(&mut fog.start, 0.0..=5.0)).changed() {
-			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
-		}
-	});
-
-	ui.horizontal(|ui| {
 		ui.label("Fog Distance");
+		changed |= log_slider_widget(ui, &mut fog.distance, 1.0..=300.0);
+		ui.end_row();
 
-		if ui.add(Slider::new(&mut fog.distance, 1.0..=300.0).logarithmic(true)).changed() {
-			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
-		}
-	});
-
-	ui.horizontal(|ui| {
 		ui.label("Fog Emission");
-
 		let mut emission_non_linear = (fog.emission * 2.0 + 1.0).ln();
-		if ui.add(Slider::new(&mut emission_non_linear, 0.0..=1.0)).changed() {
-			fog.emission = (emission_non_linear.exp() - 1.0) / 2.0;
-			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
-		}
-	});
+		changed |= slider_widget(ui, &mut emission_non_linear, 0.0..=1.0);
+		fog.emission = (emission_non_linear.exp() - 1.0) / 2.0;
+		ui.end_row();
 
-	ui.horizontal(|ui| {
 		ui.label("Fog Transparency");
-
-		if ui.add(Slider::new(&mut fog.transparency, 0.0..=1.0)).changed() {
-			ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
-		}
+		changed |= slider_widget(ui, &mut fog.transparency, 0.0..=1.0);
+		ui.end_row();
 	});
+
+	if changed {
+		ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
+	}
+	
+	use egui::emath::Numeric;
+
+	fn slider_widget<N: Numeric>(ui: &mut egui::Ui, value: &mut N, range: std::ops::RangeInclusive<N>) -> bool {
+		ui.add(Slider::new(value, range)).changed()
+	}
+
+	fn log_slider_widget<N: Numeric>(ui: &mut egui::Ui, value: &mut N, range: std::ops::RangeInclusive<N>) -> bool {
+		ui.add(Slider::new(value, range).logarithmic(true)).changed()
+	}
 }
+
 
 fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 	ui.horizontal(|ui| {
