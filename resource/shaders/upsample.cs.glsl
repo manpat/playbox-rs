@@ -37,7 +37,7 @@ void main() {
 
 	vec3 downsampled_mip = texture(u_downsampled_mip, uv).rgb;
 
-	color = mix(color, downsampled_mip, 0.1);
+	color = mix(color, downsampled_mip, 0.5);
 
 	imageStore(u_target_mip, texel_coord, vec4(color, 1.0));
 }

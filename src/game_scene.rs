@@ -6,6 +6,7 @@ pub struct GameScene {
 
 	downsample_shader: gfx::ShaderHandle,
 	upsample_shader: gfx::ShaderHandle,
+	bloom_shader: gfx::ShaderHandle,
 
 	downsample_chain: Vec<gfx::ImageHandle>,
 	upsample_chain: Vec<gfx::ImageHandle>,
@@ -45,7 +46,7 @@ impl GameScene {
 		let mut downsample_chain = Vec::new();
 		let mut upsample_chain = Vec::new();
 
-		let num_mips = 4;
+		let num_mips = 5;
 
 		for mip in 0..num_mips + 1 {
 			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
@@ -80,6 +81,7 @@ impl GameScene {
 
 			downsample_shader: resource_manager.load_compute_shader("shaders/downsample.cs.glsl"),
 			upsample_shader: resource_manager.load_compute_shader("shaders/upsample.cs.glsl"),
+			bloom_shader: resource_manager.load_compute_shader("shaders/bloom.cs.glsl"),
 
 			hdr_color_rt,
 			depth_rt,
@@ -245,9 +247,9 @@ impl GameScene {
 
 
 		// Apply bloom
-		let mut source_mip = self.hdr_color_rt;
-
 		{
+			let mut source_mip = self.hdr_color_rt;
+
 			group.debug_marker("Downsample");
 			for &target_mip in self.downsample_chain.iter() {
 				group.compute(self.downsample_shader)
@@ -268,6 +270,12 @@ impl GameScene {
 
 				source_mip = target_mip;
 			}
+
+			group.debug_marker("Composite");
+			group.compute(self.bloom_shader)
+				.sampled_image(0, source_mip, gfx::CommonSampler::Linear)
+				.image_rw(1, self.hdr_color_rt)
+				.groups_from_image_size(self.hdr_color_rt);
 		}
 
 
@@ -297,15 +305,15 @@ impl GameScene {
 
 		// Tonemap, gamma correct and dither.
 		group.compute(self.hdr_to_ldr_shader)
-			.image(0, source_mip)
+			.image(0, self.hdr_color_rt)
 			.image_rw(1, self.ldr_color_image)
 			.ssbo(0, &[ToneMapParameters {
 				dither_time: self.time,
 				// dither_quantise: 256.0,
 				dither_quantise: 128.0,
 
-				tonemap_contrast: 1.5,
-				tonemap_exposure: 2.0,
+				tonemap_contrast: 2.0,
+				tonemap_exposure: 1.0,
 
 				tonemap_algorithm: ToneMapAlgorithm::AcesFilmic,
 			}])
