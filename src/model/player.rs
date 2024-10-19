@@ -38,7 +38,7 @@ impl Player {
 
 		if hud.in_dialog {
 			if interact_pressed {
-				ctx.message_bus.emit(model::HudCmd::DismissDialog);
+				ctx.bus.emit(model::HudCmd::DismissDialog);
 			}
 
 			return;
@@ -53,7 +53,7 @@ impl Player {
 		}
 
 		if interact_pressed {
-			ctx.message_bus.emit(PlayerCmd::Interact);
+			ctx.bus.emit(PlayerCmd::Interact);
 		}
 
 		let forward_pressed = ctx.input.button_down(input::keys::KeyW);

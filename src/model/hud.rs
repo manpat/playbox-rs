@@ -27,15 +27,15 @@ pub struct HudModel {
 }
 
 impl HudModel {
-	pub fn new(message_bus: &MessageBus) -> Self {
+	pub fn new(bus: &MessageBus) -> Self {
 		HudModel {
 			in_dialog: false,
 			hud_text: None,
-			hud_cmd: message_bus.subscribe(),
+			hud_cmd: bus.subscribe(),
 		}
 	}
 
-	pub fn update(&mut self, message_bus: &MessageBus) {
+	pub fn update(&mut self, bus: &MessageBus) {
 		if let Some(hud_text) = &mut self.hud_text {
 			hud_text.elapsed_visible_time += 1.0 / 60.0;
 			if hud_text.elapsed_visible_time > HUD_TEXT_SHOW_TIME {
@@ -43,7 +43,7 @@ impl HudModel {
 			}
 		}
 
-		for msg in message_bus.poll_consume(&self.hud_cmd) {
+		for msg in bus.poll_consume(&self.hud_cmd) {
 			match msg {
 				HudCmd::DismissDialog => {
 					self.in_dialog = false;
@@ -61,7 +61,7 @@ impl HudModel {
 				}
 
 				HudCmd::TransitionWorld{world_name, ..} => {
-					message_bus.emit(MenuCmd::Play(world_name));
+					bus.emit(MenuCmd::Play(world_name));
 				}
 			}
 		}
@@ -85,7 +85,7 @@ pub struct HudText {
 
 pub fn handle_hud_commands(ctx: &mut Context, _model: &Model) -> anyhow::Result<()> {
 	if let Some(text) = ctx.console.command("hudtext") {
-		ctx.message_bus.emit(HudCmd::ShowText(text));
+		ctx.bus.emit(HudCmd::ShowText(text));
 	}
 
 	Ok(())

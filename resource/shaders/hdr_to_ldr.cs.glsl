@@ -65,6 +65,8 @@ void main() {
 	color = exp(log_color);
 
 	color = max(color, 0.0) * u_tonemap_exposure;
+	
+	// https://gpuopen.com/wp-content/uploads/2016/03/GdcVdrLottes.pdf
 
 	// Tonemap
 	switch (u_tonemap_algorithm) {

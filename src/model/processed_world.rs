@@ -48,7 +48,7 @@ impl ProcessedWorld {
 			.and_then(|wall| wall.connection_info.as_ref())
 	}
 
-	pub fn connections_for_room(&self, room_index: usize) -> impl Iterator<Item=&'_ ConnectionInfo> + '_ {
+	pub fn connections_for_room(&self, room_index: usize) -> impl Iterator<Item=&'_ ConnectionInfo> + use<'_> {
 		let connecting_walls = match self.room_info(room_index) {
 			Some(info) => info.connecting_walls.as_slice(),
 			None => &[]
@@ -58,7 +58,7 @@ impl ProcessedWorld {
 			.filter_map(move |&wall_index| self.connection_info(WallId{room_index, wall_index}))
 	}
 
-	pub fn object_indices_for_room(&self, room_index: usize) -> impl Iterator<Item=usize> + '_ {
+	pub fn object_indices_for_room(&self, room_index: usize) -> impl Iterator<Item=usize> + use<'_> {
 		let object_indices = match self.room_info(room_index) {
 			Some(info) => info.object_indices.as_slice(),
 			None => &[]
@@ -67,7 +67,7 @@ impl ProcessedWorld {
 		object_indices.iter().cloned()
 	}
 
-	pub fn objects_in_room<'w, 's: 'w>(&'s self, room_index: usize, world: &'w World) -> impl Iterator<Item=&'w Object> + 'w {
+	pub fn objects_in_room<'w, 's>(&'s self, room_index: usize, world: &'w World) -> impl Iterator<Item=&'w Object> + use<'s, 'w> {
 		self.object_indices_for_room(room_index)
 			.map(move |idx| &world.objects[idx])
 	}

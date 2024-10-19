@@ -2,8 +2,10 @@ use toybox::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+mod sfx;
+mod music;
 
-#[derive(Clone)]
+
 pub struct MyAudioSystem {
 	control: Arc<Control>,
 }
@@ -15,8 +17,8 @@ impl MyAudioSystem {
 		let provider = MyAudioProvider {
 			control: control.clone(),
 
-			music: MusicProvider::default(),
-			sfx: SfxProvider::new(),
+			music: music::MusicProvider::default(),
+			sfx: sfx::SfxProvider::new(),
 		};
 
 		audio.set_provider(provider)?;
@@ -54,16 +56,20 @@ impl Control {
 struct MyAudioProvider {
 	control: Arc<Control>,
 
-	music: MusicProvider,
-	sfx: SfxProvider,
+	music: music::MusicProvider,
+	sfx: sfx::SfxProvider,
 }
 
 impl audio::Provider for MyAudioProvider {
 	fn on_configuration_changed(&mut self, config: Option<audio::Configuration>) {
 		let Some(config) = config else { return };
 
-		self.sfx.sample_dt = 1.0/config.sample_rate as f64;
-		log::info!("Configuration change! dt = {}", self.sfx.sample_dt);
+		let sample_dt = 1.0/config.sample_rate as f64;
+
+		self.sfx.sample_dt = sample_dt;
+		self.music.sample_dt = sample_dt;
+
+		log::info!("Configuration change! dt = {sample_dt}");
 
 		assert!(config.channels == 2);
 	}
@@ -73,77 +79,11 @@ impl audio::Provider for MyAudioProvider {
 
 		self.sfx.update(&self.control);
 		self.sfx.fill(buffer);
-	}
-}
 
+		self.music.update(&self.control);
+		self.music.fill(buffer);
 
-#[derive(Default)]
-struct MusicProvider {}
-
-struct SfxProvider {
-	target_volume: f32,
-	volume: f32,
-
-	sample_dt: f64,
-
-	osc_phase: f64,
-	env_phase: f64,
-}
-
-impl SfxProvider {
-	fn new() -> Self {
-		Self {
-			// TODO(pat.m): not db - too weird
-			target_volume: linear_to_db(0.3),
-			volume: linear_to_db(DC_OFFSET),
-
-			sample_dt: 0.0,
-			osc_phase: 0.0,
-			env_phase: 1.0,
-		}
-	}
-
-	fn update(&mut self, ctl: &Control) {
-		if ctl.trigger_sfx.fetch_and(false, Ordering::Relaxed) {
-			self.env_phase = 0.0;
-		}
-
-		self.target_volume = ctl.sfx_volume.load(Ordering::Relaxed);
-	}
-
-	fn fill(&mut self, buffer: &mut [f32]) {
-		let mut osc_phase = self.osc_phase * 110.0 * std::f64::consts::TAU;
-		let osc_dt = self.sample_dt * 110.0 * std::f64::consts::TAU;
-
-		let mut gain = db_to_linear(self.volume);
-
-		for frame in buffer.chunks_exact_mut(2) {
-			if self.volume != self.target_volume {
-				let diff = self.target_volume - self.volume;
-
-				self.volume += diff * self.sample_dt as f32 * 100.0;
-
-				if diff.abs() < 0.1 {
-					self.volume = self.target_volume;
-				}
-
-				gain = db_to_linear(self.volume);
-			}
-
-			let osc = osc_phase.sin();
-			let amp = (1.0 - self.env_phase).max(0.0).powi(2) * gain as f64;
-
-			let value = (amp * osc) as f32;
-
-			frame[0] += value;
-			frame[1] += value;
-
-			self.osc_phase += self.sample_dt;
-			self.env_phase += self.sample_dt * 2.0;
-			osc_phase += osc_dt;
-		}
-
-		self.osc_phase %= std::f64::consts::TAU;
+		// TODO(pat.m): compress/limit
 	}
 }
 

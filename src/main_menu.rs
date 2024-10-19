@@ -41,11 +41,11 @@ impl MainMenuScene {
 
 		if builder.button("Play") || ctx.input.button_just_down(input::keys::Space) {
 			ctx.audio.trigger();
-			ctx.message_bus.emit(MenuCmd::Play("default".into()));
+			ctx.bus.emit(MenuCmd::Play("default".into()));
 		}
 
 		if builder.button("Settings") {
-			// ctx.message_bus.emit(MenuCmd::Settings);
+			// ctx.bus.emit(MenuCmd::Settings);
 		}
 
 		{
@@ -60,7 +60,7 @@ impl MainMenuScene {
 
 
 		if builder.button("Quit") {
-			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
+			ctx.bus.emit(MenuCmd::QuitToDesktop);
 		}
 
 		self.painter.submit(&mut ctx.gfx, ctx.ui_shared, screen_rect);
@@ -114,15 +114,15 @@ impl PauseMenuScene {
 		builder.input_scale_factor = scale_factor;
 
 		if builder.button("Resume") || ctx.input.button_just_down(input::keys::Escape) {
-			ctx.message_bus.emit(MenuCmd::Resume);
+			ctx.bus.emit(MenuCmd::Resume);
 		}
 
 		if builder.button("Quit To Menu") {
-			ctx.message_bus.emit(MenuCmd::QuitToMain);
+			ctx.bus.emit(MenuCmd::QuitToMain);
 		}
 
 		if builder.button("Quit To Desktop") {
-			ctx.message_bus.emit(MenuCmd::QuitToDesktop);
+			ctx.bus.emit(MenuCmd::QuitToDesktop);
 		}
 
 		self.painter.submit(&mut ctx.gfx, ctx.ui_shared, screen_rect);

@@ -22,8 +22,6 @@ pub struct GameScene {
 	world_view: view::WorldView,
 	hud_view: view::HudView,
 
-	message_bus: MessageBus,
-
 	model: model::Model,
 
 	time: f32,
@@ -73,7 +71,7 @@ impl GameScene {
 		// 	toy_renderer
 		// };
 
-		let processed_world = model::ProcessedWorld::new(&world, &ctx.message_bus);
+		let processed_world = model::ProcessedWorld::new(&world, &ctx.bus);
 
 		Ok(GameScene {
 			fog_shader: resource_manager.load_compute_shader("shaders/fog.cs.glsl"),
@@ -93,10 +91,8 @@ impl GameScene {
 
 			// toy_renderer,
 			// sprites: Sprites::new(&mut ctx.gfx)?,
-			world_view: view::WorldView::new(&mut ctx.gfx, &world, &processed_world, ctx.message_bus.clone())?,
-			hud_view: view::HudView::new(&mut ctx.gfx, ctx.message_bus.clone())?,
-
-			message_bus: ctx.message_bus.clone(),
+			world_view: view::WorldView::new(&mut ctx.gfx, &world, &processed_world, ctx.bus.clone())?,
+			hud_view: view::HudView::new(&mut ctx.gfx, ctx.bus.clone())?,
 
 			model: model::Model {
 				player: model::Player {
@@ -112,9 +108,9 @@ impl GameScene {
 					hack_height_change: None,
 				},
 
-				interactions: model::Interactions::new(ctx.message_bus),
-				environment: model::EnvironmentModel::new(&world, ctx.message_bus),
-				hud: model::HudModel::new(ctx.message_bus),
+				interactions: model::Interactions::new(ctx.bus),
+				environment: model::EnvironmentModel::new(&world, ctx.bus),
+				hud: model::HudModel::new(ctx.bus),
 				processed_world,
 
 				progress: model::ProgressModel::default(),
@@ -125,15 +121,15 @@ impl GameScene {
 			time: 0.0,
 			height_offset: 0.0,
 
-			editor_state: editor::State::new(ctx.message_bus),
+			editor_state: editor::State::new(ctx.bus),
 			force_game_controls: false,
 		})
 	}
 
-	pub fn switch_world(&mut self, _ctx: &mut Context<'_>, new_world: model::World) {
+	pub fn switch_world(&mut self, ctx: &mut Context<'_>, new_world: model::World) {
 		self.model.player.placement = new_world.player_spawn;
 		self.model.world = new_world;
-		self.message_bus.emit(model::WorldChangedEvent);
+		ctx.bus.emit(model::WorldChangedEvent);
 
 		self.editor_state.reset();
 	}
@@ -146,8 +142,8 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!ctx.show_editor || self.force_game_controls);
 
 		if ctx.show_editor {
-			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, &self.message_bus);
-			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, &self.message_bus);
+			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, ctx.bus);
+			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, ctx.bus);
 		}
 
 		if let Err(err) = self.handle_console(ctx) {
@@ -156,16 +152,16 @@ impl GameScene {
 
 		let model::Model { processed_world, world, player, progress, interactions, environment, hud, .. } = &mut self.model;
 
-		processed_world.update(&world, &progress, &self.message_bus);
+		processed_world.update(&world, &progress, ctx.bus);
 
 		if !ctx.show_editor && !ctx.console.is_visible() || self.force_game_controls {
 			player.handle_input(ctx, &world, &processed_world, &hud);
-			interactions.update(&player, &world, &processed_world, &self.message_bus);
+			interactions.update(&player, &world, &processed_world, ctx.bus);
 		}
 
-		hud.update(&self.message_bus);
+		hud.update(ctx.bus);
 
-		environment.update(&world, &self.message_bus);
+		environment.update(&world, ctx.bus);
 
 		// self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
 	}
@@ -332,25 +328,25 @@ impl GameScene {
 	pub fn add_editor_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
 		ui.menu_button("Editor", |ui| {
 			if ui.button("New World").clicked() {
-				// self.message_bus.emit(editor::EditorModalCmd::NewWorld);
+				// ctx.bus.emit(editor::EditorModalCmd::NewWorld);
 
 				// if changes made to current world, check save
 
 				self.model.world = model::World::new();
-				self.message_bus.emit(model::WorldChangedEvent);
+				ctx.bus.emit(model::WorldChangedEvent);
 
 				ui.close_menu();
 			}
 
 			if ui.button("Load World").clicked() {
-				// self.message_bus.emit(editor::EditorModalCmd::LoadWorld);
+				// ctx.bus.emit(editor::EditorModalCmd::LoadWorld);
 
-				self.message_bus.emit(MenuCmd::Play("default".into()));
+				ctx.bus.emit(MenuCmd::Play("default".into()));
 				ui.close_menu();
 			}
 
 			if ui.button("Save World").clicked() {
-				// self.message_bus.emit(editor::EditorModalCmd::SaveWorld);
+				// ctx.bus.emit(editor::EditorModalCmd::SaveWorld);
 
 				let default_world_path = "worlds/default.world";
 
@@ -369,7 +365,7 @@ impl GameScene {
 				anyhow::bail!("'load' requires world name argument");
 			}
 
-			self.message_bus.emit(MenuCmd::Play(world_name));
+			ctx.bus.emit(MenuCmd::Play(world_name));
 		}
 
 		if let Some(world_name) = ctx.console.command("save") {
