@@ -19,6 +19,8 @@ pub struct Player {
 	pub placement: Placement,
 	pub pitch: f32,
 
+	pub step_accumulator: f32,
+
 	pub blood: u32,
 	pub salt: u32,
 
@@ -131,6 +133,8 @@ impl Player {
 				self.free_pos -= right * speed;
 			}
 
+			self.step_accumulator = 0.0;
+
 		} else {
 			let forward = self.placement.forward();
 			let right = self.placement.right();
@@ -153,7 +157,15 @@ impl Player {
 				delta -= right * speed;
 			}
 
-			self.try_move_by(world, processed_world, delta);
+			let distance_traveled = self.try_move_by(world, processed_world, delta);
+			self.step_accumulator += distance_traveled;
+
+			// Dumb step sounds
+			let step_size = 0.35;
+			if self.step_accumulator > step_size {
+				ctx.audio.trigger();
+				self.step_accumulator -= step_size;
+			}
 		}
 	}
 }
@@ -162,9 +174,9 @@ impl Player {
 // TODO(pat.m): some kind of transform/connectivity cache
 
 impl Player {
-	fn try_move_by(&mut self, world: &World, processed_world: &ProcessedWorld, delta: Vec2) {
+	fn try_move_by(&mut self, world: &World, processed_world: &ProcessedWorld, delta: Vec2) -> f32 {
 		if delta.dot(delta) <= 0.00001 {
-			return;
+			return 0.0;
 		}
 
 		// TODO(pat.m): limit movement by delta length to avoid teleporting
@@ -234,6 +246,9 @@ impl Player {
 						continue
 					}
 
+					// TODO(pat.m): assumes that we don't hit anything after transition
+					let travel_distance = (desired_position - self.placement.position).length();
+
 					self.placement.room_index = connection_info.target_id.room_index;
 					self.placement.position = connection_info.source_to_target * desired_position;
 
@@ -244,7 +259,7 @@ impl Player {
 					self.hack_height_change = Some(connection_info.height_difference);
 
 					// TODO(pat.m): collide with walls in opposing wall as well
-					return;
+					return travel_distance;
 				}
 			}
 
@@ -253,6 +268,8 @@ impl Player {
 		}
 
 		// If we get here, no transitions have happened and desired_position has been adjusted to remove wall collisions
+		let travel_distance = (desired_position - self.placement.position).length();
 		self.placement.position = desired_position;
+		travel_distance
 	}
 }

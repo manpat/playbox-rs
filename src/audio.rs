@@ -6,12 +6,23 @@ mod sfx;
 mod music;
 
 
+
+// TODO(pat.m): noise + filters for ambience
+// TODO(pat.m): basic sequencer for music
+// TODO(pat.m): voice based synthesizer for playing sequences
+// TODO(pat.m): audio loader and sample buffer manager, so we can play sound files as sfx
+// TODO(pat.m): basic delay/reverb
+// TODO(pat.m): parameterisation/controls for all of the above
+// TODO(pat.m): spatialisation - how to handle spatial objects?
+
+
 pub struct MyAudioSystem {
 	control: Arc<Control>,
 }
 
 impl MyAudioSystem {
 	pub fn start(audio: &mut audio::System) -> anyhow::Result<MyAudioSystem> {
+		// TODO(pat.m): load from config
 		let control = Arc::new(Control::new());
 
 		let provider = MyAudioProvider {

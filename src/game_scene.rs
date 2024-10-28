@@ -99,6 +99,8 @@ impl GameScene {
 					placement: world.player_spawn,
 					pitch: 0.0,
 
+					step_accumulator: 0.0,
+
 					blood: 100,
 					salt: 100,
 

@@ -40,8 +40,8 @@ impl SfxProvider {
 	}
 
 	pub fn fill(&mut self, buffer: &mut [f32]) {
-		let mut osc_phase = self.osc_phase * 110.0 * std::f64::consts::TAU;
-		let osc_dt = self.sample_dt * 110.0 * std::f64::consts::TAU;
+		let mut osc_phase = self.osc_phase * 50.0 * std::f64::consts::TAU;
+		let osc_dt = self.sample_dt * 50.0 * std::f64::consts::TAU;
 
 		let mut gain = db_to_linear(self.volume);
 
@@ -59,7 +59,7 @@ impl SfxProvider {
 			}
 
 			let osc = osc_phase.sin();
-			let amp = (1.0 - self.env_phase).max(0.0).powi(2) * gain as f64;
+			let amp = ((1.0 - self.env_phase) * std::f64::consts::PI).max(0.0).sin().powi(2) * gain as f64;
 
 			let value = (amp * osc) as f32;
 
@@ -67,7 +67,7 @@ impl SfxProvider {
 			frame[1] += value;
 
 			self.osc_phase += self.sample_dt;
-			self.env_phase += self.sample_dt * 2.0;
+			self.env_phase += self.sample_dt / 0.03;
 			osc_phase += osc_dt;
 		}
 
