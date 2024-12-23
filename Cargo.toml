@@ -5,14 +5,16 @@ edition = "2021"
 
 
 [dependencies]
-slotmap = "1.0.6"
 fontdue = "0.8"
 serde = "1.0"
 serde_json = "1.0"
 bitflags = "2.6"
 
 
-
 [dependencies.toybox]
 git = "https://github.com/manpat/toybox-rs.git"
 features = ["tracy"]
+
+[dependencies.slotmap]
+version = "1.0.6"
+features = ["serde"]

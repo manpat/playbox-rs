@@ -2,7 +2,9 @@ use crate::prelude::*;
 use model::{Placement, VertexId, WallId, FogParameters};
 
 mod object;
+mod geometry;
 pub use object::*;
+pub use geometry::*;
 
 // world is set of rooms, described by walls.
 // rooms are connected by wall pairs
@@ -10,15 +12,14 @@ pub use object::*;
 #[derive(Clone)]
 pub struct WorldChangedEvent;
 
-
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
-	// TODO(pat.m): name
+	pub name: String,
 
-	// Describes world layout
-	pub rooms: Vec<Room>,
-	pub connections: Vec<(WallId, WallId)>,
+	#[serde(flatten)]
+	pub geometry: WorldGeometry,
 
+	// TODO(pat.m): split out static vs scripted objects
 	pub objects: Vec<Object>,
 
 	pub player_spawn: Placement,
@@ -31,8 +32,9 @@ pub struct World {
 impl World {
 	pub fn new() -> World {
 		World {
-			rooms: vec![Room::new_square(2.0)],
-			connections: vec![],
+			name: String::from("default"),
+
+			geometry: WorldGeometry::new_square(64),
 
 			objects: vec![],
 
@@ -137,30 +139,6 @@ impl Room {
 
 	pub fn bounds(&self) -> Aabb2 {
 		Aabb2::from_points(&self.wall_vertices)
-	}
-}
-
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Wall {
-	pub color: Color,
-
-	// How much to offset the height of the target room.
-	#[serde(default)]
-	pub vertical_offset: f32,
-
-	// How much to offset the aperture horizontally in units from the center of the wall.
-	// Clamped to half the length of the wall
-	#[serde(default)]
-	pub horizontal_offset: f32,
-}
-
-impl Wall {
-	pub fn new() -> Wall {
-		Wall {
-			color: Color::white(),
-			vertical_offset: 0.0,
-			horizontal_offset: 0.0,
-		}
 	}
 }
 
