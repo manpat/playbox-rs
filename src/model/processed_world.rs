@@ -8,8 +8,6 @@ pub struct ProcessedWorld {
 	wall_infos: HashMap<WallId, WallInfo>,
 	room_infos: Vec<RoomInfo>,
 
-	active_objects: Vec<usize>,
-
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
 
@@ -18,9 +16,6 @@ impl ProcessedWorld {
 		let mut this = Self {
 			wall_infos: HashMap::default(),
 			room_infos: Vec::new(),
-
-			// TODO(pat.m): some objects might be disabled on first spawn - this should take ProgressModel into account
-			active_objects: (0..world.objects.len()).collect(),
 
 			world_change_sub: message_bus.subscribe(),
 		};
@@ -70,10 +65,6 @@ impl ProcessedWorld {
 	pub fn objects_in_room<'w, 's>(&'s self, room_index: usize, world: &'w World) -> impl Iterator<Item=&'w Object> + use<'s, 'w> {
 		self.object_indices_for_room(room_index)
 			.map(move |idx| &world.objects[idx])
-	}
-
-	pub fn is_object_active(&self, object_index: usize) -> bool {
-		self.active_objects.contains(&object_index)
 	}
 
 	fn rebuild_world(&mut self, world: &World) {
