@@ -12,6 +12,11 @@ pub use geometry::*;
 #[derive(Clone)]
 pub struct WorldChangedEvent;
 
+// TODO(pat.m): Turn this into the read-only world definition _resource_
+// that only the editor can edit.
+// Then process that into the convex-only rooms that we currently have,
+// and use that _exclusively_ in other systems.
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
 	pub name: String,
