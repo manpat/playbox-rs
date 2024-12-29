@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use model::{Model, Room, Object, VertexId, WallId, FogParameters};
+use model::{Model, RoomDef, Object, VertexId, WallId, RoomId, FogParameters};
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -15,9 +15,9 @@ pub enum EditorModalCmd {
 pub enum EditorWorldEditCmd {
 	TranslateItem(Item, Vec2),
 
-	SetCeilingColor(usize, Color),
-	SetCeilingHeight(usize, f32),
-	SetFloorColor(usize, Color),
+	SetCeilingColor(RoomId, Color),
+	SetCeilingHeight(RoomId, f32),
+	SetFloorColor(RoomId, Color),
 
 	SetWallColor(WallId, Color),
 	SetHorizontalWallOffset(WallId, f32),
@@ -27,12 +27,12 @@ pub enum EditorWorldEditCmd {
 
 
 	AddRoom {
-		room: Room,
-		connection: Option<(usize, WallId)>,
+		room: RoomDef,
+		connection: Option<(WallId, WallId)>,
 	},
 
-	RemoveRoom(usize),
-	DisconnectRoom(usize),
+	RemoveRoom(RoomId),
+	DisconnectRoom(RoomId),
 
 	ConnectWall(WallId, WallId),
 	DisconnectWall(WallId),
@@ -324,7 +324,8 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					let selected_room_index = selected_item.room_index(&world);
 
 					if selected_room_index > room_index {
-						selected_item.set_room_index(selected_room_index.saturating_sub(1));
+						todo!();
+						// selected_item.set_room_index(selected_room_index.saturating_sub(1));
 					} else if selected_room_index == room_index {
 						state.selection = None;
 					}

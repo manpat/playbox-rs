@@ -1,5 +1,6 @@
 use crate::prelude::*;
-use model::{Model, Player, Object, Room, Wall, WallId, World, WorldChangedEvent};
+use model::{Model, Player, Object, WallId, World, WorldChangedEvent};
+use model::world::geometry::*;
 
 use std::time::{Instant, Duration};
 
@@ -202,25 +203,26 @@ struct UndoContext<'m> {
 #[derive(Debug)]
 pub enum UndoEntry {
 	UpdateRoom {
-		room_index: usize,
-		before: Room,
-		after: Room,
+		room_id: RoomId,
+		before: RoomDef,
+		after: RoomDef,
 	},
 
 	UpdateWall {
 		wall_id: WallId,
-		before: Wall,
-		after: Wall,
+		before: WallDef,
+		after: WallDef,
+	},
+
+	UpdateVertex {
+		vertex_id: VertexId,
+		before: VertexDef,
+		after: VertexDef,
 	},
 
 	UpdatePlayer {
 		before: Player,
 		after: Player,
-	},
-
-	UpdateConnections {
-		before: Vec<(WallId, WallId)>,
-		after: Vec<(WallId, WallId)>,
 	},
 
 	UpdateObject {
@@ -241,15 +243,13 @@ impl UndoEntry {
 		use UndoEntry::*;
 
 		match (self, other) {
-			(UpdateRoom{room_index: left_index, ..}, UpdateRoom{room_index: right_index, ..}) => left_index == right_index,
-			(UpdateWall{wall_id: left_id, ..}, UpdateWall{wall_id: right_id, ..}) => left_id == right_id,
+			(UpdateRoom{room_id: left, ..}, UpdateRoom{room_id: right, ..}) => left == right,
+			(UpdateWall{wall_id: left, ..}, UpdateWall{wall_id: right, ..}) => left == right,
+			(UpdateVertex{vertex_id: left, ..}, UpdateVertex{vertex_id: right, ..}) => left == right,
 			(UpdateObject{object_index: left, ..}, UpdateObject{object_index: right, ..}) => left == right,
-
-			(UpdateRoom{room_index, ..}, UpdateWall{wall_id, ..}) => *room_index == wall_id.room_index,
 
 			(UpdateWorld{..}, UpdateWorld{..}) => true,
 			(UpdatePlayer{..}, UpdatePlayer{..}) => true,
-			(UpdateConnections{..}, UpdateConnections{..}) => true,
 
 			_ => false,
 		}
@@ -267,24 +267,16 @@ impl UndoEntry {
 				*old_after = new_after;
 			}
 
+			(UpdateVertex{after: old_after, ..}, UpdateVertex{after: new_after, ..}) => {
+				*old_after = new_after;
+			}
+
 			(UpdateObject{after: old_after, ..}, UpdateObject{after: new_after, ..}) => {
 				*old_after = new_after;
 			}
 
-			(UpdateRoom{after: room, ..}, UpdateWall{after: wall, wall_id: WallId{wall_index, ..}, ..}) => {
-				room.walls[wall_index].clone_from(&wall);
-			}
-
-			(UpdateConnections{after, ..}, UpdateConnections{after: new_after, ..}) => {
-				*after = new_after;
-			}
-
 			(UpdateWorld{after, ..}, UpdateWorld{after: new_after, ..}) => {
 				*after = new_after;
-			}
-
-			(UpdateWorld{after, ..}, UpdateConnections{after: connections, ..}) => {
-				after.connections = connections;
 			}
 
 			(UpdatePlayer{after, ..}, UpdatePlayer{after: new_after, ..}) => {
@@ -299,18 +291,18 @@ impl UndoEntry {
 		use UndoEntry::*;
 
 		match self {
-			UpdateRoom{room_index, before, ..} => {
-				ctx.model.world.rooms[*room_index].clone_from(before);
+			UpdateRoom{room_id, before, ..} => {
+				ctx.model.world.geometry.rooms[*room_id].clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
 			UpdateWall{wall_id, before, ..} => {
-				ctx.model.world.rooms[wall_id.room_index].walls[wall_id.wall_index].clone_from(before);
+				ctx.model.world.geometry.walls[*wall_id].clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
-			UpdateConnections{before, ..} => {
-				ctx.model.world.connections.clone_from(before);
+			UpdateVertex{vertex_id, before, ..} => {
+				ctx.model.world.geometry.vertices[*vertex_id].clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
@@ -331,20 +323,20 @@ impl UndoEntry {
 
 	fn redo(&self, ctx: &mut UndoContext<'_>) {
 		use UndoEntry::*;
-		
+
 		match self {
-			UpdateRoom{room_index, after, ..} => {
-				ctx.model.world.rooms[*room_index].clone_from(after);
+			UpdateRoom{room_id, after, ..} => {
+				ctx.model.world.geometry.rooms[*room_id].clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
 			UpdateWall{wall_id, after, ..} => {
-				ctx.model.world.rooms[wall_id.room_index].walls[wall_id.wall_index].clone_from(after);
+				ctx.model.world.geometry.walls[*wall_id].clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
-			UpdateConnections{after, ..} => {
-				ctx.model.world.connections.clone_from(after);
+			UpdateVertex{vertex_id, after, ..} => {
+				ctx.model.world.geometry.vertices[*vertex_id].clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
@@ -395,26 +387,23 @@ impl Transaction<'_> {
 		&self.model
 	}
 
-	pub fn update_room(&mut self, room_index: usize, edit: impl FnOnce(&Model, &mut Room) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let room = self.model.world.rooms.get_mut(room_index)
-			.with_context(|| format!("Trying to edit non-existent room #{room_index}"))?;
+	pub fn update_room(&mut self, room_id: RoomId, edit: impl FnOnce(&Model, &mut RoomDef) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let room = self.model.world.geometry.rooms.get_mut(room_id)
+			.with_context(|| format!("Trying to edit non-existent room {room_id:?}"))?;
 
 		let before = room.clone();
 		let mut after = room.clone();
 
 		edit(&self.model, &mut after)?;
 
-		self.group.push(UndoEntry::UpdateRoom {room_index, before, after});
+		self.group.push(UndoEntry::UpdateRoom {room_id, before, after});
 
 		Ok(())
 	}
 
-	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&Model, &mut Wall) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let room = self.model.world.rooms.get_mut(wall_id.room_index)
-			.with_context(|| format!("Trying to edit {wall_id} in non-existent room"))?;
-
-		let wall = room.walls.get_mut(wall_id.wall_index)
-			.with_context(|| format!("Trying to edit non-existent {wall_id}"))?;
+	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&Model, &mut WallDef) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let wall = self.model.world.geometry.walls.get_mut(wall_id)
+			.with_context(|| format!("Trying to edit non-existent {wall_id:?}"))?;
 
 		let before = wall.clone();
 		let mut after = wall.clone();
@@ -422,6 +411,20 @@ impl Transaction<'_> {
 		edit(&self.model, &mut after)?;
 
 		self.group.push(UndoEntry::UpdateWall {wall_id, before, after});
+
+		Ok(())
+	}
+
+	pub fn update_vertex(&mut self, vertex_id: VertexId, edit: impl FnOnce(&Model, &mut VertexDef) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let vertex = self.model.world.geometry.vertices.get_mut(vertex_id)
+			.with_context(|| format!("Trying to edit non-existent {vertex_id:?}"))?;
+
+		let before = vertex.clone();
+		let mut after = vertex.clone();
+
+		edit(&self.model, &mut after)?;
+
+		self.group.push(UndoEntry::UpdateVertex {vertex_id, before, after});
 
 		Ok(())
 	}
@@ -458,17 +461,6 @@ impl Transaction<'_> {
 		edit(&self.model, &mut after)?;
 
 		self.group.push(UndoEntry::UpdatePlayer {before, after});
-
-		Ok(())
-	}
-
-	pub fn update_connections(&mut self, edit: impl FnOnce(&Model, &mut Vec<(WallId, WallId)>) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let before = self.model.world.connections.clone();
-		let mut after = self.model.world.connections.clone();
-
-		edit(&self.model, &mut after)?;
-
-		self.group.push(UndoEntry::UpdateConnections {before, after});
 
 		Ok(())
 	}

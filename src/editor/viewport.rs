@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, ProcessedWorld, Room, VertexId, WallId, Placement, Location};
+use model::{World, ProcessedWorld, VertexId, WallId, Placement, Location};
 use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -165,8 +165,8 @@ impl<'c> Viewport<'c> {
 		}
 	}
 
-	pub fn add_room(&mut self, room_index: usize, room_to_world: Mat2x3, flags: ViewportItemFlags) {
-		let room = &self.world.rooms[room_index];
+	pub fn add_room(&mut self, room_id: RoomId, room_to_world: Mat2x3, flags: ViewportItemFlags) {
+		let room = &self.world.geometry.rooms[room_id];
 		let num_walls = room.walls.len();
 
 		let interaction_flags = flags.intersection(ViewportItemFlags::BASIC_INTERACTIONS);
@@ -182,7 +182,7 @@ impl<'c> Viewport<'c> {
 		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Vertex(room_to_world * *vertex),
-				item: Some(Item::Vertex(VertexId {room_index, vertex_index})),
+				item: Some(Item::Vertex(VertexId {room_id, vertex_index})),
 				color: Color::grey(0.5),
 				room_to_world,
 				flags: interaction_flags,
@@ -195,7 +195,7 @@ impl<'c> Viewport<'c> {
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
-				item: Some(Item::Wall(WallId {room_index, wall_index})),
+				item: Some(Item::Wall(WallId {room_id, wall_index})),
 				color: room.walls[wall_index].color,
 				room_to_world,
 				flags: wall_interaction_flags,
@@ -206,22 +206,22 @@ impl<'c> Viewport<'c> {
 		let room_center = room.wall_vertices.iter().sum::<Vec2>() / num_walls as f32;
 		self.items.push(ViewportItem {
 			shape: ViewportItemShape::Vertex(room_to_world * room_center),
-			item: Some(Item::Room(room_index)),
+			item: Some(Item::Room(room_id)),
 			color: Color::grey(0.5),
 			room_to_world,
 			flags: room_interaction_flags,
 		});
 	}
 
-	pub fn add_room_connections(&mut self, room_index: usize, room_to_world: Mat2x3, flags: ViewportItemFlags) {
-		let room = &self.world.rooms[room_index];
+	pub fn add_room_connections(&mut self, room_id: RoomId, room_to_world: Mat2x3, flags: ViewportItemFlags) {
+		let room = &self.world.rooms[room_id];
 		let num_walls = room.walls.len();
 
 		// Connections are only clickable
 		let interaction_flags = flags.intersection(ViewportItemFlags::CLICKABLE) & !ViewportItemFlags::CONNECTABLE;
 
 		for wall_index in 0..num_walls {
-			let src_wall_id = WallId{room_index, wall_index};
+			let src_wall_id = WallId{room_id, wall_index};
 
 			let Some(wall_info) = self.processed_world.wall_info(src_wall_id) else {
 				continue
@@ -247,7 +247,7 @@ impl<'c> Viewport<'c> {
 
 	pub fn add_player_indicator(&mut self, placement: Placement, item: impl Into<Option<Item>>, color: impl Into<Color>, flags: ViewportItemFlags) {
 		let transforms = self.items.iter()
-			.filter(|vpitem| vpitem.item == Some(Item::Room(placement.room_index)))
+			.filter(|vpitem| vpitem.item == Some(Item::Room(placement.room_id)))
 			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
@@ -268,7 +268,7 @@ impl<'c> Viewport<'c> {
 
 	pub fn add_object(&mut self, placement: Placement, item: impl Into<Option<Item>>, color: impl Into<Color>, flags: ViewportItemFlags) {
 		let transforms = self.items.iter()
-			.filter(|vpitem| vpitem.item == Some(Item::Room(placement.room_index)))
+			.filter(|vpitem| vpitem.item == Some(Item::Room(placement.room_id)))
 			.map(|vpitem| vpitem.room_to_world)
 			.collect::<Vec<_>>();
 
@@ -306,7 +306,7 @@ impl<'c> Viewport<'c> {
 		self.show_context_menu();
 
 		if let Some(selected_item) = self.editor_state.selection {
-			self.editor_state.focused_room_index = selected_item.room_index(self.world);
+			self.editor_state.focused_room_index = selected_item.room_id(self.world);
 		}
 
 		self.draw_items();
@@ -364,9 +364,9 @@ impl Viewport<'_> {
 
 	fn handle_camera(&mut self) {
 		// Pan to tracked location
-		if let Some(Location{room_index, position}) = self.tracked_location
+		if let Some(Location{room_id, position}) = self.tracked_location
 			&& let Some(vpitem) = self.items.iter()
-				.find(|vpitem| vpitem.item == Some(Item::Room(room_index)))
+				.find(|vpitem| vpitem.item == Some(Item::Room(room_id)))
 		{
 			self.viewport_state.camera_pivot = vpitem.room_to_world * position;
 			self.viewport_metrics.update(&self.viewport_state);
@@ -488,10 +488,10 @@ impl Viewport<'_> {
 					}
 				}
 
-				Item::Room(room_index) => {
+				Item::Room(room_id) => {
 					if ui.button("Duplicate").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
-							room: self.world.rooms[room_index].clone(),
+							room: self.world.rooms[room_id].clone(),
 							connection: None,
 						});
 						ui.close_menu();
@@ -500,12 +500,12 @@ impl Viewport<'_> {
 					ui.separator();
 
 					if ui.button("Disconnect All").clicked() {
-						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_index));
+						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_id));
 						ui.close_menu();
 					}
 
 					if ui.button("Delete").clicked() {
-						self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_index));
+						self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_id));
 						ui.close_menu();
 					}
 				}
@@ -569,13 +569,13 @@ impl Viewport<'_> {
 
 			match shape {
 				ViewportItemShape::Vertex(vertex) => {
-					if let Some(Item::Room(room_index)) = item {
+					if let Some(Item::Room(room_id)) = item {
 						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
 
 						self.painter.text(
 							vertex_px,
 							egui::Align2::CENTER_CENTER,
-							format!("#{room_index}"),
+							format!("#{room_id}"),
 							egui::FontId::proportional(12.0),
 							if item_hovered || item_selected {
 								egui::Color32::WHITE

@@ -14,7 +14,7 @@ pub mod view;
 pub mod model;
 
 pub mod console;
-// pub mod editor;
+pub mod editor;
 
 pub mod prelude {
 	pub use toybox::prelude::*;
@@ -33,7 +33,7 @@ pub mod prelude {
 	pub use crate::view;
 
 	pub use crate::console::Console;
-	// pub use crate::editor;
+	pub use crate::editor;
 
 	pub use crate::glyph_cache::GlyphCache;
 

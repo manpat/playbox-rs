@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use model::{Model, VertexId, WallId};
+use model::{Model, VertexId, WallId, RoomId};
 
 mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
@@ -21,30 +21,26 @@ use egui::widgets::Slider;
 pub enum Item {
 	Vertex(VertexId),
 	Wall(WallId),
-	Room(usize),
+	Room(RoomId),
 
 	PlayerSpawn,
 	Object(usize),
 }
 
 impl Item {
-	fn room_index(&self, world: &model::World) -> usize {
+	fn room_id(&self, world: &model::World) -> RoomId {
+		let geometry = &world.geometry;
+
 		match *self {
-			Item::Room(room_index) => room_index,
-			Item::Vertex(VertexId{room_index, ..}) | Item::Wall(WallId{room_index, ..}) => room_index,
-			Item::PlayerSpawn => world.player_spawn.room_index,
-			Item::Object(object_index) => world.objects.get(object_index)
-				.map_or(0, |obj| obj.placement.room_index),
-		}
-	}
-
-	fn set_room_index(&mut self, new_room_index: usize) {
-		match self {
-			Item::Room(room_index) | Item::Vertex(VertexId{room_index, ..}) | Item::Wall(WallId{room_index, ..}) => {
-				*room_index = new_room_index;
+			Item::Room(room_id) => room_id,
+			Item::Vertex(vertex_id) => {
+				let wall_id = geometry.vertices[vertex_id].outgoing_wall;
+				geometry.walls[wall_id].room
 			}
-
-			_ => {}
+			Item::Wall(wall_id) => geometry.walls[wall_id].room,
+			Item::PlayerSpawn => world.player_spawn.room_id,
+			Item::Object(object_index) => world.objects.get(object_index)
+				.map_or(0, |obj| obj.placement.room_id),
 		}
 	}
 }
@@ -102,19 +98,20 @@ struct Context<'w> {
 }
 
 fn validate_model(state: &mut State, model: &mut Model) {
-	let num_rooms = model.world.rooms.len();
+	let geometry = &model.world.geometry;
+	let first_room = geometry.rooms.keys().next().unwrap();
 
-	if state.inner.focused_room_index >= num_rooms {
-		state.inner.focused_room_index = 0;
+	if geometry.rooms.contains_key(state.inner.focused_room_id) {
+		state.inner.focused_room_id = first_room;
 	}
 
-	if model.player.placement.room_index >= num_rooms {
-		model.player.placement.room_index = 0;
+	if geometry.rooms.contains_key(model.player.placement.room_id) {
+		model.player.placement.room_id = first_room;
 	}
 
 	// Yuck
-	if model.world.player_spawn.room_index >= num_rooms {
-		model.world.player_spawn.room_index = 0;
+	if geometry.rooms.contains_key(model.world.player_spawn.room_id) {
+		model.world.player_spawn.room_id = first_room;
 	}
 
 	validate_item(model, &mut state.inner.hovered);
@@ -123,11 +120,11 @@ fn validate_model(state: &mut State, model: &mut Model) {
 
 
 fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
-	let num_rooms = model.world.rooms.len();
+	let geometry = &model.world.geometry;
 	let num_objects = model.world.objects.len();
 
 	match maybe_item {
-		Some(item) if item.room_index(&model.world) >= num_rooms => {
+		Some(item) if !geometry.rooms.contains_key(item.room_id(&model.world)) => {
 			*maybe_item = None;
 		}
 
@@ -135,11 +132,12 @@ fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
 			*maybe_item = None;
 		}
 
-		&mut Some(Item::Wall(WallId{room_index, wall_index: index}) | Item::Vertex(VertexId{room_index, vertex_index: index})) => {
-			// Safe because room_index is already checked
-			if index >= model.world.rooms[room_index].walls.len() {
-				*maybe_item = None;
-			}
+		&mut Some(Item::Wall(wall_id)) if !geometry.walls.contains_key(wall_id) => {
+			*maybe_item = None;
+		}
+
+		&mut Some(Item::Vertex(vertex_id)) if !geometry.vertices.contains_key(vertex_id) => {
+			*maybe_item = None;
 		}
 
 		_ => {}
