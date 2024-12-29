@@ -60,14 +60,14 @@ pub struct Model {
 
 #[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Location {
-	pub room_index: usize,
+	pub room_id: RoomId,
 	pub position: Vec2,
 }
 
 
 #[derive(Debug, Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Placement {
-	pub room_index: usize,
+	pub room_id: RoomId,
 	pub position: Vec2,
 	pub yaw: f32,
 }
@@ -75,7 +75,7 @@ pub struct Placement {
 impl Placement {
 	pub fn location(&self) -> Location {
 		Location {
-			room_index: self.room_index,
+			room_id: self.room_id,
 			position: self.position,
 		}
 	}
@@ -90,48 +90,48 @@ impl Placement {
 }
 
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct WallId {
-	pub room_index: usize,
-	pub wall_index: usize,
-}
+// #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+// pub struct WallId {
+// 	pub room_index: usize,
+// 	pub wall_index: usize,
+// }
 
-impl WallId {
-	// Each vertex represents the start of a wall, so we can map between their Ids
-	pub fn to_vertex_id(&self) -> VertexId {
-		VertexId {
-			room_index: self.room_index,
-			vertex_index: self.wall_index,
-		}
-	}
-}
+// impl WallId {
+// 	// Each vertex represents the start of a wall, so we can map between their Ids
+// 	pub fn to_vertex_id(&self) -> VertexId {
+// 		VertexId {
+// 			room_index: self.room_index,
+// 			vertex_index: self.wall_index,
+// 		}
+// 	}
+// }
 
-impl Display for WallId {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Wall {}:{}", self.room_index, self.wall_index)
-	}
-}
+// impl Display for WallId {
+// 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+// 		write!(f, "Wall {}:{}", self.room_index, self.wall_index)
+// 	}
+// }
 
 
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct VertexId {
-	pub room_index: usize,
-	pub vertex_index: usize,
-}
+// #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+// pub struct VertexId {
+// 	pub room_index: usize,
+// 	pub vertex_index: usize,
+// }
 
-impl VertexId {
-	// Each vertex represents the start of a wall, so we can map between their Ids
-	pub fn to_wall_id(&self) -> WallId {
-		WallId {
-			room_index: self.room_index,
-			wall_index: self.vertex_index,
-		}
-	}
-}
+// impl VertexId {
+// 	// Each vertex represents the start of a wall, so we can map between their Ids
+// 	pub fn to_wall_id(&self) -> WallId {
+// 		WallId {
+// 			room_index: self.room_index,
+// 			wall_index: self.vertex_index,
+// 		}
+// 	}
+// }
 
-impl Display for VertexId {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Vertex {}:{}", self.room_index, self.vertex_index)
-	}
-}
+// impl Display for VertexId {
+// 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+// 		write!(f, "Vertex {}:{}", self.room_index, self.vertex_index)
+// 	}
+// }

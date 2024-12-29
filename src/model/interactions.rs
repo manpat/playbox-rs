@@ -45,7 +45,7 @@ impl Interactions {
 		self.hovered_object = None;
 
 		for (object_index, object) in world.objects.iter().enumerate() {
-			if object.placement.room_index != player.placement.room_index {
+			if object.placement.room_id != player.placement.room_id {
 				continue
 			}
 

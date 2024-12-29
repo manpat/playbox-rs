@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use slotmap::Slotmap;
+use slotmap::SlotMap;
 
 slotmap::new_key_type! {
 	pub struct VertexId;
@@ -43,18 +43,18 @@ pub struct RoomDef {
 /// Describes world layout via half-edge structure
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct WorldGeometry {
-	pub vertices: Slotmap<VertexId, VertexDef>,
-	pub walls: Slotmap<WallId, WallDef>,
-	pub rooms: Slotmap<RoomId, RoomDef>,
+	pub vertices: SlotMap<VertexId, VertexDef>,
+	pub walls: SlotMap<WallId, WallDef>,
+	pub rooms: SlotMap<RoomId, RoomDef>,
 }
 
 
 impl WorldGeometry {
 	pub fn new() -> WorldGeometry {
 		WorldGeometry {
-			vertices: Slotmap::with_key(),
-			walls: Slotmap::with_key(),
-			rooms: Slotmap::with_key(),
+			vertices: SlotMap::with_key(),
+			walls: SlotMap::with_key(),
+			rooms: SlotMap::with_key(),
 		}
 	}
 
@@ -83,13 +83,13 @@ impl WorldGeometry {
 		for &position in positions {
 			let vertex_id = self.vertices.insert(VertexDef {
 				position,
-				.. VertexDef::default(),
+				.. VertexDef::default()
 			});
 
 			let wall_id = self.walls.insert(WallDef {
 				source_vertex: vertex_id,
 				room: room_id,
-				.. WallDef::default(),
+				.. WallDef::default()
 			});
 
 			self.vertices[vertex_id].outgoing_wall = wall_id;
@@ -97,12 +97,12 @@ impl WorldGeometry {
 			wall_ids.push(wall_id);
 		}
 
-		let wall_count = wall_ids.len()
+		let wall_count = wall_ids.len();
 		for index in 0..wall_count {
 			let next_index = (index + 1) % wall_count;
 			let prev_index = (index + wall_count - 1) % wall_count;
 
-			let wall = &mut self.walls[index];
+			let wall = &mut self.walls[wall_ids[index]];
 			wall.next_wall = wall_ids[next_index];
 			wall.prev_wall = wall_ids[prev_index];
 		}
@@ -112,10 +112,94 @@ impl WorldGeometry {
 	}
 }
 
+impl WorldGeometry {
+	pub fn wall_vertices(&self, wall_id: WallId) -> (Vec2, Vec2) {
+		let wall = &self.walls[wall_id];
+		let next_wall = &self.walls[wall.next_wall];
+		let vertex_0 = self.vertices[wall.source_vertex].position.to_vec2() / 16.0;
+		let vertex_1 = self.vertices[next_wall.source_vertex].position.to_vec2() / 16.0;
+		(vertex_0, vertex_1)
+	}
+
+	pub fn wall_length(&self, wall_id: WallId) -> f32 {
+		let (start, end) = self.wall_vertices(wall_id);
+		(end - start).length()
+	}
+
+	pub fn room_walls(&self, room_id: RoomId) -> RoomWallIterator<'_> {
+		let room = &self.rooms[room_id];
+		RoomWallIterator {
+			geometry: self,
+			first_wall: room.first_wall,
+			last_wall: self.walls[room.first_wall].prev_wall,
+			fused: false,
+		}
+	}
+}
+
+#[derive(Clone)]
+pub struct RoomWallIterator<'g> {
+	geometry: &'g WorldGeometry,
+	first_wall: WallId,
+	last_wall: WallId,
+	fused: bool,
+}
+
+impl Iterator for RoomWallIterator<'_> {
+	type Item = WallId;
+
+	fn next(&mut self) -> Option<WallId> {
+		if self.fused {
+			return None
+		}
+
+		if self.first_wall == self.last_wall {
+			self.fused = true
+		}
+
+		let result = self.first_wall;
+		self.first_wall = self.geometry.walls[self.first_wall].next_wall;
+		Some(result)
+	}
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		if self.fused {
+			return (0, Some(0));
+		}
+
+		let mut count = 1;
+		let mut it = self.first_wall;
+
+		while it != self.last_wall {
+			count += 1;
+			it = self.geometry.walls[it].next_wall;
+		}
+
+		(count, Some(count))
+	}
+}
+
+impl DoubleEndedIterator for RoomWallIterator<'_> {
+	fn next_back(&mut self) -> Option<WallId> {
+		if self.fused {
+			return None
+		}
+
+		if self.first_wall == self.last_wall {
+			self.fused = true
+		}
+
+		let result = self.last_wall;
+		self.last_wall = self.geometry.walls[self.last_wall].prev_wall;
+		Some(result)
+	}
+}
+
+impl ExactSizeIterator for RoomWallIterator<'_> {}
 
 
 impl Default for WallDef {
-	fn default() -> RoomDef {
+	fn default() -> WallDef {
 		WallDef {
 			source_vertex: VertexId::default(),
 			next_wall: WallId::default(),

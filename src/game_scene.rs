@@ -27,7 +27,7 @@ pub struct GameScene {
 	time: f32,
 	height_offset: f32,
 
-	editor_state: editor::State,
+	// editor_state: editor::State,
 	force_game_controls: bool,
 }
 
@@ -123,7 +123,7 @@ impl GameScene {
 			time: 0.0,
 			height_offset: 0.0,
 
-			editor_state: editor::State::new(ctx.bus),
+			// editor_state: editor::State::new(ctx.bus),
 			force_game_controls: false,
 		})
 	}
@@ -133,7 +133,7 @@ impl GameScene {
 		self.model.world = new_world;
 		ctx.bus.emit(model::WorldChangedEvent);
 
-		self.editor_state.reset();
+		// self.editor_state.reset();
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
@@ -144,8 +144,8 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!ctx.show_editor || self.force_game_controls);
 
 		if ctx.show_editor {
-			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, ctx.bus);
-			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, ctx.bus);
+			// editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, ctx.bus);
+			// editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, ctx.bus);
 		}
 
 		if let Err(err) = self.handle_console(ctx) {
@@ -186,7 +186,7 @@ impl GameScene {
 		}
 
 
-		let eye_position = player.placement.position.to_x0y() + Vec3::from_y(model::PLAYER_HEIGHT - self.height_offset) + player.free_pos;
+		let eye_position = player.placement.position.to_x0y() + Vec3::from_y(model::PLAYER_HEIGHT as f32 / 16.0 - self.height_offset) + player.free_pos;
 
 		let aspect = gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);

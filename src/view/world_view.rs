@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use model::*;
 
+use slotmap::SecondaryMap;
+
 mod room_mesh_builder;
 use room_mesh_builder::*;
 
@@ -13,7 +15,7 @@ const MAX_VISIBILITY_RECURSION_DEPTH: i32 = 50;
 
 
 pub struct WorldView {
-	room_mesh_infos: Vec<RoomMeshInfo>,
+	room_mesh_infos: SecondaryMap<RoomId, RoomMeshInfo>,
 	vbo: gfx::BufferName,
 	ebo: gfx::BufferName,
 	light_buffer: gfx::BufferName,
@@ -94,8 +96,8 @@ impl WorldView {
 		// Draw
 		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 
-		for &RoomInstance{room_index, room_to_world, clip_by, height_offset} in self.visible_rooms.iter() {
-			let room_mesh = &self.room_mesh_infos[room_index];
+		for &RoomInstance{room_id, room_to_world, clip_by, height_offset} in self.visible_rooms.iter() {
+			let room_mesh = &self.room_mesh_infos[room_id];
 			let index_size = std::mem::size_of::<u32>() as u32;
 
 			let [x,z,w] = room_to_world.columns();
@@ -103,7 +105,7 @@ impl WorldView {
 				x.to_x0y(),
 				Vec3::from_y(1.0),
 				z.to_x0y(),
-				w.to_x0y() + Vec3::from_y(height_offset)
+				w.to_x0y() + Vec3::from_y(height_offset as f32 / 16.0)
 			]);
 
 			#[derive(Copy, Clone)]
@@ -162,19 +164,19 @@ impl WorldView {
 	fn build_visibility_graph(&mut self, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
 		self.visible_rooms.clear();
 		self.visible_rooms.push(RoomInstance {
-			room_index: viewer_placement.room_index,
+			room_id: viewer_placement.room_id,
 			room_to_world: Mat2x3::identity(),
-			height_offset: 0.0,
+			height_offset: 0,
 			clip_by: None,
 		});
 
-		// Viewer forward vector
 		let viewer_forward = viewer_placement.forward();
+		let geometry = &world.geometry;
 
 		let mut instance_index = 0;
 
 		// Build visibility graph
-		while let Some(&RoomInstance{room_index, room_to_world, clip_by, height_offset}) = self.visible_rooms.get(instance_index) {
+		while let Some(&RoomInstance{room_id, room_to_world, clip_by, height_offset}) = self.visible_rooms.get(instance_index) {
 			instance_index += 1;
 
 			let depth = clip_by.map_or(0, |c| c.depth);
@@ -182,11 +184,9 @@ impl WorldView {
 				continue
 			}
 
-			let num_walls = world.rooms[room_index].walls.len();
 			let local_viewer_position = clip_by.map_or(viewer_placement.position, |c| c.local_viewer_position);
 
-			for wall_index in 0..num_walls {
-				let wall_id = WallId{room_index, wall_index};
+			for wall_id in geometry.room_walls(room_id) {
 				let Some(wall_info) = processed_world.wall_info(wall_id) else {
 					continue
 				};
@@ -231,7 +231,7 @@ impl WorldView {
 				let aperture_plane = aperture_normal.extend(aperture_normal.dot(connection_info.source_to_target * unclipped_left_aperture));
 
 				self.visible_rooms.push(RoomInstance {
-					room_index: connection_info.target_id.room_index,
+					room_id: connection_info.target_room,
 					room_to_world: total_transform,
 					height_offset: height_offset + connection_info.height_difference,
 
@@ -302,24 +302,24 @@ fn clip_wall_segment((mut left_vertex, mut right_vertex): (Vec2, Vec2), clip_by:
 
 
 struct RoomInstance {
-	room_index: usize,
+	room_id: RoomId,
 	room_to_world: Mat2x3,
-	height_offset: f32,
+	height_offset: i32,
 	clip_by: Option<ClipState>,
 }
 
 
 
 fn build_room_buffers(gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld,
-	vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) -> Vec<RoomMeshInfo>
+	vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) -> SecondaryMap<RoomId, RoomMeshInfo>
 {
 	let mut room_builder = RoomMeshBuilder::new(world, processed_world);
 
-	let mut room_mesh_infos = Vec::new();
+	let mut room_mesh_infos = SecondaryMap::with_capacity(world.geometry.rooms.len());
 
-	for room_idx in 0..world.rooms.len() {
-		let info = room_builder.build_room(room_idx);
-		room_mesh_infos.push(info);
+	for room_id in world.geometry.rooms.keys() {
+		let info = room_builder.build_room(room_id);
+		room_mesh_infos.insert(room_id, info);
 	}
 
 	room_builder.upload(gfx, vbo, ebo, light_buffer);

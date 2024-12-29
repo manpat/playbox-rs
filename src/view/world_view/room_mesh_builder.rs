@@ -88,18 +88,25 @@ impl RoomMeshBuilder<'_> {
 		self.add_convex_textured(vs, std::iter::repeat(Vec2::zero()), color, 0);
 	}
 
-	pub fn build_room(&mut self, room_index: usize) -> RoomMeshInfo {
+	pub fn build_room(&mut self, room_id: RoomId) -> RoomMeshInfo {
 		self.base_vertex = self.vertices.len() as u32;
 		let base_index = self.indices.len() as u32;
 
-		let room = &self.world.rooms[room_index];
-		let up = Vec3::from_y(room.height);
+		let geometry = &self.world.geometry;
+
+		let room = &geometry.rooms[room_id];
+		let up = Vec3::from_y(room.height as f32 / 16.0);
+
+		let forward_vertices = geometry.room_walls(room_id)
+			.map(|id| geometry.vertices[geometry.walls[id].source_vertex].position.to_vec2() / 16.0);
+		let backward_vertices = geometry.room_walls(room_id).rev()
+			.map(|id| geometry.vertices[geometry.walls[id].source_vertex].position.to_vec2() / 16.0);
 
 		// ASSUME: rooms are always convex
-		let floor_verts = room.wall_vertices.iter().map(|&v| v.to_x0y());
-		let floor_uvs = room.wall_vertices.iter().cloned();
-		let ceiling_verts = floor_verts.clone().rev().map(|v| v + up);
-		let ceiling_uvs = room.wall_vertices.iter().rev().cloned();
+		let floor_verts = forward_vertices.clone().map(|v| v.to_x0y());
+		let floor_uvs = forward_vertices;
+		let ceiling_verts = backward_vertices.clone().map(|v| v.to_x0y() + up);
+		let ceiling_uvs = backward_vertices;
 
 		// Floor/Ceiling
 		self.set_texture_index(3);
@@ -107,28 +114,28 @@ impl RoomMeshBuilder<'_> {
 		self.add_convex(ceiling_verts, ceiling_uvs, room.ceiling_color);
 
 		// Walls
-		for wall_index in 0..room.walls.len() {
-			self.build_wall(WallId{room_index, wall_index});
+		for wall_id in geometry.walls.keys() {
+			self.build_wall(wall_id);
 		}
 
 		// Objects
 		let base_light = self.lights.len() as u32;
 
 		self.set_texture_index(0);
-		for object in self.processed_world.objects_in_room(room_index, self.world) {
+		for object in self.processed_world.objects_in_room(room_id, self.world) {
 			self.build_object(object);
 		}
 
 		// Lights in neighboring rooms
-		for connection in self.processed_world.connections_for_room(room_index) {
-			let target_room = connection.target_id.room_index;
+		for connection in self.processed_world.connections_for_room(room_id) {
+			let target_room = connection.target_room;
 
 			let [x,z,w] = connection.target_to_source.columns();
 			let transform = Mat3x4::from_columns([
 				x.to_x0y(),
 				Vec3::from_y(1.0),
 				z.to_x0y(),
-				w.to_x0y() + Vec3::from_y(connection.height_difference)
+				w.to_x0y() + Vec3::from_y(connection.height_difference as f32 / 16.0)
 			]);
 
 			// TODO(pat.m): recurse into all rooms touched by light
@@ -160,19 +167,22 @@ impl RoomMeshBuilder<'_> {
 	}
 
 	pub fn build_wall(&mut self, wall_id: WallId) {
-		let room = &self.world.rooms[wall_id.room_index];
-		let wall = &room.walls[wall_id.wall_index];
+		let geometry = &self.world.geometry;
+
+		let wall = &geometry.walls[wall_id];
+		let room = &geometry.rooms[wall.room];
 
 		// self.set_texture_index(wall_id.wall_index as u32 % 2 + 1);
 		self.set_texture_index(1);
 
-		let (start_vertex, end_vertex) = room.wall_vertices(wall_id.wall_index);
+		let (start_vertex, end_vertex) = geometry.wall_vertices(wall_id);
 
 		let length = (start_vertex - end_vertex).length();
 		let start_vertex_3d = start_vertex.to_x0y();
 		let end_vertex_3d = end_vertex.to_x0y();
 
-		let up = Vec3::from_y(room.height);
+		let room_height_world = room.height as f32 / 16.0;
+		let up = Vec3::from_y(room_height_world);
 
 		let Some(connection_info) = self.processed_world.connection_info(wall_id) else {
 			let verts = [
@@ -184,8 +194,8 @@ impl RoomMeshBuilder<'_> {
 
 			let uvs = [
 				Vec2::new(0.0, 0.0),
-				Vec2::new(0.0, room.height),
-				Vec2::new(length, room.height),
+				Vec2::new(0.0, room_height_world),
+				Vec2::new(length, room_height_world),
 				Vec2::new(length, 0.0),
 			];
 
@@ -194,7 +204,7 @@ impl RoomMeshBuilder<'_> {
 			return
 		};
 
-		let opposing_room = &self.world.rooms[connection_info.target_id.room_index];
+		let opposing_room = &geometry.rooms[connection_info.target_room];
 
 		let left_length = (start_vertex - connection_info.aperture_start).length();
 		let right_length = (end_vertex - connection_info.aperture_end).length();
@@ -214,8 +224,8 @@ impl RoomMeshBuilder<'_> {
 
 		let uvs = [
 			Vec2::new(0.0, 0.0),
-			Vec2::new(0.0, room.height),
-			Vec2::new(left_length, room.height),
+			Vec2::new(0.0, room_height_world),
+			Vec2::new(left_length, room_height_world),
 			Vec2::new(left_length, 0.0),
 		];
 
@@ -230,16 +240,16 @@ impl RoomMeshBuilder<'_> {
 
 		let uvs = [
 			Vec2::new(right_uv_start, 0.0),
-			Vec2::new(right_uv_start, room.height),
-			Vec2::new(length, room.height),
+			Vec2::new(right_uv_start, room_height_world),
+			Vec2::new(length, room_height_world),
 			Vec2::new(length, 0.0),
 		];
 
 		self.add_convex(verts, uvs, wall.color);
 
 		// Add quads above and below the aperture
-		if connection_info.height_difference > 0.0 {
-			let aperture_bottom = Vec3::from_y(connection_info.height_difference);
+		if connection_info.height_difference > 0 {
+			let aperture_bottom = Vec3::from_y(connection_info.height_difference as f32 / 16.0);
 
 			let verts = [
 				left_vertex_3d,
@@ -258,8 +268,9 @@ impl RoomMeshBuilder<'_> {
 			self.add_convex(verts, uvs, wall.color);
 		}
 
-		if connection_info.height_difference + opposing_room.height < room.height {
-			let aperture_top = Vec3::from_y(connection_info.height_difference + opposing_room.height);
+		if connection_info.height_difference + (opposing_room.height as i32) < room.height as i32 {
+			let aperture_top = connection_info.height_difference + opposing_room.height as i32;
+			let aperture_top = Vec3::from_y(aperture_top as f32 / 16.0);
 
 			let verts = [
 				left_vertex_3d + aperture_top,
@@ -270,8 +281,8 @@ impl RoomMeshBuilder<'_> {
 
 			let uvs = [
 				Vec2::new(left_length, aperture_top.y),
-				Vec2::new(left_length, room.height),
-				Vec2::new(right_uv_start, room.height),
+				Vec2::new(left_length, room_height_world),
+				Vec2::new(right_uv_start, room_height_world),
 				Vec2::new(right_uv_start, aperture_top.y),
 			];
 

@@ -2,8 +2,8 @@ use crate::prelude::*;
 use model::{Placement, WallId, World, ProcessedWorld, HudModel};
 
 /// Ratio of player height to max step distance.
-pub const PLAYER_MAX_STEP_HEIGHT_PERCENTAGE: f32 = 0.5;
-pub const PLAYER_HEIGHT: f32 = 0.5;
+pub const PLAYER_MAX_STEP_HEIGHT: i32 = 4;
+pub const PLAYER_HEIGHT: i32 = 8;
 pub const PLAYER_RADIUS: f32 = 0.1;
 
 
@@ -181,7 +181,8 @@ impl Player {
 
 		// TODO(pat.m): limit movement by delta length to avoid teleporting
 
-		let current_room = &world.rooms[self.placement.room_index];
+		let geometry = &world.geometry;
+
 		let mut desired_position = self.placement.position + delta;
 
 		fn collide_vertex(desired_position: &mut Vec2, vertex: Vec2, radius: f32) {
@@ -197,13 +198,15 @@ impl Player {
 		}
 
 		// Collide with room verts
-		for vertex in current_room.wall_vertices.iter() {
-			collide_vertex(&mut desired_position, *vertex, PLAYER_RADIUS);
+		for wall_id in geometry.room_walls(self.placement.room_id) {
+			let vertex_id = geometry.walls[wall_id].source_vertex;
+			let vertex_position = geometry.vertices[vertex_id].position.to_vec2() / 16.0;
+			collide_vertex(&mut desired_position, vertex_position, PLAYER_RADIUS);
 		}
 
 		// Collide with walls
-		for wall_index in 0..current_room.walls.len() {
-			let (wall_start, wall_end) = current_room.wall_vertices(wall_index);
+		for wall_id in geometry.room_walls(self.placement.room_id) {
+			let (wall_start, wall_end) = geometry.wall_vertices(wall_id);
 
 			let wall_direction = (wall_end - wall_start).normalize();
 			let wall_length = (wall_end - wall_start).length();
@@ -226,7 +229,6 @@ impl Player {
 
 			// We have some kind of intersection here - figure out if we need to transition to another room
 			// or if we need to slide against the wall
-			let wall_id = WallId{room_index: self.placement.room_index, wall_index};
 			if let Some(connection_info) = processed_world.connection_info(wall_id) {
 				// Collide with the virtual aperture verts
 				collide_vertex(&mut desired_position, connection_info.aperture_start, PLAYER_RADIUS);
@@ -237,7 +239,7 @@ impl Player {
 
 				// Target room must be tall enough and the step must not be too steep
 				let can_transition_to_opposing_room = PLAYER_HEIGHT < connection_info.aperture_height
-					&& connection_info.height_difference.abs() < PLAYER_HEIGHT * PLAYER_MAX_STEP_HEIGHT_PERCENTAGE;
+					&& connection_info.height_difference.abs() < PLAYER_MAX_STEP_HEIGHT;
 
 				// If we're transitioning through the aperture then we need to transition to the opposing room.
 				// Otherwise just slide as normal.
@@ -249,14 +251,14 @@ impl Player {
 					// TODO(pat.m): assumes that we don't hit anything after transition
 					let travel_distance = (desired_position - self.placement.position).length();
 
-					self.placement.room_index = connection_info.target_id.room_index;
+					self.placement.room_id = connection_info.target_room;
 					self.placement.position = connection_info.source_to_target * desired_position;
 
 					// Apply yaw offset
 					self.placement.yaw += connection_info.yaw_delta;
 
 					// TODO(pat.m): figure out another way to do this
-					self.hack_height_change = Some(connection_info.height_difference);
+					self.hack_height_change = Some(connection_info.height_difference as f32 / 16.0);
 
 					// TODO(pat.m): collide with walls in opposing wall as well
 					return travel_distance;

@@ -1,12 +1,12 @@
 use crate::prelude::*;
 use model::*;
 
-
+use slotmap::SecondaryMap;
 
 #[derive(Debug)]
 pub struct ProcessedWorld {
-	wall_infos: HashMap<WallId, WallInfo>,
-	room_infos: Vec<RoomInfo>,
+	wall_infos: SecondaryMap<WallId, WallInfo>,
+	room_infos: SecondaryMap<RoomId, RoomInfo>,
 
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
@@ -14,8 +14,8 @@ pub struct ProcessedWorld {
 impl ProcessedWorld {
 	pub fn new(world: &World, message_bus: &MessageBus) -> Self {
 		let mut this = Self {
-			wall_infos: HashMap::default(),
-			room_infos: Vec::new(),
+			wall_infos: SecondaryMap::new(),
+			room_infos: SecondaryMap::new(),
 
 			world_change_sub: message_bus.subscribe(),
 		};
@@ -31,30 +31,30 @@ impl ProcessedWorld {
 	}
 
 	pub fn wall_info(&self, wall_id: WallId) -> Option<&WallInfo> {
-		self.wall_infos.get(&wall_id)
+		self.wall_infos.get(wall_id)
 	}
 
-	pub fn room_info(&self, room_index: usize) -> Option<&RoomInfo> {
-		self.room_infos.get(room_index)
+	pub fn room_info(&self, room_id: RoomId) -> Option<&RoomInfo> {
+		self.room_infos.get(room_id)
 	}
 
 	pub fn connection_info(&self, wall_id: WallId) -> Option<&ConnectionInfo> {
-		self.wall_infos.get(&wall_id)
+		self.wall_infos.get(wall_id)
 			.and_then(|wall| wall.connection_info.as_ref())
 	}
 
-	pub fn connections_for_room(&self, room_index: usize) -> impl Iterator<Item=&'_ ConnectionInfo> + use<'_> {
-		let connecting_walls = match self.room_info(room_index) {
+	pub fn connections_for_room(&self, room_id: RoomId) -> impl Iterator<Item=&'_ ConnectionInfo> + use<'_> {
+		let connecting_walls = match self.room_info(room_id) {
 			Some(info) => info.connecting_walls.as_slice(),
 			None => &[]
 		};
 
 		connecting_walls.into_iter()
-			.filter_map(move |&wall_index| self.connection_info(WallId{room_index, wall_index}))
+			.filter_map(move |&wall_id| self.connection_info(wall_id))
 	}
 
-	pub fn object_indices_for_room(&self, room_index: usize) -> impl Iterator<Item=usize> + use<'_> {
-		let object_indices = match self.room_info(room_index) {
+	pub fn object_indices_for_room(&self, room_id: RoomId) -> impl Iterator<Item=usize> + use<'_> {
+		let object_indices = match self.room_info(room_id) {
 			Some(info) => info.object_indices.as_slice(),
 			None => &[]
 		};
@@ -62,8 +62,8 @@ impl ProcessedWorld {
 		object_indices.iter().cloned()
 	}
 
-	pub fn objects_in_room<'w, 's>(&'s self, room_index: usize, world: &'w World) -> impl Iterator<Item=&'w Object> + use<'s, 'w> {
-		self.object_indices_for_room(room_index)
+	pub fn objects_in_room<'w, 's>(&'s self, room_id: RoomId, world: &'w World) -> impl Iterator<Item=&'w Object> + use<'s, 'w> {
+		self.object_indices_for_room(room_id)
 			.map(move |idx| &world.objects[idx])
 	}
 
@@ -71,20 +71,24 @@ impl ProcessedWorld {
 		self.room_infos.clear();
 		self.wall_infos.clear();
 
-		for (room_index, room) in world.rooms.iter().enumerate() {
+		let geometry = &world.geometry;
+
+		for room_id in geometry.rooms.keys() {
 			let mut connecting_walls = Vec::new();
 
 			// Collect walls
-			for wall_index in 0..room.walls.len() {
-				let wall_id = WallId{room_index, wall_index};
-				let connection_info = world.wall_target(wall_id)
+			for wall_id in geometry.room_walls(room_id) {
+				let wall = &geometry.walls[wall_id];
+
+				let connection_info = wall.connected_wall
 					.map(|target_id| ConnectionInfo::new(world, wall_id, target_id));
 
 				if connection_info.is_some() {
-					connecting_walls.push(wall_index);
+					connecting_walls.push(wall_id);
 				}
 
-				let direction = world.wall_vector(wall_id).normalize();
+				let (start, end) = geometry.wall_vertices(wall_id);
+				let direction = (end - start).normalize();
 				let normal = direction.perp();
 
 				let wall_info = WallInfo {
@@ -97,11 +101,11 @@ impl ProcessedWorld {
 
 			// Collect objects
 			let object_indices = world.objects.iter().enumerate()
-				.filter(|(_, o)| o.placement.room_index == room_index)
+				.filter(|(_, o)| o.placement.room_id == room_id)
 				.map(|(index, _)| index)
 				.collect();
 
-			self.room_infos.push(RoomInfo {
+			self.room_infos.insert(room_id, RoomInfo {
 				object_indices,
 				connecting_walls,
 			});
@@ -122,7 +126,8 @@ pub struct WallInfo {
 
 #[derive(Debug)]
 pub struct ConnectionInfo {
-	pub target_id: WallId,
+	pub target_wall: WallId,
+	pub target_room: RoomId,
 
 	pub target_to_source: Mat2x3,
 	pub source_to_target: Mat2x3,
@@ -139,29 +144,33 @@ pub struct ConnectionInfo {
 	pub aperture_offset: f32,
 
 	// Height of the aperture
-	pub aperture_height: f32,
+	pub aperture_height: i32,
 
 	// Floor height difference when transitioning connection
-	pub height_difference: f32,
+	pub height_difference: i32,
 }
 
 impl ConnectionInfo {
 	fn new(world: &World, source_id: WallId, target_id: WallId) -> Self {
-		let source_room = &world.rooms[source_id.room_index];
-		let source_wall = &source_room.walls[source_id.wall_index];
+		let geometry = &world.geometry;
 
-		let target_room = &world.rooms[target_id.room_index];
-		let target_wall = &target_room.walls[target_id.wall_index];
+		let source_wall = &geometry.walls[source_id];
+		let source_room = &geometry.rooms[source_wall.room];
 
-		let source_wall_length = world.wall_length(source_id);
-		let target_wall_length = world.wall_length(target_id);
+		let target_wall = &geometry.walls[target_id];
+		let target_room = &geometry.rooms[target_wall.room];
 
-		let start_vertex = source_room.wall_vertices[source_id.wall_index];
-		let wall_vector = world.wall_vector(source_id);
-		let wall_direction = wall_vector / source_wall_length;
+		let source_wall_length = geometry.wall_length(source_id);
+		let target_wall_length = geometry.wall_length(target_id);
+
+		let (start_vertex, end_vertex) = geometry.wall_vertices(source_id);
+
+		let wall_diff = end_vertex - start_vertex;
+		let wall_direction = wall_diff / source_wall_length;
+		let horizontal_offset = source_wall.horizontal_offset as f32 / 16.0;
 
 		let aperture_extent = source_wall_length.min(target_wall_length) / 2.0;
-		let aperture_offset = source_wall.horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
+		let aperture_offset = horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
 
 		let aperture_center = source_wall_length/2.0 + aperture_offset;
 
@@ -170,7 +179,7 @@ impl ConnectionInfo {
 
 
 		let vertical_offset = source_wall.vertical_offset - target_wall.vertical_offset;
-		let aperture_height = (source_room.height - vertical_offset).min(target_room.height + vertical_offset);
+		let aperture_height = (source_room.height as i32 - vertical_offset).min(target_room.height as i32 + vertical_offset);
 
 		let target_to_source = calculate_portal_transform(world, source_id, target_id);
 		let source_to_target = target_to_source.inverse();
@@ -181,7 +190,8 @@ impl ConnectionInfo {
 		};
 
 		ConnectionInfo {
-			target_id,
+			target_wall: target_id,
+			target_room: target_wall.room,
 			target_to_source,
 			source_to_target,
 			yaw_delta,
@@ -203,5 +213,5 @@ impl ConnectionInfo {
 #[derive(Default, Debug)]
 pub struct RoomInfo {
 	pub object_indices: Vec<usize>,
-	pub connecting_walls: Vec<usize>,
+	pub connecting_walls: Vec<WallId>,
 }
