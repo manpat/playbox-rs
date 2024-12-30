@@ -144,10 +144,10 @@ pub struct ConnectionInfo {
 	pub aperture_offset: f32,
 
 	// Height of the aperture
-	pub aperture_height: i32,
+	pub aperture_height: f32,
 
 	// Floor height difference when transitioning connection
-	pub height_difference: i32,
+	pub height_difference: f32,
 }
 
 impl ConnectionInfo {
@@ -167,10 +167,9 @@ impl ConnectionInfo {
 
 		let wall_diff = end_vertex - start_vertex;
 		let wall_direction = wall_diff / source_wall_length;
-		let horizontal_offset = source_wall.horizontal_offset as f32 / 16.0;
 
 		let aperture_extent = source_wall_length.min(target_wall_length) / 2.0;
-		let aperture_offset = horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
+		let aperture_offset = source_wall.horizontal_offset.clamp(aperture_extent-source_wall_length/2.0, source_wall_length/2.0-aperture_extent);
 
 		let aperture_center = source_wall_length/2.0 + aperture_offset;
 
@@ -179,7 +178,7 @@ impl ConnectionInfo {
 
 
 		let vertical_offset = source_wall.vertical_offset - target_wall.vertical_offset;
-		let aperture_height = (source_room.height as i32 - vertical_offset).min(target_room.height as i32 + vertical_offset);
+		let aperture_height = (source_room.height - vertical_offset).min(target_room.height + vertical_offset);
 
 		let target_to_source = calculate_portal_transform(world, source_id, target_id);
 		let source_to_target = target_to_source.inverse();

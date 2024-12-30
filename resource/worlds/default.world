@@ -1,0 +1,264 @@
+{
+  "name": "default",
+  "vertices": [
+    {
+      "value": null,
+      "version": 0
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 1,
+          "version": 1
+        },
+        "position": [
+          -2.0,
+          -2.0
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 2,
+          "version": 1
+        },
+        "position": [
+          -2.0,
+          2.0
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 3,
+          "version": 1
+        },
+        "position": [
+          2.0,
+          2.0
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 4,
+          "version": 1
+        },
+        "position": [
+          2.0,
+          -2.0
+        ]
+      },
+      "version": 1
+    }
+  ],
+  "walls": [
+    {
+      "value": null,
+      "version": 0
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 1,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 2,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 4,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 2,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 3,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 1,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 3,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 4,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 2,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 4,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 1,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 3,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    }
+  ],
+  "rooms": [
+    {
+      "value": null,
+      "version": 0
+    },
+    {
+      "value": {
+        "first_wall": {
+          "idx": 1,
+          "version": 1
+        },
+        "floor_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "ceiling_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "height": 1.0
+      },
+      "version": 1
+    }
+  ],
+  "objects": [
+    {
+      "name": "light",
+      "room_id": {
+        "idx": 1,
+        "version": 1
+      },
+      "position": [
+        -1.0033896,
+        -1.2227032
+      ],
+      "yaw": -3.9261742,
+      "info": {
+        "kind": "Light",
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "height": 0.5,
+        "power": 1.0,
+        "radius": 2.6
+      }
+    }
+  ],
+  "player_spawn": {
+    "room_id": {
+      "idx": 1,
+      "version": 1
+    },
+    "position": [
+      1.1418942,
+      0.82834834
+    ],
+    "yaw": -0.9247335
+  },
+  "fog": {
+    "color": {
+      "r": 0.27300432,
+      "g": 0.27300432,
+      "b": 0.27300432,
+      "a": 1.0
+    },
+    "start": 0.0,
+    "distance": 30.0,
+    "emission": 1.0,
+    "transparency": 0.5
+  }
+}

@@ -36,7 +36,7 @@ pub struct World {
 
 impl World {
 	pub fn new() -> World {
-		let geometry = WorldGeometry::new_square(64);
+		let geometry = WorldGeometry::new_square(4.0);
 		let first_room = geometry.rooms.keys().next().unwrap();
 
 		World {
@@ -109,11 +109,6 @@ pub fn calculate_portal_transform(world: &World, from: WallId, to: WallId) -> Ma
 	let (from_wall_start, from_wall_end) = world.geometry.wall_vertices(from);
 	let (to_wall_start, to_wall_end) = world.geometry.wall_vertices(to);
 
-	let from_wall_start = from_wall_start.to_vec2() / 8.0;
-	let from_wall_end = from_wall_end.to_vec2() / 8.0;
-	let to_wall_start = to_wall_start.to_vec2() / 8.0;
-	let to_wall_end = to_wall_end.to_vec2() / 8.0;
-
 	let from_wall_length = (from_wall_end - from_wall_start).length();
 	let to_wall_length = (to_wall_end - to_wall_start).length();
 
@@ -123,8 +118,8 @@ pub fn calculate_portal_transform(world: &World, from: WallId, to: WallId) -> Ma
 
 	let aperture_extent = from_wall_length.min(to_wall_length) / 2.0;
 
-	let from_wall_offset = (from_wall.horizontal_offset as f32 / 16.0).clamp(aperture_extent-from_wall_length/2.0, from_wall_length/2.0-aperture_extent);
-	let to_wall_offset = (to_wall.horizontal_offset as f32 / 16.0).clamp(aperture_extent-to_wall_length/2.0, to_wall_length/2.0-aperture_extent);
+	let from_wall_offset = from_wall.horizontal_offset.clamp(aperture_extent-from_wall_length/2.0, from_wall_length/2.0-aperture_extent);
+	let to_wall_offset = to_wall.horizontal_offset.clamp(aperture_extent-to_wall_length/2.0, to_wall_length/2.0-aperture_extent);
 
 
 	let s = from_wall_dir.wedge(-to_wall_dir);

@@ -10,7 +10,7 @@ slotmap::new_key_type! {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct VertexDef {
 	pub outgoing_wall: WallId,
-	pub position: Vec2i,
+	pub position: Vec2,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -24,11 +24,11 @@ pub struct WallDef {
 	pub color: Color,
 
 	// How much to offset the height of the target room.
-	pub vertical_offset: i32,
+	pub vertical_offset: f32,
 
 	// How much to offset the aperture horizontally in units from the center of the wall.
 	// Clamped to half the length of the wall
-	pub horizontal_offset: i32,
+	pub horizontal_offset: f32,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -37,7 +37,7 @@ pub struct RoomDef {
 
 	pub floor_color: Color,
 	pub ceiling_color: Color,
-	pub height: u32,
+	pub height: f32,
 }
 
 /// Describes world layout via half-edge structure
@@ -58,22 +58,21 @@ impl WorldGeometry {
 		}
 	}
 
-	pub fn new_square(size: u32) -> WorldGeometry {
+	pub fn new_square(size: f32) -> WorldGeometry {
 		let mut geometry = WorldGeometry::new();
-
-		let half_size = (size / 2) as i32;
+		let half_size = size / 2.0;
 
 		geometry.insert_room_from_positions(&[
-			Vec2i::new(-half_size, -half_size),
-			Vec2i::new(-half_size,  half_size),
-			Vec2i::new( half_size,  half_size),
-			Vec2i::new( half_size, -half_size),
+			Vec2::new(-half_size, -half_size),
+			Vec2::new(-half_size,  half_size),
+			Vec2::new( half_size,  half_size),
+			Vec2::new( half_size, -half_size),
 		]);
 
 		geometry
 	}
 
-	pub fn insert_room_from_positions(&mut self, positions: &[Vec2i]) -> RoomId {
+	pub fn insert_room_from_positions(&mut self, positions: &[Vec2]) -> RoomId {
 		assert!(!positions.is_empty());
 
 		let room_id = self.rooms.insert(RoomDef::default());
@@ -116,8 +115,8 @@ impl WorldGeometry {
 	pub fn wall_vertices(&self, wall_id: WallId) -> (Vec2, Vec2) {
 		let wall = &self.walls[wall_id];
 		let next_wall = &self.walls[wall.next_wall];
-		let vertex_0 = self.vertices[wall.source_vertex].position.to_vec2() / 16.0;
-		let vertex_1 = self.vertices[next_wall.source_vertex].position.to_vec2() / 16.0;
+		let vertex_0 = self.vertices[wall.source_vertex].position;
+		let vertex_1 = self.vertices[next_wall.source_vertex].position;
 		(vertex_0, vertex_1)
 	}
 
@@ -155,8 +154,8 @@ impl WorldGeometry {
 			.map(|wall_id| self.walls[wall_id].source_vertex)
 	}
 
-	pub fn room_bounds(&self, room_id: RoomId) -> Aabb2i {
-		let mut bounds = Aabb2i::empty();
+	pub fn room_bounds(&self, room_id: RoomId) -> Aabb2 {
+		let mut bounds = Aabb2::empty();
 
 		for vertex_id in self.room_vertices(room_id) {
 			let position = self.vertices[vertex_id].position;
@@ -239,8 +238,8 @@ impl Default for WallDef {
 
 			color: Color::white(),
 
-			vertical_offset: 0,
-			horizontal_offset: 0,
+			vertical_offset: 0.0,
+			horizontal_offset: 0.0,
 		}
 	}
 }
@@ -253,7 +252,7 @@ impl Default for RoomDef {
 			floor_color: Color::white(),
 			ceiling_color: Color::white(),
 
-			height: 16,
+			height: 1.0,
 		}
 	}
 }

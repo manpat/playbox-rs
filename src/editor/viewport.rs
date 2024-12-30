@@ -179,7 +179,7 @@ impl<'c> Viewport<'c> {
 
 		// Add vertices
 		for vertex_id in geometry.room_vertices(room_id) {
-			let position = geometry.vertices[vertex_id].position.to_vec2() / 16.0;
+			let position = geometry.vertices[vertex_id].position;
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Vertex(room_to_world * position),
@@ -206,7 +206,7 @@ impl<'c> Viewport<'c> {
 		// Pick room
 		let num_walls = geometry.room_walls(room_id).count();
 		let room_center = geometry.room_vertices(room_id)
-			.map(|vertex_id| geometry.vertices[vertex_id].position.to_vec2() / 16.0)
+			.map(|vertex_id| geometry.vertices[vertex_id].position)
 			.sum::<Vec2>() / num_walls as f32;
 
 		self.items.push(ViewportItem {
@@ -472,7 +472,7 @@ impl Viewport<'_> {
 					ui.separator();
 
 					if ui.button("Split").clicked() {
-						let insert_pos = (self.world.geometry.wall_center(wall_id) * 16.0).to_vec2i();
+						let insert_pos = self.world.geometry.wall_center(wall_id);
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
 						ui.close_menu();

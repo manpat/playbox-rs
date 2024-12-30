@@ -16,12 +16,12 @@ pub enum EditorWorldEditCmd {
 	TranslateItem(Item, Vec2),
 
 	SetCeilingColor(RoomId, Color),
-	SetCeilingHeight(RoomId, u32),
+	SetCeilingHeight(RoomId, f32),
 	SetFloorColor(RoomId, Color),
 
 	SetWallColor(WallId, Color),
-	SetHorizontalWallOffset(WallId, i32),
-	SetVerticalWallOffset(WallId, i32),
+	SetHorizontalWallOffset(WallId, f32),
+	SetVerticalWallOffset(WallId, f32),
 
 	SetFogParams(FogParameters),
 
@@ -37,7 +37,7 @@ pub enum EditorWorldEditCmd {
 	ConnectWall(WallId, WallId),
 	DisconnectWall(WallId),
 
-	SplitWall(WallId, Vec2i),
+	SplitWall(WallId, Vec2),
 	DeleteVertex(VertexId),
 
 
@@ -143,13 +143,11 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 	match cmd {
 		// TODO(pat.m): this needs reconsideration
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
-			let delta_fixed = (delta * 16.0).to_vec2i();
-
 			match item {
 				Item::Vertex(vertex_id) => {
 					transaction.describe(format!("Move {vertex_id:?}"));
 					transaction.update_vertex(vertex_id, |_, vertex| {
-						vertex.position += delta_fixed;
+						vertex.position += delta;
 						Ok(())
 					})?;
 					transaction.submit();
@@ -163,11 +161,11 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					let vertex_b = geometry.walls[geometry.walls[wall_id].next_wall].source_vertex;
 
 					transaction.update_vertex(vertex_a, |_, vertex| {
-						vertex.position += delta_fixed;
+						vertex.position += delta;
 						Ok(())
 					})?;
 					transaction.update_vertex(vertex_b, |_, vertex| {
-						vertex.position += delta_fixed;
+						vertex.position += delta;
 						Ok(())
 					})?;
 					transaction.submit();

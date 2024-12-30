@@ -2,8 +2,8 @@ use crate::prelude::*;
 use model::{Placement, World, ProcessedWorld, HudModel};
 
 /// Ratio of player height to max step distance.
-pub const PLAYER_MAX_STEP_HEIGHT: i32 = 4;
-pub const PLAYER_HEIGHT: i32 = 8;
+pub const PLAYER_MAX_STEP_HEIGHT: f32 = 0.2;
+pub const PLAYER_HEIGHT: f32 = 0.5;
 pub const PLAYER_RADIUS: f32 = 0.1;
 
 
@@ -200,7 +200,7 @@ impl Player {
 		// Collide with room verts
 		for wall_id in geometry.room_walls(self.placement.room_id) {
 			let vertex_id = geometry.walls[wall_id].source_vertex;
-			let vertex_position = geometry.vertices[vertex_id].position.to_vec2() / 16.0;
+			let vertex_position = geometry.vertices[vertex_id].position;
 			collide_vertex(&mut desired_position, vertex_position, PLAYER_RADIUS);
 		}
 
@@ -258,7 +258,7 @@ impl Player {
 					self.placement.yaw += connection_info.yaw_delta;
 
 					// TODO(pat.m): figure out another way to do this
-					self.hack_height_change = Some(connection_info.height_difference as f32 / 16.0);
+					self.hack_height_change = Some(connection_info.height_difference);
 
 					// TODO(pat.m): collide with walls in opposing wall as well
 					return travel_distance;

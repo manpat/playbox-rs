@@ -105,7 +105,7 @@ impl WorldView {
 				x.to_x0y(),
 				Vec3::from_y(1.0),
 				z.to_x0y(),
-				w.to_x0y() + Vec3::from_y(height_offset as f32 / 16.0)
+				w.to_x0y() + Vec3::from_y(height_offset)
 			]);
 
 			#[derive(Copy, Clone)]
@@ -166,7 +166,7 @@ impl WorldView {
 		self.visible_rooms.push(RoomInstance {
 			room_id: viewer_placement.room_id,
 			room_to_world: Mat2x3::identity(),
-			height_offset: 0,
+			height_offset: 0.0,
 			clip_by: None,
 		});
 
@@ -304,7 +304,7 @@ fn clip_wall_segment((mut left_vertex, mut right_vertex): (Vec2, Vec2), clip_by:
 struct RoomInstance {
 	room_id: RoomId,
 	room_to_world: Mat2x3,
-	height_offset: i32,
+	height_offset: f32,
 	clip_by: Option<ClipState>,
 }
 

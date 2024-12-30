@@ -290,7 +290,7 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Ceiling Height");
 
 		let mut height = room.height;
-		if ui.add(Slider::new(&mut height, 2..=72).logarithmic(true))
+		if ui.add(Slider::new(&mut height, 0.1..=5.0).logarithmic(true))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetCeilingHeight(room_id, height));
@@ -329,7 +329,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("horizontal Offset");
 
 		let mut offset = wall.horizontal_offset;
-		if ui.add(Slider::new(&mut offset, -16..=16).clamp_to_range(false))
+		if ui.add(Slider::new(&mut offset, -2.0..=2.0).step_by(0.01).clamp_to_range(false))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset));
@@ -340,7 +340,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Vertical Offset");
 
 		let mut offset = wall.vertical_offset;
-		if ui.add(Slider::new(&mut offset, -16..=16).clamp_to_range(false))
+		if ui.add(Slider::new(&mut offset, -2.0..=2.0).step_by(0.01).clamp_to_range(false))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset));
@@ -528,7 +528,7 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 	let per_row = 5;
 
 	for (room_index, room_id) in world.geometry.rooms.keys().enumerate() {
-		let bounds = world.geometry.room_bounds(room_id).to_aabb2();
+		let bounds = world.geometry.room_bounds(room_id);
 		let room_size = bounds.size();
 		let offset = position + room_size / 2.0 - bounds.center();
 

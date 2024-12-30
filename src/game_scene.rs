@@ -186,7 +186,7 @@ impl GameScene {
 		}
 
 
-		let eye_position = player.placement.position.to_x0y() + Vec3::from_y(model::PLAYER_HEIGHT as f32 / 16.0 - self.height_offset) + player.free_pos;
+		let eye_position = player.placement.position.to_x0y() + Vec3::from_y(model::PLAYER_HEIGHT - self.height_offset) + player.free_pos;
 
 		let aspect = gfx.backbuffer_aspect();
 		let projection = Mat4::perspective(80.0f32.to_radians(), aspect, 0.01, 100.0);
