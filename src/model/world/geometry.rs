@@ -126,6 +126,20 @@ impl WorldGeometry {
 		(end - start).length()
 	}
 
+	pub fn wall_center(&self, wall_id: WallId) -> Vec2 {
+		let (start, end) = self.wall_vertices(wall_id);
+		(start + end) / 2.0
+	}
+
+	pub fn wall_target(&self, wall_id: WallId) -> Option<WallId> {
+		self.walls.get(wall_id)?
+			.connected_wall
+	}
+
+	pub fn first_room(&self) -> RoomId {
+		self.rooms.keys().next().unwrap()
+	}
+
 	pub fn room_walls(&self, room_id: RoomId) -> RoomWallIterator<'_> {
 		let room = &self.rooms[room_id];
 		RoomWallIterator {

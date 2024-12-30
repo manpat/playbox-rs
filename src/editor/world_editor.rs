@@ -23,6 +23,11 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 		});
 	}
 
+	if state.inner.focused_room_id.is_none() {
+		let first_room = model.world.geometry.first_room();
+		state.inner.focused_room_id = Some(first_room);
+	}
+
 	let mut context = Context {
 		state: &mut state.inner,
 		model,
@@ -470,7 +475,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		(true, _, _) => context.model.player.placement.room_id,
 		(false, Some(item), _) => item.room_id(&context.model.world),
 		(false, None, Some(focused_room_id)) => focused_room_id,
-		_ => { todo!() }
+		_ => todo!()
 	};
 
 	let neighbouring_room_margin = 0.3;

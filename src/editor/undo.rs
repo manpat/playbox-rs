@@ -388,7 +388,7 @@ impl Transaction<'_> {
 	}
 
 	pub fn update_room(&mut self, room_id: RoomId, edit: impl FnOnce(&Model, &mut RoomDef) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let room = self.model.world.geometry.rooms.get_mut(room_id)
+		let room = self.model.world.geometry.rooms.get(room_id)
 			.with_context(|| format!("Trying to edit non-existent room {room_id:?}"))?;
 
 		let before = room.clone();
@@ -402,7 +402,7 @@ impl Transaction<'_> {
 	}
 
 	pub fn update_wall(&mut self, wall_id: WallId, edit: impl FnOnce(&Model, &mut WallDef) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let wall = self.model.world.geometry.walls.get_mut(wall_id)
+		let wall = self.model.world.geometry.walls.get(wall_id)
 			.with_context(|| format!("Trying to edit non-existent {wall_id:?}"))?;
 
 		let before = wall.clone();
@@ -416,7 +416,7 @@ impl Transaction<'_> {
 	}
 
 	pub fn update_vertex(&mut self, vertex_id: VertexId, edit: impl FnOnce(&Model, &mut VertexDef) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let vertex = self.model.world.geometry.vertices.get_mut(vertex_id)
+		let vertex = self.model.world.geometry.vertices.get(vertex_id)
 			.with_context(|| format!("Trying to edit non-existent {vertex_id:?}"))?;
 
 		let before = vertex.clone();
@@ -430,7 +430,7 @@ impl Transaction<'_> {
 	}
 
 	pub fn update_object(&mut self, object_index: usize, edit: impl FnOnce(&Model, &mut Object) -> anyhow::Result<()>) -> anyhow::Result<()> {
-		let object = self.model.world.objects.get_mut(object_index)
+		let object = self.model.world.objects.get(object_index)
 			.with_context(|| format!("Trying to edit non-existent object #{object_index}"))?;
 
 		let before = object.clone();

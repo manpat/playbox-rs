@@ -37,7 +37,7 @@ pub enum EditorWorldEditCmd {
 	ConnectWall(WallId, WallId),
 	DisconnectWall(WallId),
 
-	SplitWall(WallId, Vec2),
+	SplitWall(WallId, Vec2i),
 	DeleteVertex(VertexId),
 
 
@@ -141,12 +141,15 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 	}
 
 	match cmd {
+		// TODO(pat.m): this needs reconsideration
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
+			let delta_fixed = (delta * 16.0).to_vec2i();
+
 			match item {
 				Item::Vertex(vertex_id) => {
 					transaction.describe(format!("Move {vertex_id:?}"));
 					transaction.update_vertex(vertex_id, |_, vertex| {
-						vertex.position += (delta * 16.0).to_vec2i();
+						vertex.position += delta_fixed;
 						Ok(())
 					})?;
 					transaction.submit();
@@ -154,24 +157,34 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 				Item::Wall(wall_id) => {
 					transaction.describe(format!("Move {wall_id:?}"));
-					transaction.update_wall(wall_id, |_, room| {
-						let wall_count = room.wall_vertices.len();
-						room.wall_vertices[wall_index] += delta;
-						room.wall_vertices[(wall_index+1) % wall_count] += delta;
+
+					let geometry = &transaction.model().world.geometry;
+					let vertex_a = geometry.walls[wall_id].source_vertex;
+					let vertex_b = geometry.walls[geometry.walls[wall_id].next_wall].source_vertex;
+
+					transaction.update_vertex(vertex_a, |_, vertex| {
+						vertex.position += delta_fixed;
+						Ok(())
+					})?;
+					transaction.update_vertex(vertex_b, |_, vertex| {
+						vertex.position += delta_fixed;
 						Ok(())
 					})?;
 					transaction.submit();
 				}
 
-				Item::Room(room_index) => {
-					transaction.describe(format!("Recenter Room #{room_index}"));
-					transaction.update_room(room_index, |_, room| {
-						for vertex in room.wall_vertices.iter_mut() {
-							*vertex += delta;
-						}
+				Item::Room(room_id) => {
+					anyhow::bail!("Not implemented");
 
-						Ok(())
-					})?;
+					// transaction.describe(format!("Recenter Room #{room_id:?}"));
+					// transaction.update_room(room_id, |_, room| {
+					// 	for vertex in room.wall_vertices.iter_mut() {
+					// 		*vertex += delta;
+					// 	}
+
+					// 	Ok(())
+					// })?;
+					// transaction.submit();
 				}
 
 				Item::Object(object_index) => {
@@ -263,231 +276,199 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::AddRoom { room, connection } => {
-			if let Some((_, target_wall_id)) = connection {
-				transaction.describe(format!("Add Room from {target_wall_id}"));
-			} else {
-				transaction.describe("Add Room");
-			}
+			anyhow::bail!("Not implemented");
 
-			transaction.update_world(|_, world| {
-				world.rooms.push(room);
-				Ok(())
-			})?;
+			// if let Some((_, target_wall_id)) = connection {
+			// 	transaction.describe(format!("Add Room from {target_wall_id:?}"));
+			// } else {
+			// 	transaction.describe("Add Room");
+			// }
 
-			if let Some((source_wall_index, target_wall_id)) = connection {
-				transaction.update_connections(|model, connections| {
-					let new_room_index = model.world.rooms.len();
+			// transaction.update_world(|_, world| {
+			// 	world.rooms.push(room);
+			// 	Ok(())
+			// })?;
 
-					// Disconnect target wall
-					connections.retain(|&(wall_a, wall_b)| {
-						wall_a != target_wall_id && wall_b != target_wall_id
-					});
+			// if let Some((source_wall_index, target_wall_id)) = connection {
+			// 	transaction.update_connections(|model, connections| {
+			// 		let new_room_index = model.world.rooms.len();
 
-					let source_wall_id = WallId {
-						room_index: new_room_index,
-						wall_index: source_wall_index,
-					};
+			// 		// Disconnect target wall
+			// 		connections.retain(|&(wall_a, wall_b)| {
+			// 			wall_a != target_wall_id && wall_b != target_wall_id
+			// 		});
 
-					// Create new connection
-					connections.push((source_wall_id, target_wall_id));
+			// 		let source_wall_id = WallId {
+			// 			room_index: new_room_index,
+			// 			wall_index: source_wall_index,
+			// 		};
 
-					Ok(())
-				})?;
-			}
+			// 		// Create new connection
+			// 		connections.push((source_wall_id, target_wall_id));
 
-			transaction.submit();
+			// 		Ok(())
+			// 	})?;
+			// }
+
+			// transaction.submit();
 		}
 
-		EditorWorldEditCmd::RemoveRoom(room_index) => {
-			if transaction.model().world.rooms.len() == 1 {
-				anyhow::bail!("Can't delete last room in world")
-			}
+		EditorWorldEditCmd::RemoveRoom(room_id) => {
+			anyhow::bail!("Not implemented");
+			// if transaction.model().world.rooms.len() == 1 {
+			// 	anyhow::bail!("Can't delete last room in world")
+			// }
 
-			if transaction.model().player.placement.room_index == room_index {
-				anyhow::bail!("Can't delete room containing player");
-			}
+			// if transaction.model().player.placement.room_id == room_id {
+			// 	anyhow::bail!("Can't delete room containing player");
+			// }
 
-			transaction.describe(format!("Remove Room #{room_index}"));
+			// transaction.describe(format!("Remove Room #{room_id}"));
 
-			transaction.update_world(|_, world| {
-				// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every Location in the model
+			// transaction.update_world(|_, world| {
+			// 	// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every Location in the model
 
-				// Fix player spawn
-				if world.player_spawn.room_index > room_index {
-					world.player_spawn.room_index = world.player_spawn.room_index.saturating_sub(1);
-				}
+			// 	// Clear or adjust selection
+			// 	if let Some(selected_item) = &mut state.selection {
+			// 		// TODO(pat.m): this doesn't really make sense for player spawn
+			// 		let selected_room_id = selected_item.room_id(&world);
 
-				// Clear or adjust selection
-				if let Some(selected_item) = &mut state.selection {
-					// TODO(pat.m): this doesn't really make sense for player spawn
-					let selected_room_index = selected_item.room_index(&world);
+			// 		if selected_room_id == room_id {
+			// 			state.selection = None;
+			// 		}
+			// 	}
 
-					if selected_room_index > room_index {
-						todo!();
-						// selected_item.set_room_index(selected_room_index.saturating_sub(1));
-					} else if selected_room_index == room_index {
-						state.selection = None;
-					}
-				}
+			// 	// Actually remove room
+			// 	world.geometry.rooms.remove(room_id);
 
-				// Update focused room
-				if state.focused_room_index >= room_index {
-					state.focused_room_index = state.focused_room_index.saturating_sub(1);
-				}
+			// 	todo!("Remove walls and vertices");
 
-				// Actually remove room
-				world.rooms.remove(room_index);
+			// 	Ok(())
+			// })?;
 
-				Ok(())
-			})?;
-
-			transaction.update_connections(|_, connections| {
-				// Remove connections to deleted room
-				connections.retain(|&(wall_a, wall_b)| {
-					wall_a.room_index != room_index && wall_b.room_index != room_index
-				});
-
-				// Update all connections with corrected room indices
-				for (wall_a, wall_b) in connections.iter_mut() {
-					if wall_a.room_index > room_index {
-						wall_a.room_index -= 1;
-					}
-
-					if wall_b.room_index > room_index {
-						wall_b.room_index -= 1;
-					}
-				}
-
-				Ok(())
-			})?;
-
-			// Fix player position if we've made it this far
-			transaction.update_player(|_, player| {
-				if player.placement.room_index > room_index {
-					player.placement.room_index = player.placement.room_index.saturating_sub(1);
-				}
-
-				Ok(())
-			})?;
-
-			transaction.submit();
+			// transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectRoom(room_index) => {
-			transaction.describe(format!("Disconnect Room #{room_index}"));
-			transaction.update_connections(|_, connections| {
-				connections.retain(|&(wall_a, wall_b)| {
-					wall_a.room_index != room_index && wall_b.room_index != room_index
-				});
+			anyhow::bail!("Not implemented");
+			// transaction.describe(format!("Disconnect Room #{room_index}"));
+			// transaction.update_connections(|_, connections| {
+			// 	connections.retain(|&(wall_a, wall_b)| {
+			// 		wall_a.room_index != room_index && wall_b.room_index != room_index
+			// 	});
 
-				Ok(())
-			})?;
-			transaction.submit();
+			// 	Ok(())
+			// })?;
+			// transaction.submit();
 		}
 
 		EditorWorldEditCmd::ConnectWall(source_wall_id, target_wall_id) => {
-			transaction.describe(format!("Connect {source_wall_id} -> {target_wall_id}"));
-			transaction.update_connections(|_, connections| {
-				// Remove any connections to either the source or target walls
-				connections.retain(|&(wall_a, wall_b)| {
-					wall_a != source_wall_id && wall_b != source_wall_id
-					&& wall_a != target_wall_id && wall_b != target_wall_id
-				});
+			anyhow::bail!("Not implemented");
+			// transaction.describe(format!("Connect {source_wall_id} -> {target_wall_id}"));
+			// transaction.update_connections(|_, connections| {
+			// 	// Remove any connections to either the source or target walls
+			// 	connections.retain(|&(wall_a, wall_b)| {
+			// 		wall_a != source_wall_id && wall_b != source_wall_id
+			// 		&& wall_a != target_wall_id && wall_b != target_wall_id
+			// 	});
 
-				// Connect
-				connections.push((source_wall_id, target_wall_id));
+			// 	// Connect
+			// 	connections.push((source_wall_id, target_wall_id));
 
-				Ok(())
-			})?;
-			transaction.submit();
+			// 	Ok(())
+			// })?;
+			// transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
-			transaction.describe(format!("Disconnect {wall_id:?}"));
-			transaction.update_connections(|_, connections| {
-				connections.retain(|&(wall_a, wall_b)| {
-					wall_a != wall_id && wall_b != wall_id
-				});
+			anyhow::bail!("Not implemented");
+			// transaction.describe(format!("Disconnect {wall_id:?}"));
+			// transaction.update_connections(|_, connections| {
+			// 	connections.retain(|&(wall_a, wall_b)| {
+			// 		wall_a != wall_id && wall_b != wall_id
+			// 	});
 
-				Ok(())
-			})?;
-			transaction.submit();
+			// 	Ok(())
+			// })?;
+			// transaction.submit();
 		}
 
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
-			let new_wall_index = wall_id.wall_index + 1;
+			anyhow::bail!("Not implemented");
+			// let new_wall_index = wall_id.wall_index + 1;
 
-			transaction.describe(format!("Split Wall {wall_id:?}"));
+			// transaction.describe(format!("Split Wall {wall_id:?}"));
 
-			transaction.update_room(wall_id.room_index, |_, room| {
-				let wall = room.walls.get(wall_id.wall_index)
-					.context("Invalid wall index")?
-					.clone();
+			// transaction.update_room(wall_id.room_index, |_, room| {
+			// 	let wall = room.walls.get(wall_id.wall_index)
+			// 		.context("Invalid wall index")?
+			// 		.clone();
 
-				// Insert the new wall after the target wall
-				room.walls.insert(new_wall_index, wall);
-				room.wall_vertices.insert(new_wall_index, new_position);
+			// 	// Insert the new wall after the target wall
+			// 	room.walls.insert(new_wall_index, wall);
+			// 	room.wall_vertices.insert(new_wall_index, new_position);
 
-				Ok(())
-			})?;
+			// 	Ok(())
+			// })?;
 
-			transaction.update_connections(|_, connections| {
-				// Update all connections with corrected wall ids
-				for (wall_a, wall_b) in connections.iter_mut() {
-					if wall_a.room_index == wall_id.room_index && wall_a.wall_index >= new_wall_index {
-						wall_a.wall_index += 1;
-					}
+			// transaction.update_connections(|_, connections| {
+			// 	// Update all connections with corrected wall ids
+			// 	for (wall_a, wall_b) in connections.iter_mut() {
+			// 		if wall_a.room_index == wall_id.room_index && wall_a.wall_index >= new_wall_index {
+			// 			wall_a.wall_index += 1;
+			// 		}
 
-					if wall_b.room_index == wall_id.room_index && wall_b.wall_index >= new_wall_index {
-						wall_b.wall_index += 1;
-					}
-				}
+			// 		if wall_b.room_index == wall_id.room_index && wall_b.wall_index >= new_wall_index {
+			// 			wall_b.wall_index += 1;
+			// 		}
+			// 	}
 
-				Ok(())
-			})?;
+			// 	Ok(())
+			// })?;
 
-			transaction.submit();
+			// transaction.submit();
 		}
 
 		EditorWorldEditCmd::DeleteVertex(vertex_id) => {
-			transaction.describe(format!("Remove Vertex {vertex_id}"));
+			anyhow::bail!("Not implemented");
+			// transaction.describe(format!("Remove Vertex {vertex_id}"));
 
-			// Remove vertex and adjacent wall
-			transaction.update_room(vertex_id.room_index, |_, room| {
-				if vertex_id.vertex_index >= room.walls.len() {
-					anyhow::bail!("Trying to delete invalid vertex");
-				}
+			// // Remove vertex and adjacent wall
+			// transaction.update_room(vertex_id.room_index, |_, room| {
+			// 	if vertex_id.vertex_index >= room.walls.len() {
+			// 		anyhow::bail!("Trying to delete invalid vertex");
+			// 	}
 
-				room.walls.remove(vertex_id.vertex_index);
-				room.wall_vertices.remove(vertex_id.vertex_index);
+			// 	room.walls.remove(vertex_id.vertex_index);
+			// 	room.wall_vertices.remove(vertex_id.vertex_index);
 
-				Ok(())
-			})?;
+			// 	Ok(())
+			// })?;
 
-			// Remove connections to adjacent wall
-			transaction.update_connections(|_, connections| {
-				let wall_id = vertex_id.to_wall_id();
+			// // Remove connections to adjacent wall
+			// transaction.update_connections(|_, connections| {
+			// 	let wall_id = vertex_id.to_wall_id();
 
-				// Remove connections to deleted wall
-				connections.retain(|&(wall_a, wall_b)| {
-					wall_a != wall_id && wall_b != wall_id
-				});
+			// 	// Remove connections to deleted wall
+			// 	connections.retain(|&(wall_a, wall_b)| {
+			// 		wall_a != wall_id && wall_b != wall_id
+			// 	});
 
-				// Update all connections with corrected wall ids
-				for (wall_a, wall_b) in connections.iter_mut() {
-					if wall_a.room_index == vertex_id.room_index && wall_a.wall_index > vertex_id.vertex_index {
-						wall_a.wall_index -= 1;
-					}
+			// 	// Update all connections with corrected wall ids
+			// 	for (wall_a, wall_b) in connections.iter_mut() {
+			// 		if wall_a.room_index == vertex_id.room_index && wall_a.wall_index > vertex_id.vertex_index {
+			// 			wall_a.wall_index -= 1;
+			// 		}
 
-					if wall_b.room_index == vertex_id.room_index && wall_b.wall_index > vertex_id.vertex_index {
-						wall_b.wall_index -= 1;
-					}
-				}
+			// 		if wall_b.room_index == vertex_id.room_index && wall_b.wall_index > vertex_id.vertex_index {
+			// 			wall_b.wall_index -= 1;
+			// 		}
+			// 	}
 
-				Ok(())
-			})?;
+			// 	Ok(())
+			// })?;
 
-			transaction.submit();
+			// transaction.submit();
 		}
 
 

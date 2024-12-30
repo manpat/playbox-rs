@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, ProcessedWorld, RoomDef, WallId, RoomId, Placement, Location};
+use model::{World, ProcessedWorld, WallId, RoomId, Placement, Location};
 use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -445,7 +445,7 @@ impl Viewport<'_> {
 
 			match item {
 				Item::Wall(wall_id) => {
-					let wall_target = self.world.wall_target(wall_id);
+					let wall_target = self.world.geometry.wall_target(wall_id);
 					if wall_target.is_some() {
 						if ui.button("Reconnect").clicked() {
 							self.viewport_state.current_operation = Some(Operation::ConnectWall{
@@ -472,21 +472,22 @@ impl Viewport<'_> {
 					ui.separator();
 
 					if ui.button("Split").clicked() {
-						let insert_pos = self.world.wall_center(wall_id);
+						let insert_pos = (self.world.geometry.wall_center(wall_id) * 16.0).to_vec2i();
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
 						ui.close_menu();
 					}
 
 					if ui.button("Add Room").clicked() {
-						let wall_length = self.world.geometry.wall_length(wall_id);
+						todo!();
 
-						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
-							room: RoomDef::new_square(wall_length),
-							connection: Some((todo!(), wall_id)),
-						});
+						// let wall_length = self.world.geometry.wall_length(wall_id);
+						// self.message_bus.emit(EditorWorldEditCmd::AddRoom {
+						// 	room: RoomDef::new_square(wall_length),
+						// 	connection: Some((todo!(), wall_id)),
+						// });
 
-						ui.close_menu();
+						// ui.close_menu();
 					}
 				}
 
@@ -514,26 +515,27 @@ impl Viewport<'_> {
 
 				Item::Vertex(vertex_id) => {
 					if ui.button("Bevel").clicked() {
-						let outgoing_wall = vertex_id.to_wall_id();
-						let incoming_wall = self.world.prev_wall(outgoing_wall);
+						todo!();
+						// let outgoing_wall = vertex_id.to_wall_id();
+						// let incoming_wall = self.world.prev_wall(outgoing_wall);
 
-						let incoming_start = self.world.vertex(incoming_wall.to_vertex_id());
-						let (original_vertex, outgoing_end) = self.world.wall_vertices(outgoing_wall);
+						// let incoming_start = self.world.vertex(incoming_wall.to_vertex_id());
+						// let (original_vertex, outgoing_end) = self.world.wall_vertices(outgoing_wall);
 
-						let incoming_direction = incoming_start - original_vertex;
-						let outgoing_direction = outgoing_end - original_vertex;
+						// let incoming_direction = incoming_start - original_vertex;
+						// let outgoing_direction = outgoing_end - original_vertex;
 
-						// Bevel to half way along the shortest wall
-						let bevel_dist = incoming_direction.length().min(outgoing_direction.length()) / 2.0;
+						// // Bevel to half way along the shortest wall
+						// let bevel_dist = incoming_direction.length().min(outgoing_direction.length()) / 2.0;
 
-						let start_vertex = original_vertex + incoming_direction.normalize() * bevel_dist;
-						let end_vertex_delta = outgoing_direction.normalize() * bevel_dist;
+						// let start_vertex = original_vertex + incoming_direction.normalize() * bevel_dist;
+						// let end_vertex_delta = outgoing_direction.normalize() * bevel_dist;
 
-						// Translate the original vertex along the _incoming_ wall
-						self.message_bus.emit(EditorWorldEditCmd::TranslateItem(Item::Vertex(vertex_id), end_vertex_delta));
+						// // Translate the original vertex along the _incoming_ wall
+						// self.message_bus.emit(EditorWorldEditCmd::TranslateItem(Item::Vertex(vertex_id), end_vertex_delta));
 
-						// Split the _outgoing_ wall and place the new vertex at the end pos.
-						self.message_bus.emit(EditorWorldEditCmd::SplitWall(incoming_wall, start_vertex));
+						// // Split the _outgoing_ wall and place the new vertex at the end pos.
+						// self.message_bus.emit(EditorWorldEditCmd::SplitWall(incoming_wall, start_vertex));
 
 						ui.close_menu();
 					}
@@ -657,14 +659,14 @@ impl Viewport<'_> {
 	fn draw_operation(&self, operation: &Operation) {
 		match operation {
 			&Operation::ConnectWall{source_wall, room_to_world} => {
-				let center_room = self.world.wall_center(source_wall);
+				let center_room = self.world.geometry.wall_center(source_wall);
 				let center_widget = self.viewport_metrics.world_to_widget_position(room_to_world * center_room);
 
 				let is_hovered_connectable = self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::CONNECTABLE);
 
 				match self.editor_state.hovered {
 					Some(Item::Wall(wall_id)) if wall_id != source_wall && is_hovered_connectable => {
-						let center_room = self.world.wall_center(wall_id);
+						let center_room = self.world.geometry.wall_center(wall_id);
 
 						// Draw a line to each instance of the room in the viewport
 						let transforms = self.items.iter()
