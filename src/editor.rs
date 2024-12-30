@@ -40,7 +40,8 @@ impl Item {
 			Item::Wall(wall_id) => geometry.walls[wall_id].room,
 			Item::PlayerSpawn => world.player_spawn.room_id,
 			Item::Object(object_index) => world.objects.get(object_index)
-				.map_or(0, |obj| obj.placement.room_id),
+				.map(|obj| obj.placement.room_id)
+				.unwrap(),
 		}
 	}
 }
@@ -61,7 +62,7 @@ struct InnerState {
 	hovered: Option<Item>,
 	selection: Option<Item>,
 
-	focused_room_index: usize,
+	focused_room_id: Option<RoomId>,
 	track_player: bool,
 }
 
@@ -72,7 +73,7 @@ impl State {
 				hovered: None,
 				selection: None,
 
-				focused_room_index: 0,
+				focused_room_id: None,
 				track_player: false,
 			},
 
@@ -85,7 +86,7 @@ impl State {
 
 	pub fn reset(&mut self) {
 		self.undo_stack.clear();
-		self.inner.focused_room_index = 0;
+		self.inner.focused_room_id = None;
 		self.inner.hovered = None;
 		self.inner.selection = None;
 	}
@@ -101,16 +102,16 @@ fn validate_model(state: &mut State, model: &mut Model) {
 	let geometry = &model.world.geometry;
 	let first_room = geometry.rooms.keys().next().unwrap();
 
-	if geometry.rooms.contains_key(state.inner.focused_room_id) {
-		state.inner.focused_room_id = first_room;
+	if !state.inner.focused_room_id.map_or(false, |room_id| geometry.rooms.contains_key(room_id)) {
+		state.inner.focused_room_id = Some(first_room);
 	}
 
-	if geometry.rooms.contains_key(model.player.placement.room_id) {
+	if !geometry.rooms.contains_key(model.player.placement.room_id) {
 		model.player.placement.room_id = first_room;
 	}
 
 	// Yuck
-	if geometry.rooms.contains_key(model.world.player_spawn.room_id) {
+	if !geometry.rooms.contains_key(model.world.player_spawn.room_id) {
 		model.world.player_spawn.room_id = first_room;
 	}
 

@@ -17,7 +17,7 @@ impl Interactions {
 		}
 	}
 
-	pub fn update(&mut self, player: &Player, world: &World, processed_world: &ProcessedWorld, message_bus: &MessageBus) {
+	pub fn update(&mut self, player: &Player, world: &World, _processed_world: &ProcessedWorld, message_bus: &MessageBus) {
 		if message_bus.poll(&self.player_cmd_sub).any(|msg| msg == PlayerCmd::Interact) {
 			if let Some(object_index) = self.hovered_object
 				&& let Some(object) = world.objects.get(object_index)

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{World, ProcessedWorld, VertexId, WallId, Placement, Location};
+use model::{World, ProcessedWorld, RoomDef, WallId, RoomId, Placement, Location};
 use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
 #[derive(Copy, Clone)]
@@ -166,8 +166,7 @@ impl<'c> Viewport<'c> {
 	}
 
 	pub fn add_room(&mut self, room_id: RoomId, room_to_world: Mat2x3, flags: ViewportItemFlags) {
-		let room = &self.world.geometry.rooms[room_id];
-		let num_walls = room.walls.len();
+		let geometry = &self.world.geometry;
 
 		let interaction_flags = flags.intersection(ViewportItemFlags::BASIC_INTERACTIONS);
 
@@ -179,10 +178,12 @@ impl<'c> Viewport<'c> {
 		let wall_interaction_flags = interaction_flags | ViewportItemFlags::CONNECTABLE;
 
 		// Add vertices
-		for (vertex_index, vertex) in room.wall_vertices.iter().enumerate() {
+		for vertex_id in geometry.room_vertices(room_id) {
+			let position = geometry.vertices[vertex_id].position.to_vec2() / 16.0;
+
 			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Vertex(room_to_world * *vertex),
-				item: Some(Item::Vertex(VertexId {room_id, vertex_index})),
+				shape: ViewportItemShape::Vertex(room_to_world * position),
+				item: Some(Item::Vertex(vertex_id)),
 				color: Color::grey(0.5),
 				room_to_world,
 				flags: interaction_flags,
@@ -190,20 +191,24 @@ impl<'c> Viewport<'c> {
 		}
 
 		// Pick walls
-		for wall_index in 0..num_walls {
-			let (start, end) = room.wall_vertices(wall_index);
+		for wall_id in geometry.room_walls(room_id) {
+			let (start, end) = geometry.wall_vertices(wall_id);
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
-				item: Some(Item::Wall(WallId {room_id, wall_index})),
-				color: room.walls[wall_index].color,
+				item: Some(Item::Wall(wall_id)),
+				color: geometry.walls[wall_id].color,
 				room_to_world,
 				flags: wall_interaction_flags,
 			});
 		}
 
 		// Pick room
-		let room_center = room.wall_vertices.iter().sum::<Vec2>() / num_walls as f32;
+		let num_walls = geometry.room_walls(room_id).count();
+		let room_center = geometry.room_vertices(room_id)
+			.map(|vertex_id| geometry.vertices[vertex_id].position.to_vec2() / 16.0)
+			.sum::<Vec2>() / num_walls as f32;
+
 		self.items.push(ViewportItem {
 			shape: ViewportItemShape::Vertex(room_to_world * room_center),
 			item: Some(Item::Room(room_id)),
@@ -214,15 +219,12 @@ impl<'c> Viewport<'c> {
 	}
 
 	pub fn add_room_connections(&mut self, room_id: RoomId, room_to_world: Mat2x3, flags: ViewportItemFlags) {
-		let room = &self.world.rooms[room_id];
-		let num_walls = room.walls.len();
+		let geometry = &self.world.geometry;
 
 		// Connections are only clickable
 		let interaction_flags = flags.intersection(ViewportItemFlags::CLICKABLE) & !ViewportItemFlags::CONNECTABLE;
 
-		for wall_index in 0..num_walls {
-			let src_wall_id = WallId{room_id, wall_index};
-
+		for src_wall_id in geometry.room_walls(room_id) {
 			let Some(wall_info) = self.processed_world.wall_info(src_wall_id) else {
 				continue
 			};
@@ -237,7 +239,7 @@ impl<'c> Viewport<'c> {
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Line(room_to_world * aperture_start, room_to_world * aperture_end),
-				item: Some(Item::Wall(connection_info.target_id)),
+				item: Some(Item::Wall(connection_info.target_wall)),
 				color: WALL_CONNECTION_COLOR,
 				room_to_world,
 				flags: interaction_flags,
@@ -306,7 +308,7 @@ impl<'c> Viewport<'c> {
 		self.show_context_menu();
 
 		if let Some(selected_item) = self.editor_state.selection {
-			self.editor_state.focused_room_index = selected_item.room_id(self.world);
+			self.editor_state.focused_room_id = Some(selected_item.room_id(self.world));
 		}
 
 		self.draw_items();
@@ -477,11 +479,11 @@ impl Viewport<'_> {
 					}
 
 					if ui.button("Add Room").clicked() {
-						let wall_length = self.world.wall_length(wall_id);
+						let wall_length = self.world.geometry.wall_length(wall_id);
 
 						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
-							room: Room::new_square(wall_length),
-							connection: Some((0, wall_id)),
+							room: RoomDef::new_square(wall_length),
+							connection: Some((todo!(), wall_id)),
 						});
 
 						ui.close_menu();
@@ -491,7 +493,7 @@ impl Viewport<'_> {
 				Item::Room(room_id) => {
 					if ui.button("Duplicate").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
-							room: self.world.rooms[room_id].clone(),
+							room: self.world.geometry.rooms[room_id].clone(),
 							connection: None,
 						});
 						ui.close_menu();
@@ -575,7 +577,7 @@ impl Viewport<'_> {
 						self.painter.text(
 							vertex_px,
 							egui::Align2::CENTER_CENTER,
-							format!("#{room_id}"),
+							format!("{room_id:?}"),
 							egui::FontId::proportional(12.0),
 							if item_hovered || item_selected {
 								egui::Color32::WHITE

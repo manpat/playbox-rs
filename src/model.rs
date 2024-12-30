@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use std::fmt::{self, Display};
 
 pub mod hud;
 pub mod world;

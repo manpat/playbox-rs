@@ -1,5 +1,4 @@
 use super::{
-	db_to_linear,
 	linear_to_db,
 	Control,
 	DC_OFFSET,
@@ -34,7 +33,7 @@ impl MusicProvider {
 		self.target_volume = ctl.music_volume.load(Ordering::Relaxed);
 	}
 
-	pub fn fill(&mut self, buffer: &mut [f32]) {
+	pub fn fill(&mut self, _buffer: &mut [f32]) {
 		// let mut osc_phase = self.osc_phase * 55.0 * std::f64::consts::TAU;
 		// let osc_dt = self.sample_dt * 55.0 * std::f64::consts::TAU;
 

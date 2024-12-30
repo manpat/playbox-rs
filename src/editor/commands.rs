@@ -16,12 +16,12 @@ pub enum EditorWorldEditCmd {
 	TranslateItem(Item, Vec2),
 
 	SetCeilingColor(RoomId, Color),
-	SetCeilingHeight(RoomId, f32),
+	SetCeilingHeight(RoomId, u32),
 	SetFloorColor(RoomId, Color),
 
 	SetWallColor(WallId, Color),
-	SetHorizontalWallOffset(WallId, f32),
-	SetVerticalWallOffset(WallId, f32),
+	SetHorizontalWallOffset(WallId, i32),
+	SetVerticalWallOffset(WallId, i32),
 
 	SetFogParams(FogParameters),
 
@@ -143,19 +143,18 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 	match cmd {
 		EditorWorldEditCmd::TranslateItem(item, delta) => {
 			match item {
-				Item::Vertex(vertex_id @ VertexId {room_index, vertex_index}) => {
-					transaction.describe(format!("Move {vertex_id}"));
-					transaction.update_room(room_index, |_, room| {
-						room.wall_vertices[vertex_index] += delta;
-
+				Item::Vertex(vertex_id) => {
+					transaction.describe(format!("Move {vertex_id:?}"));
+					transaction.update_vertex(vertex_id, |_, vertex| {
+						vertex.position += (delta * 16.0).to_vec2i();
 						Ok(())
 					})?;
 					transaction.submit();
 				}
 
-				Item::Wall(wall_id @ WallId {room_index, wall_index}) => {
-					transaction.describe(format!("Move {wall_id}"));
-					transaction.update_room(room_index, |_, room| {
+				Item::Wall(wall_id) => {
+					transaction.describe(format!("Move {wall_id:?}"));
+					transaction.update_wall(wall_id, |_, room| {
 						let wall_count = room.wall_vertices.len();
 						room.wall_vertices[wall_index] += delta;
 						room.wall_vertices[(wall_index+1) % wall_count] += delta;
@@ -191,27 +190,27 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			}
 		}
 
-		EditorWorldEditCmd::SetCeilingColor(room_index, color) => {
-			transaction.describe(format!("Set Room #{room_index} ceiling color"));
-			transaction.update_room(room_index, |_, room| {
+		EditorWorldEditCmd::SetCeilingColor(room_id, color) => {
+			transaction.describe(format!("Set {room_id:?} ceiling color"));
+			transaction.update_room(room_id, |_, room| {
 				room.ceiling_color = color;
 				Ok(())
 			})?;
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::SetCeilingHeight(room_index, height) => {
-			transaction.describe(format!("Set Room #{room_index} ceiling height"));
-			transaction.update_room(room_index, |_, room| {
+		EditorWorldEditCmd::SetCeilingHeight(room_id, height) => {
+			transaction.describe(format!("Set {room_id:?} ceiling height"));
+			transaction.update_room(room_id, |_, room| {
 				room.height = height;
 				Ok(())
 			})?;
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::SetFloorColor(room_index, color) => {
-			transaction.describe(format!("Set Room #{room_index} floor color"));
-			transaction.update_room(room_index, |_, room| {
+		EditorWorldEditCmd::SetFloorColor(room_id, color) => {
+			transaction.describe(format!("Set {room_id:?} floor color"));
+			transaction.update_room(room_id, |_, room| {
 				room.floor_color = color;
 				Ok(())
 			})?;
@@ -219,7 +218,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::SetWallColor(wall_id, color) => {
-			transaction.describe(format!("Set {wall_id} color"));
+			transaction.describe(format!("Set {wall_id:?} color"));
 			transaction.update_wall(wall_id, |_, wall| {
 				wall.color = color;
 				Ok(())
@@ -228,7 +227,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset) => {
-			transaction.describe(format!("Set {wall_id} horizontal offset"));
+			transaction.describe(format!("Set {wall_id:?} horizontal offset"));
 			transaction.update_wall(wall_id, |_, wall| {
 				wall.horizontal_offset = offset;
 				Ok(())
@@ -237,7 +236,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset) => {
-			transaction.describe(format!("Set {wall_id} vertical offset"));
+			transaction.describe(format!("Set {wall_id:?} vertical offset"));
 			transaction.update_wall(wall_id, |_, wall| {
 				wall.vertical_offset = offset;
 				Ok(())
@@ -404,7 +403,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
-			transaction.describe(format!("Disconnect {wall_id}"));
+			transaction.describe(format!("Disconnect {wall_id:?}"));
 			transaction.update_connections(|_, connections| {
 				connections.retain(|&(wall_a, wall_b)| {
 					wall_a != wall_id && wall_b != wall_id
@@ -418,7 +417,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
 			let new_wall_index = wall_id.wall_index + 1;
 
-			transaction.describe(format!("Split Wall {wall_id}"));
+			transaction.describe(format!("Split Wall {wall_id:?}"));
 
 			transaction.update_room(wall_id.room_index, |_, room| {
 				let wall = room.walls.get(wall_id.wall_index)

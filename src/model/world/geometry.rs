@@ -135,6 +135,22 @@ impl WorldGeometry {
 			fused: false,
 		}
 	}
+
+	pub fn room_vertices(&self, room_id: RoomId) -> impl Iterator<Item=VertexId> + DoubleEndedIterator + ExactSizeIterator + use<'_> {
+		self.room_walls(room_id)
+			.map(|wall_id| self.walls[wall_id].source_vertex)
+	}
+
+	pub fn room_bounds(&self, room_id: RoomId) -> Aabb2i {
+		let mut bounds = Aabb2i::empty();
+
+		for vertex_id in self.room_vertices(room_id) {
+			let position = self.vertices[vertex_id].position;
+			bounds = bounds.include_point(position);
+		}
+
+		bounds
+	}
 }
 
 #[derive(Clone)]

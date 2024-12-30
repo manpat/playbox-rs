@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, WallId, World, ProcessedWorld, HudModel};
+use model::{Placement, World, ProcessedWorld, HudModel};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT: i32 = 4;

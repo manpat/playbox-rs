@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use model::{Model, Player, Object, WallId, World, WorldChangedEvent};
-use model::world::geometry::*;
+use model::world::*;
 
 use std::time::{Instant, Duration};
 

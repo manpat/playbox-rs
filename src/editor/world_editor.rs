@@ -48,7 +48,7 @@ pub fn draw_world_editor(ctx: &egui::Context, state: &mut State, model: &model::
 				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
 					ui.menu_button("...", |ui| {
 						if ui.button("Focus Player").clicked() {
-							context.state.selection = Some(Item::Room(model.player.placement.room_index));
+							context.state.selection = Some(Item::Room(model.player.placement.room_id));
 							// TODO(pat.m): recenter viewport
 							ui.close_menu();
 						}
@@ -123,8 +123,8 @@ fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
 	ui.horizontal(|ui| {
 		ui.label("Player Spawn");
 
-		let Placement{ room_index, position: Vec2{x, y}, yaw } = ctx.model.world.player_spawn;
-		ui.label(format!("Room #{room_index} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
+		let Placement{ room_id, position: Vec2{x, y}, yaw } = ctx.model.world.player_spawn;
+		ui.label(format!("{room_id:?} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
 
 		if ui.button("Set Here").clicked() {
 			ctx.message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn);
@@ -240,18 +240,18 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 			ui.label("<select an item>");
 		}
 
-		Some(Item::Vertex(vertex_id)) => {
-			draw_room_inspector(ui, ctx, vertex_id.room_index);
-		}
+		// Some(Item::Vertex(vertex_id)) => {
+		// 	draw_room_inspector(ui, ctx, vertex_id.room_index);
+		// }
 
-		Some(Item::Wall(wall_id)) => {
-			draw_room_inspector(ui, ctx, wall_id.room_index);
-			ui.separator();
-			draw_wall_inspector(ui, ctx, wall_id);
-		}
+		// Some(Item::Wall(wall_id)) => {
+		// 	draw_room_inspector(ui, ctx, wall_id.room_index);
+		// 	ui.separator();
+		// 	draw_wall_inspector(ui, ctx, wall_id);
+		// }
 
-		Some(Item::Room(room_index)) => {
-			draw_room_inspector(ui, ctx, room_index);
+		Some(Item::Room(room_id)) => {
+			draw_room_inspector(ui, ctx, room_id);
 		}
 
 		Some(Item::Object(object_index)) => {
@@ -265,19 +265,19 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 
 }
 
-fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, room_index: usize) {
-	let Some(room) = model.world.rooms.get(room_index) else {
+fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, room_id: RoomId) {
+	let Some(room) = model.world.geometry.rooms.get(room_id) else {
 		return
 	};
 
-	ui.label(format!("Room #{room_index}"));
+	ui.label(format!("Room #{room_id:?}"));
 
 	ui.horizontal(|ui| {
 		ui.label("Ceiling Color");
 
 		let mut ceiling_color = room.ceiling_color;
 		if ui.color_edit_button_rgb(ceiling_color.as_mut()).changed() {
-			message_bus.emit(EditorWorldEditCmd::SetCeilingColor(room_index, ceiling_color));
+			message_bus.emit(EditorWorldEditCmd::SetCeilingColor(room_id, ceiling_color));
 		}
 	});
 
@@ -285,10 +285,10 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Ceiling Height");
 
 		let mut height = room.height;
-		if ui.add(Slider::new(&mut height, 0.1..=5.0).step_by(0.01).logarithmic(true))
+		if ui.add(Slider::new(&mut height, 2..=72).logarithmic(true))
 			.changed()
 		{
-			message_bus.emit(EditorWorldEditCmd::SetCeilingHeight(room_index, height));
+			message_bus.emit(EditorWorldEditCmd::SetCeilingHeight(room_id, height));
 		}
 	});
 
@@ -299,21 +299,17 @@ fn draw_room_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 
 		let mut floor_color = room.floor_color;
 		if ui.color_edit_button_rgb(floor_color.as_mut()).changed() {
-			message_bus.emit(EditorWorldEditCmd::SetFloorColor(room_index, floor_color));
+			message_bus.emit(EditorWorldEditCmd::SetFloorColor(room_id, floor_color));
 		}
 	});
 }
 
 fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, wall_id: WallId) {
-	let WallId{room_index, wall_index} = wall_id;
-
-	let Some(wall) = model.world.rooms.get(room_index)
-		.and_then(|room| room.walls.get(wall_index))
-	else {
+	let Some(wall) = model.world.geometry.walls.get(wall_id) else {
 		return
 	};
 
-	ui.label(format!("Wall #{wall_index}"));
+	ui.label(format!("Wall #{wall_id:?}"));
 
 	ui.horizontal(|ui| {
 		ui.label("Color");
@@ -328,7 +324,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("horizontal Offset");
 
 		let mut offset = wall.horizontal_offset;
-		if ui.add(Slider::new(&mut offset, -2.0..=2.0).step_by(0.01).clamp_to_range(false))
+		if ui.add(Slider::new(&mut offset, -16..=16).clamp_to_range(false))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetHorizontalWallOffset(wall_id, offset));
@@ -339,7 +335,7 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 		ui.label("Vertical Offset");
 
 		let mut offset = wall.vertical_offset;
-		if ui.add(Slider::new(&mut offset, -1.0..=1.0).step_by(0.01).clamp_to_range(false))
+		if ui.add(Slider::new(&mut offset, -16..=16).clamp_to_range(false))
 			.changed()
 		{
 			message_bus.emit(EditorWorldEditCmd::SetVerticalWallOffset(wall_id, offset));
@@ -456,13 +452,13 @@ const OBJECT_COLOR: Color = Color::rgb(0.3, 0.8, 0.5);
 
 
 fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context) {
-	let selected_room_index = state.selection.as_ref().map_or(state.focused_room_index, |item| item.room_index(&model.world));
+	let selected_room_id = state.selection.as_ref().map(|item| item.room_id(&model.world)).or(state.focused_room_id);
 
 	ui.horizontal(|ui| {
-		for (room_index, _room) in model.world.rooms.iter().enumerate() {
-			let selected = room_index == selected_room_index;
-			if ui.selectable_label(selected, format!("{room_index}")).clicked() {
-				state.selection = Some(Item::Room(room_index));
+		for room_id in model.world.geometry.rooms.keys() {
+			let selected = Some(room_id) == selected_room_id;
+			if ui.selectable_label(selected, format!("{room_id:?}")).clicked() {
+				state.selection = Some(Item::Room(room_id));
 			}
 		}
 	});
@@ -470,24 +466,24 @@ fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context
 
 
 fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
-	let focused_room_index = match (context.state.track_player, &context.state.selection) {
-		(true, _) => context.model.player.placement.room_index,
-		(false, Some(item)) => item.room_index(&context.model.world),
-		(false, None) => context.state.focused_room_index,
+	let focused_room_id = match (context.state.track_player, &context.state.selection, context.state.focused_room_id) {
+		(true, _, _) => context.model.player.placement.room_id,
+		(false, Some(item), _) => item.room_id(&context.model.world),
+		(false, None, Some(focused_room_id)) => focused_room_id,
+		_ => { todo!() }
 	};
 
 	let neighbouring_room_margin = 0.3;
 
 	let mut neighbouring_rooms = Vec::new();
 
-	for wall_index in 0..context.model.world.rooms[focused_room_index].walls.len() {
-		let src_wall_id = WallId{room_index: focused_room_index, wall_index};
+	for src_wall_id in context.model.world.geometry.room_walls(focused_room_id) {
 		if let Some(wall_info) = context.model.processed_world.wall_info(src_wall_id)
 			&& let Some(connection_info) = &wall_info.connection_info
 		{
 			let offset_transform = Mat2x3::translate(wall_info.normal * neighbouring_room_margin) * connection_info.target_to_source;
 
-			neighbouring_rooms.push((connection_info.target_id.room_index, offset_transform));
+			neighbouring_rooms.push((connection_info.target_room, offset_transform));
 		}
 	}
 
@@ -495,8 +491,8 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 	let world = &context.model.world;
 
 	let mut viewport = Viewport::new(ui, context);
-	viewport.add_room(focused_room_index, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
-	viewport.add_room_connections(focused_room_index, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS);
+	viewport.add_room(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
+	viewport.add_room_connections(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS);
 
 	for (room_index, transform) in neighbouring_rooms {
 		viewport.add_room(room_index, transform, ViewportItemFlags::BASIC_INTERACTIONS);
@@ -526,13 +522,13 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 	let margin = 0.4;
 	let per_row = 5;
 
-	for (room_index, room) in world.rooms.iter().enumerate() {
-		let bounds = room.bounds();
+	for (room_index, room_id) in world.geometry.rooms.keys().enumerate() {
+		let bounds = world.geometry.room_bounds(room_id).to_aabb2();
 		let room_size = bounds.size();
 		let offset = position + room_size / 2.0 - bounds.center();
 
-		viewport.add_room(room_index, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
-		viewport.add_room_connections(room_index, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
+		viewport.add_room(room_id, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
+		viewport.add_room_connections(room_id, Mat2x3::translate(offset), ViewportItemFlags::BASIC_INTERACTIONS);
 
 		max_height = max_height.max(room_size.y);
 
