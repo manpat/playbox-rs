@@ -38,12 +38,21 @@ impl WallId {
 		self.get(geometry).source_vertex
 	}
 
+	pub fn next_vertex(&self, geometry: &WorldGeometry) -> VertexId {
+		self.next_wall(geometry).vertex(geometry)
+	}
+
 	pub fn room(&self, geometry: &WorldGeometry) -> RoomId {
 		self.get(geometry).room
 	}
 
 	pub fn connected_wall(&self, geometry: &WorldGeometry) -> Option<WallId> {
 		self.get(geometry).connected_wall
+	}
+
+	pub fn connected_room(&self, geometry: &WorldGeometry) -> Option<RoomId> {
+		self.connected_wall(geometry)
+			.map(|wall_id| wall_id.room(geometry))
 	}
 
 	pub fn next_wall(&self, geometry: &WorldGeometry) -> WallId {

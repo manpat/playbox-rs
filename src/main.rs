@@ -41,6 +41,8 @@ pub mod prelude {
 
 	pub use std::collections::HashMap;
 	pub use std::borrow::Cow;
+
+	pub use smallvec::SmallVec;
 }
 
 use prelude::*;

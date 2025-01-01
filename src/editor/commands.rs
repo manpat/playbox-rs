@@ -157,8 +157,8 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					transaction.describe(format!("Move {wall_id:?}"));
 
 					let geometry = &transaction.model().world.geometry;
-					let vertex_a = geometry.walls[wall_id].source_vertex;
-					let vertex_b = geometry.walls[geometry.walls[wall_id].next_wall].source_vertex;
+					let vertex_a = wall_id.vertex(geometry);
+					let vertex_b = wall_id.next_vertex(geometry);
 
 					transaction.update_vertex(vertex_a, |_, vertex| {
 						vertex.position += delta;
@@ -172,17 +172,20 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				}
 
 				Item::Room(room_id) => {
-					anyhow::bail!("Not implemented");
+					transaction.describe(format!("Move Room #{room_id:?}"));
 
-					// transaction.describe(format!("Recenter Room #{room_id:?}"));
-					// transaction.update_room(room_id, |_, room| {
-					// 	for vertex in room.wall_vertices.iter_mut() {
-					// 		*vertex += delta;
-					// 	}
+					let vertices: SmallVec<[VertexId; 8]> = transaction.model().world.geometry
+						.room_vertices(room_id)
+						.collect();
 
-					// 	Ok(())
-					// })?;
-					// transaction.submit();
+					for vertex_id in vertices {
+						transaction.update_vertex(vertex_id, |_, vertex| {
+							vertex.position += delta;
+							Ok(())
+						})?;
+					}
+
+					transaction.submit();
 				}
 
 				Item::Object(object_index) => {
@@ -379,52 +382,24 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
-			anyhow::bail!("Not implemented");
-			// transaction.describe(format!("Disconnect {wall_id:?}"));
-			// transaction.update_connections(|_, connections| {
-			// 	connections.retain(|&(wall_a, wall_b)| {
-			// 		wall_a != wall_id && wall_b != wall_id
-			// 	});
-
-			// 	Ok(())
-			// })?;
-			// transaction.submit();
+			transaction.describe(format!("Disconnect {wall_id:?}"));
+			transaction.update_geometry(|_, geometry| {
+				if let Some(target) = wall_id.connected_wall(geometry) {
+					target.get_mut(geometry).connected_wall = None;
+					wall_id.get_mut(geometry).connected_wall = None;
+				}
+				Ok(())
+			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
-			anyhow::bail!("Not implemented");
-			// let new_wall_index = wall_id.wall_index + 1;
-
-			// transaction.describe(format!("Split Wall {wall_id:?}"));
-
-			// transaction.update_room(wall_id.room_index, |_, room| {
-			// 	let wall = room.walls.get(wall_id.wall_index)
-			// 		.context("Invalid wall index")?
-			// 		.clone();
-
-			// 	// Insert the new wall after the target wall
-			// 	room.walls.insert(new_wall_index, wall);
-			// 	room.wall_vertices.insert(new_wall_index, new_position);
-
-			// 	Ok(())
-			// })?;
-
-			// transaction.update_connections(|_, connections| {
-			// 	// Update all connections with corrected wall ids
-			// 	for (wall_a, wall_b) in connections.iter_mut() {
-			// 		if wall_a.room_index == wall_id.room_index && wall_a.wall_index >= new_wall_index {
-			// 			wall_a.wall_index += 1;
-			// 		}
-
-			// 		if wall_b.room_index == wall_id.room_index && wall_b.wall_index >= new_wall_index {
-			// 			wall_b.wall_index += 1;
-			// 		}
-			// 	}
-
-			// 	Ok(())
-			// })?;
-
-			// transaction.submit();
+			transaction.describe(format!("Split Wall {wall_id:?}"));
+			transaction.update_geometry(|_, geometry| {
+				geometry.split_wall(wall_id, new_position);
+				Ok(())
+			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DeleteVertex(vertex_id) => {

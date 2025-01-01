@@ -9,6 +9,7 @@ fontdue = "0.8"
 serde = "1.0"
 serde_json = "1.0"
 bitflags = "2.6"
+smallvec = "1.13.2"
 
 
 [dependencies.toybox]

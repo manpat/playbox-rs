@@ -51,8 +51,60 @@
           "version": 1
         },
         "position": [
-          2.0,
-          -2.0
+          0.42978013,
+          -0.8885108
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 5,
+          "version": 1
+        },
+        "position": [
+          1.1274823,
+          -4.3380513
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 6,
+          "version": 1
+        },
+        "position": [
+          -0.80169916,
+          -0.8943008
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 7,
+          "version": 1
+        },
+        "position": [
+          -0.8415203,
+          -1.4635098
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 8,
+          "version": 1
+        },
+        "position": [
+          1.3144121,
+          -1.5923059
         ]
       },
       "version": 1
@@ -74,7 +126,7 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 4,
+          "idx": 5,
           "version": 1
         },
         "connected_wall": null,
@@ -160,11 +212,131 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 1,
+          "idx": 6,
           "version": 1
         },
         "prev_wall": {
           "idx": 3,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 5,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 1,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 8,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 6,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 7,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 4,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 7,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 8,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 6,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 8,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 5,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 7,
           "version": 1
         },
         "connected_wall": null,
@@ -244,10 +416,10 @@
       "version": 1
     },
     "position": [
-      1.1418942,
-      0.82834834
+      -1.9,
+      -0.7500883
     ],
-    "yaw": -0.9247335
+    "yaw": 1.3932382
   },
   "fog": {
     "color": {

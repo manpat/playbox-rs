@@ -119,7 +119,7 @@ impl WorldGeometry {
 impl WorldGeometry {
 	pub fn wall_vertices(&self, wall_id: WallId) -> (Vec2, Vec2) {
 		let vertex_0 = wall_id.vertex(self).position(self);
-		let vertex_1 = wall_id.next_wall(self).vertex(self).position(self);
+		let vertex_1 = wall_id.next_vertex(self).position(self);
 		(vertex_0, vertex_1)
 	}
 
