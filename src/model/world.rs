@@ -102,12 +102,12 @@ impl World {
 // TODO(pat.m): would be good to move some of the below into a higher level model that can cache transforms, since
 // transforms between connected rooms will always be the same.
 
-pub fn calculate_portal_transform(world: &World, from: WallId, to: WallId) -> Mat2x3 {
-	let from_wall = &world.geometry.walls[from];
-	let to_wall = &world.geometry.walls[to];
+pub fn calculate_portal_transform(geometry: &WorldGeometry, from: WallId, to: WallId) -> Mat2x3 {
+	let from_wall = &geometry.walls[from];
+	let to_wall = &geometry.walls[to];
 
-	let (from_wall_start, from_wall_end) = world.geometry.wall_vertices(from);
-	let (to_wall_start, to_wall_end) = world.geometry.wall_vertices(to);
+	let (from_wall_start, from_wall_end) = geometry.wall_vertices(from);
+	let (to_wall_start, to_wall_end) = geometry.wall_vertices(to);
 
 	let from_wall_length = (from_wall_end - from_wall_start).length();
 	let to_wall_length = (to_wall_end - to_wall_start).length();

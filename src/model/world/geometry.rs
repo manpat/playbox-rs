@@ -4,7 +4,7 @@ use slotmap::SlotMap;
 pub mod cursor;
 pub mod editing;
 pub mod iterator;
-pub use cursor::*;
+pub mod validation;
 
 slotmap::new_key_type! {
 	pub struct VertexId;
@@ -77,6 +77,12 @@ impl WorldGeometry {
 		geometry
 	}
 
+	pub fn clear(&mut self) {
+		self.vertices.clear();
+		self.walls.clear();
+		self.rooms.clear();
+	}
+
 	pub fn insert_room_from_positions(&mut self, positions: &[Vec2]) -> RoomId {
 		assert!(!positions.is_empty());
 
@@ -136,6 +142,11 @@ impl WorldGeometry {
 	pub fn wall_target(&self, wall_id: WallId) -> Option<WallId> {
 		self.walls.get(wall_id)?
 			.connected_wall
+	}
+
+	pub fn wall_direction(&self, wall_id: WallId) -> Vec2 {
+		let (start, end) = self.wall_vertices(wall_id);
+		(end - start).normalize()
 	}
 
 	pub fn first_room(&self) -> RoomId {

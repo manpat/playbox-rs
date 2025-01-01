@@ -100,9 +100,9 @@ struct Context<'w> {
 
 fn validate_model(state: &mut State, model: &mut Model) {
 	let geometry = &model.world.geometry;
-	let first_room = geometry.rooms.keys().next().unwrap();
+	let first_room = geometry.first_room();
 
-	if !state.inner.focused_room_id.map_or(false, |room_id| geometry.rooms.contains_key(room_id)) {
+	if !state.inner.focused_room_id.map_or(false, |room_id| room_id.is_valid(geometry)) {
 		state.inner.focused_room_id = Some(first_room);
 	}
 
@@ -144,3 +144,4 @@ fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
 		_ => {}
 	}
 }
+

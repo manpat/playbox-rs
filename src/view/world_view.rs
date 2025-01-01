@@ -90,8 +90,7 @@ impl WorldView {
 			self.room_mesh_infos = build_room_buffers(gfx, world, processed_world, self.vbo, self.ebo, self.light_buffer);
 		}
 
-
-		self.build_visibility_graph(world, processed_world, viewer_placement);
+		self.build_visibility_graph(processed_world, viewer_placement);
 
 		// Draw
 		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
@@ -161,7 +160,7 @@ impl WorldView {
 	}
 
 	#[instrument(skip_all, name="world_view build_visibility_graph")]
-	fn build_visibility_graph(&mut self, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
+	fn build_visibility_graph(&mut self, processed_world: &ProcessedWorld, viewer_placement: Placement) {
 		self.visible_rooms.clear();
 		self.visible_rooms.push(RoomInstance {
 			room_id: viewer_placement.room_id,
@@ -171,7 +170,7 @@ impl WorldView {
 		});
 
 		let viewer_forward = viewer_placement.forward();
-		let geometry = &world.geometry;
+		let geometry = processed_world.geometry();
 
 		let mut instance_index = 0;
 
@@ -315,9 +314,9 @@ fn build_room_buffers(gfx: &mut gfx::System, world: &World, processed_world: &Pr
 {
 	let mut room_builder = RoomMeshBuilder::new(world, processed_world);
 
-	let mut room_mesh_infos = SecondaryMap::with_capacity(world.geometry.rooms.len());
+	let mut room_mesh_infos = SecondaryMap::with_capacity(processed_world.geometry().rooms.len());
 
-	for room_id in world.geometry.rooms.keys() {
+	for room_id in processed_world.geometry().rooms.keys() {
 		let info = room_builder.build_room(room_id);
 		room_mesh_infos.insert(room_id, info);
 	}

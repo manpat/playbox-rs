@@ -92,7 +92,7 @@ impl RoomMeshBuilder<'_> {
 		self.base_vertex = self.vertices.len() as u32;
 		let base_index = self.indices.len() as u32;
 
-		let geometry = &self.world.geometry;
+		let geometry = self.processed_world.geometry();
 
 		let room = &geometry.rooms[room_id];
 		let up = Vec3::from_y(room.height);
@@ -167,7 +167,7 @@ impl RoomMeshBuilder<'_> {
 	}
 
 	pub fn build_wall(&mut self, wall_id: WallId) {
-		let geometry = &self.world.geometry;
+		let geometry = self.processed_world.geometry();
 
 		let wall = &geometry.walls[wall_id];
 		let room = &geometry.rooms[wall.room];

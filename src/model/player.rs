@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use model::{Placement, World, ProcessedWorld, HudModel};
+use model::{Placement, ProcessedWorld, HudModel};
 
 /// Ratio of player height to max step distance.
 pub const PLAYER_MAX_STEP_HEIGHT: f32 = 0.2;
@@ -33,7 +33,7 @@ pub struct Player {
 }
 
 impl Player {
-	pub fn handle_input(&mut self, ctx: &mut Context<'_>, world: &World, processed_world: &ProcessedWorld, hud: &HudModel) {
+	pub fn handle_input(&mut self, ctx: &mut Context<'_>, processed_world: &ProcessedWorld, hud: &HudModel) {
 		self.hack_height_change = None;
 
 		let interact_pressed = ctx.input.button_just_down(input::MouseButton::Left) || ctx.input.button_just_down(input::keys::KeyF);
@@ -157,7 +157,7 @@ impl Player {
 				delta -= right * speed;
 			}
 
-			let distance_traveled = self.try_move_by(world, processed_world, delta);
+			let distance_traveled = self.try_move_by(processed_world, delta);
 			self.step_accumulator += distance_traveled;
 
 			// Dumb step sounds
@@ -174,14 +174,14 @@ impl Player {
 // TODO(pat.m): some kind of transform/connectivity cache
 
 impl Player {
-	fn try_move_by(&mut self, world: &World, processed_world: &ProcessedWorld, delta: Vec2) -> f32 {
+	fn try_move_by(&mut self, processed_world: &ProcessedWorld, delta: Vec2) -> f32 {
 		if delta.dot(delta) <= 0.00001 {
 			return 0.0;
 		}
 
 		// TODO(pat.m): limit movement by delta length to avoid teleporting
 
-		let geometry = &world.geometry;
+		let geometry = &processed_world.geometry();
 
 		let mut desired_position = self.placement.position + delta;
 

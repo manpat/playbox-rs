@@ -8,6 +8,8 @@ pub struct ProcessedWorld {
 	wall_infos: SecondaryMap<WallId, WallInfo>,
 	room_infos: SecondaryMap<RoomId, RoomInfo>,
 
+	geometry: WorldGeometry,
+
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
 
@@ -16,6 +18,8 @@ impl ProcessedWorld {
 		let mut this = Self {
 			wall_infos: SecondaryMap::new(),
 			room_infos: SecondaryMap::new(),
+
+			geometry: WorldGeometry::new(),
 
 			world_change_sub: message_bus.subscribe(),
 		};
@@ -36,6 +40,10 @@ impl ProcessedWorld {
 
 	pub fn room_info(&self, room_id: RoomId) -> Option<&RoomInfo> {
 		self.room_infos.get(room_id)
+	}
+
+	pub fn geometry(&self) -> &WorldGeometry {
+		&self.geometry
 	}
 
 	pub fn connection_info(&self, wall_id: WallId) -> Option<&ConnectionInfo> {
@@ -71,23 +79,25 @@ impl ProcessedWorld {
 		self.room_infos.clear();
 		self.wall_infos.clear();
 
-		let geometry = &world.geometry;
+		self.geometry = world.geometry.clone();
+		process_geometry(&mut self.geometry);
 
-		for room_id in geometry.rooms.keys() {
+		for room_id in self.geometry.rooms.keys() {
+			log::debug!("Building {room_id:?}");
+
 			let mut connecting_walls = Vec::new();
 
 			// Collect walls
-			for wall_id in geometry.room_walls(room_id) {
-				let wall = &geometry.walls[wall_id];
-
-				let connection_info = wall.connected_wall
-					.map(|target_id| ConnectionInfo::new(world, wall_id, target_id));
+			for wall_id in self.geometry.room_walls(room_id) {
+				log::debug!("--- Collecting {wall_id:?}");
+				let connection_info = wall_id.connected_wall(&self.geometry)
+					.map(|target_id| ConnectionInfo::new(&self.geometry, wall_id, target_id));
 
 				if connection_info.is_some() {
 					connecting_walls.push(wall_id);
 				}
 
-				let (start, end) = geometry.wall_vertices(wall_id);
+				let (start, end) = self.geometry.wall_vertices(wall_id);
 				let direction = (end - start).normalize();
 				let normal = direction.perp();
 
@@ -110,6 +120,8 @@ impl ProcessedWorld {
 				connecting_walls,
 			});
 		}
+
+		log::debug!("Done");
 	}
 }
 
@@ -151,9 +163,7 @@ pub struct ConnectionInfo {
 }
 
 impl ConnectionInfo {
-	fn new(world: &World, source_id: WallId, target_id: WallId) -> Self {
-		let geometry = &world.geometry;
-
+	fn new(geometry: &WorldGeometry, source_id: WallId, target_id: WallId) -> Self {
 		let source_wall = &geometry.walls[source_id];
 		let source_room = &geometry.rooms[source_wall.room];
 
@@ -180,7 +190,7 @@ impl ConnectionInfo {
 		let vertical_offset = source_wall.vertical_offset - target_wall.vertical_offset;
 		let aperture_height = (source_room.height - vertical_offset).min(target_room.height + vertical_offset);
 
-		let target_to_source = calculate_portal_transform(world, source_id, target_id);
+		let target_to_source = calculate_portal_transform(geometry, source_id, target_id);
 		let source_to_target = target_to_source.inverse();
 
 		let yaw_delta = {
@@ -213,4 +223,135 @@ impl ConnectionInfo {
 pub struct RoomInfo {
 	pub object_indices: Vec<usize>,
 	pub connecting_walls: Vec<WallId>,
+}
+
+
+fn process_geometry(geometry: &mut WorldGeometry) {
+	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
+	let mut visited_walls = std::collections::HashSet::new();
+
+	log::debug!("process_geometry");
+
+	'next_room: while let Some(current_room) = room_queue.pop() {
+		let mut current_wall = current_room.first_wall(geometry);
+		let mut current_direction = geometry.wall_direction(current_wall);
+
+		visited_walls.clear();
+		log::debug!("- Starting {current_room:?}");
+
+		'next_wall: loop {
+			visited_walls.insert(current_wall);
+			let mut next_wall = current_wall.next_wall(geometry);
+			let mut next_direction = geometry.wall_direction(next_wall);
+
+			log::debug!("--- Checking {current_wall:?}");
+
+			if current_direction.wedge(next_direction) <= 0.0 {
+				if visited_walls.contains(&next_wall) {
+					log::debug!("--- --- next wall is first wall, continuing to next room");
+					continue 'next_room;
+				} else {
+					log::debug!("--- --- {current_wall:?} is fine, next wall is {next_wall:?}");
+					current_wall = next_wall;
+					current_direction = next_direction;
+					continue 'next_wall;
+				}
+			}
+
+			log::debug!("--- --- {current_wall:?} is NOT FINE: {current_direction:?} ^ {next_direction:?} = {:?}", current_direction.wedge(next_direction));
+
+			// concavity detected, find next vertex that is clockwise from target vertex of the current wall
+			let current_vertex = current_wall.next_vertex(geometry);
+			let current_position = current_vertex.position(geometry);
+
+			// TODO(pat.m): this checks the same initial vertex multiple times. can do better
+			while current_direction.wedge(next_direction) > 0.0 {
+				next_wall.move_next(geometry);
+
+				log::debug!("--- --- --- Checking {next_wall:?}");
+
+				if next_wall == current_wall.prev_wall(geometry) {
+					log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}. next == prev(current)");
+					log::error!("current_wall: {current_wall:?}");
+					log::error!("next wall: {next_wall:?}");
+					log::error!("{geometry:#?}");
+					return;
+				}
+
+				let next_vertex = next_wall.vertex(geometry);
+				let next_position = next_vertex.position(geometry);
+
+				next_direction = (next_position - current_position).normalize();
+			}
+
+			let new_room_first_wall = current_wall.next_wall(geometry);
+			let new_room_last_wall = next_wall.prev_wall(geometry);
+
+			// hopefully by this point we've found a valid candidate, so insert a wall bridging the two vertices
+			let new_wall_current_room = geometry.walls.insert(WallDef {
+				source_vertex: current_vertex,
+				prev_wall: current_wall,
+				next_wall: next_wall,
+				room: current_room,
+				connected_wall: None,
+
+				.. current_wall.get(geometry).clone()
+			});
+
+			log::debug!("--- --- Inserted {new_wall_current_room:?}");
+
+			current_wall.get_mut(geometry).next_wall = new_wall_current_room;
+			next_wall.get_mut(geometry).prev_wall = new_wall_current_room;
+			current_vertex.get_mut(geometry).outgoing_wall = new_wall_current_room;
+
+			// Set current rooms first wall to our newly created wall, to avoid the case where it was previously
+			// one of the split off walls.
+			current_room.get_mut(geometry).first_wall = new_wall_current_room;
+
+			// Split 'lump' into a new room.
+			let new_room = geometry.rooms.insert(current_room.get(geometry).clone());
+
+			log::debug!("--- --- Inserted {new_room:?}");
+
+			let new_wall_new_room = geometry.walls.insert(WallDef {
+				source_vertex: next_wall.vertex(geometry),
+				room: new_room,
+				prev_wall: new_room_last_wall,
+				next_wall: new_room_first_wall,
+				connected_wall: None,
+
+				.. current_wall.get(geometry).clone()
+			});
+
+			log::debug!("--- --- Inserted {new_wall_new_room:?}");
+
+			new_room.get_mut(geometry).first_wall = new_wall_new_room;
+
+			// Connect new rooms
+			// new_wall_new_room.get_mut(geometry).connected_wall = Some(new_wall_current_room);
+			// new_wall_current_room.get_mut(geometry).connected_wall = Some(new_wall_new_room);
+
+			// Make sure all walls in new room point to new room
+			{
+				let mut wall_it = new_room_first_wall;
+				loop {
+					wall_it.get_mut(geometry).room = new_room;
+					if wall_it == new_room_last_wall {
+						break
+					}
+
+					wall_it.move_next(geometry);
+				}
+			}
+
+			room_queue.push(new_room);
+
+			current_wall = next_wall;
+			current_direction = geometry.wall_direction(current_wall);
+		}
+	}
+
+	model::world::validation::validate_geometry(geometry);
+
+	log::debug!("Done");
 }

@@ -157,7 +157,7 @@ impl GameScene {
 		processed_world.update(&world, &progress, ctx.bus);
 
 		if !ctx.show_editor && !ctx.console.is_visible() || self.force_game_controls {
-			player.handle_input(ctx, &world, &processed_world, &hud);
+			player.handle_input(ctx, &processed_world, &hud);
 			interactions.update(&player, &world, &processed_world, ctx.bus);
 		}
 

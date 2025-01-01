@@ -22,6 +22,4 @@ impl WorldGeometry {
 
 		new_wall
 	}
-
-	
 }
