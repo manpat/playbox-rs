@@ -235,7 +235,12 @@ pub enum UndoEntry {
 	UpdateWorld {
 		before: World,
 		after: World,
-	}
+	},
+
+	UpdateGeometry {
+		before: WorldGeometry,
+		after: WorldGeometry,
+	},
 }
 
 impl UndoEntry {
@@ -250,6 +255,10 @@ impl UndoEntry {
 
 			(UpdateWorld{..}, UpdateWorld{..}) => true,
 			(UpdatePlayer{..}, UpdatePlayer{..}) => true,
+
+			(UpdateGeometry{..}, UpdateGeometry{..}) => true,
+			(UpdateGeometry{..}, UpdateRoom{..} | UpdateWall{..} | UpdateVertex{..}) => true,
+			(UpdateWorld{..}, UpdateGeometry{..}) => true,
 
 			_ => false,
 		}
@@ -279,8 +288,27 @@ impl UndoEntry {
 				*after = new_after;
 			}
 
+			(UpdateWorld{after, ..}, UpdateGeometry{after: new_after, ..}) => {
+				after.geometry = new_after;
+			}
+
 			(UpdatePlayer{after, ..}, UpdatePlayer{after: new_after, ..}) => {
 				*after = new_after;
+			}
+
+			// Geometry merging
+			(UpdateGeometry{after, ..}, UpdateGeometry{after: new_after, ..}) => {
+				*after = new_after;
+			}
+
+			(UpdateGeometry{after, ..}, UpdateRoom{room_id, after: new_after, ..}) => {
+				after.rooms[room_id] = new_after;
+			}
+			(UpdateGeometry{after, ..}, UpdateWall{wall_id, after: new_after, ..}) => {
+				after.walls[wall_id] = new_after;
+			}
+			(UpdateGeometry{after, ..}, UpdateVertex{vertex_id, after: new_after, ..}) => {
+				after.vertices[vertex_id] = new_after;
 			}
 
 			_ => {}
@@ -308,6 +336,11 @@ impl UndoEntry {
 
 			UpdateWorld{before, ..} => {
 				ctx.model.world.clone_from(before);
+				ctx.message_bus.emit(WorldChangedEvent);
+			}
+
+			UpdateGeometry{before, ..} => {
+				ctx.model.world.geometry.clone_from(before);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
@@ -342,6 +375,11 @@ impl UndoEntry {
 
 			UpdateWorld{after, ..} => {
 				ctx.model.world.clone_from(after);
+				ctx.message_bus.emit(WorldChangedEvent);
+			}
+
+			UpdateGeometry{after, ..} => {
+				ctx.model.world.geometry.clone_from(after);
 				ctx.message_bus.emit(WorldChangedEvent);
 			}
 
@@ -450,6 +488,17 @@ impl Transaction<'_> {
 		edit(&self.model, &mut after)?;
 
 		self.group.push(UndoEntry::UpdateWorld {before, after});
+
+		Ok(())
+	}
+
+	pub fn update_geometry(&mut self, edit: impl FnOnce(&Model, &mut WorldGeometry) -> anyhow::Result<()>) -> anyhow::Result<()> {
+		let before = self.model.world.geometry.clone();
+		let mut after = self.model.world.geometry.clone();
+
+		edit(&self.model, &mut after)?;
+
+		self.group.push(UndoEntry::UpdateGeometry {before, after});
 
 		Ok(())
 	}

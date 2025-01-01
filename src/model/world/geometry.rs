@@ -1,6 +1,11 @@
 use crate::prelude::*;
 use slotmap::SlotMap;
 
+pub mod cursor;
+pub mod editing;
+pub mod iterator;
+pub use cursor::*;
+
 slotmap::new_key_type! {
 	pub struct VertexId;
 	pub struct WallId;
@@ -113,10 +118,8 @@ impl WorldGeometry {
 
 impl WorldGeometry {
 	pub fn wall_vertices(&self, wall_id: WallId) -> (Vec2, Vec2) {
-		let wall = &self.walls[wall_id];
-		let next_wall = &self.walls[wall.next_wall];
-		let vertex_0 = self.vertices[wall.source_vertex].position;
-		let vertex_1 = self.vertices[next_wall.source_vertex].position;
+		let vertex_0 = wall_id.vertex(self).position(self);
+		let vertex_1 = wall_id.next_wall(self).vertex(self).position(self);
 		(vertex_0, vertex_1)
 	}
 
@@ -139,12 +142,12 @@ impl WorldGeometry {
 		self.rooms.keys().next().unwrap()
 	}
 
-	pub fn room_walls(&self, room_id: RoomId) -> RoomWallIterator<'_> {
+	pub fn room_walls(&self, room_id: RoomId) -> iterator::RoomWallIterator<'_> {
 		let room = &self.rooms[room_id];
-		RoomWallIterator {
+		iterator::RoomWallIterator {
 			geometry: self,
 			first_wall: room.first_wall,
-			last_wall: self.walls[room.first_wall].prev_wall,
+			last_wall: room.first_wall.prev_wall(self),
 			fused: false,
 		}
 	}
@@ -166,65 +169,6 @@ impl WorldGeometry {
 	}
 }
 
-#[derive(Clone)]
-pub struct RoomWallIterator<'g> {
-	geometry: &'g WorldGeometry,
-	first_wall: WallId,
-	last_wall: WallId,
-	fused: bool,
-}
-
-impl Iterator for RoomWallIterator<'_> {
-	type Item = WallId;
-
-	fn next(&mut self) -> Option<WallId> {
-		if self.fused {
-			return None
-		}
-
-		if self.first_wall == self.last_wall {
-			self.fused = true
-		}
-
-		let result = self.first_wall;
-		self.first_wall = self.geometry.walls[self.first_wall].next_wall;
-		Some(result)
-	}
-
-	fn size_hint(&self) -> (usize, Option<usize>) {
-		if self.fused {
-			return (0, Some(0));
-		}
-
-		let mut count = 1;
-		let mut it = self.first_wall;
-
-		while it != self.last_wall {
-			count += 1;
-			it = self.geometry.walls[it].next_wall;
-		}
-
-		(count, Some(count))
-	}
-}
-
-impl DoubleEndedIterator for RoomWallIterator<'_> {
-	fn next_back(&mut self) -> Option<WallId> {
-		if self.fused {
-			return None
-		}
-
-		if self.first_wall == self.last_wall {
-			self.fused = true
-		}
-
-		let result = self.last_wall;
-		self.last_wall = self.geometry.walls[self.last_wall].prev_wall;
-		Some(result)
-	}
-}
-
-impl ExactSizeIterator for RoomWallIterator<'_> {}
 
 
 impl Default for WallDef {

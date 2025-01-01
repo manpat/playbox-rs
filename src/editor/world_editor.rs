@@ -249,11 +249,11 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 		// 	draw_room_inspector(ui, ctx, vertex_id.room_index);
 		// }
 
-		// Some(Item::Wall(wall_id)) => {
-		// 	draw_room_inspector(ui, ctx, wall_id.room_index);
-		// 	ui.separator();
-		// 	draw_wall_inspector(ui, ctx, wall_id);
-		// }
+		Some(Item::Wall(wall_id)) => {
+			// draw_room_inspector(ui, ctx, wall_id.room_index);
+			// ui.separator();
+			draw_wall_inspector(ui, ctx, wall_id);
+		}
 
 		Some(Item::Room(room_id)) => {
 			draw_room_inspector(ui, ctx, room_id);
