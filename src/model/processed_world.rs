@@ -288,6 +288,8 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 
 				let next_position = next_wall.vertex(geometry).position(geometry);
 
+				// TODO(pat.m): this isn't really good enough. we also need info on 'visibility' between vertices.
+				// otherwise self-intersecting rooms will misbehave.
 				let next_direction = (next_position - start_position).normalize();
 				if current_direction.wedge(next_direction) <= 0.0 {
 					break;

@@ -77,8 +77,8 @@
           "version": 1
         },
         "position": [
-          -0.80169916,
-          -0.8943008
+          -0.49958524,
+          -0.9503669
         ]
       },
       "version": 1
@@ -90,8 +90,8 @@
           "version": 1
         },
         "position": [
-          -0.8415203,
-          -1.4635098
+          -0.5394064,
+          -1.5195763
         ]
       },
       "version": 1
@@ -105,6 +105,32 @@
         "position": [
           1.3144121,
           -1.5923059
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 9,
+          "version": 1
+        },
+        "position": [
+          2.7808735,
+          -3.0848477
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 10,
+          "version": 1
+        },
+        "position": [
+          -0.6193014,
+          0.07077206
         ]
       },
       "version": 1
@@ -122,7 +148,7 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 2,
+          "idx": 10,
           "version": 1
         },
         "prev_wall": {
@@ -156,7 +182,7 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 1,
+          "idx": 10,
           "version": 1
         },
         "connected_wall": null,
@@ -246,7 +272,7 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 8,
+          "idx": 9,
           "version": 1
         },
         "connected_wall": null,
@@ -332,11 +358,71 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 5,
+          "idx": 9,
           "version": 1
         },
         "prev_wall": {
           "idx": 7,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 9,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 5,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 8,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 10,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 2,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 1,
           "version": 1
         },
         "connected_wall": null,
@@ -416,10 +502,10 @@
       "version": 1
     },
     "position": [
-      -1.9,
-      -0.7500883
+      0.5677773,
+      0.029907333
     ],
-    "yaw": 1.3932382
+    "yaw": -1.5819675
   },
   "fog": {
     "color": {

@@ -89,6 +89,8 @@ impl RoomMeshBuilder<'_> {
 	}
 
 	pub fn build_room(&mut self, room_id: RoomId) -> RoomMeshInfo {
+		log::debug!("--- build_room({room_id:?})");
+
 		self.base_vertex = self.vertices.len() as u32;
 		let base_index = self.indices.len() as u32;
 
@@ -114,7 +116,7 @@ impl RoomMeshBuilder<'_> {
 		self.add_convex(ceiling_verts, ceiling_uvs, room.ceiling_color);
 
 		// Walls
-		for wall_id in geometry.walls.keys() {
+		for wall_id in geometry.room_walls(room_id) {
 			self.build_wall(wall_id);
 		}
 
@@ -171,6 +173,8 @@ impl RoomMeshBuilder<'_> {
 
 		let wall = &geometry.walls[wall_id];
 		let room = &geometry.rooms[wall.room];
+
+		log::debug!("--- --- build_wall({wall_id:?})");
 
 		// self.set_texture_index(wall_id.wall_index as u32 % 2 + 1);
 		self.set_texture_index(1);
