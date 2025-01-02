@@ -6,6 +6,9 @@ pub mod editing;
 pub mod iterator;
 pub mod validation;
 
+#[cfg(test)]
+mod test;
+
 slotmap::new_key_type! {
 	pub struct VertexId;
 	pub struct WallId;

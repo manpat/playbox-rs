@@ -400,3 +400,52 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 
 	log::debug!("Done");
 }
+
+#[test]
+fn process_geometry_noop_for_simple_geometry() {
+	let mut geometry = WorldGeometry::new_square(1.0);
+	process_geometry(&mut geometry);
+
+	assert_eq!(geometry.rooms.len(), 1);
+	assert_eq!(geometry.walls.len(), 4);
+	assert_eq!(geometry.vertices.len(), 4);
+}
+
+#[test]
+fn process_geometry_with_concave_geometry() {
+	let mut geometry = WorldGeometry::new_square(1.0);
+	let first_room = geometry.first_room();
+	let first_wall = first_room.first_wall(&geometry);
+
+	let new_position = 0.5 * geometry.wall_center(first_wall);
+	let new_wall = geometry.split_wall(first_wall, new_position);
+
+	process_geometry(&mut geometry);
+
+	model::world::validation::validate_geometry(&geometry);
+
+	assert_eq!(geometry.rooms.len(), 2);
+	assert_eq!(geometry.walls.len(), 7);
+	assert_eq!(geometry.vertices.len(), 5);
+}
+
+#[test]
+fn process_geometry_with_complex_geometry() {
+	let mut geometry = WorldGeometry::new_square(1.0);
+	let first_room = geometry.first_room();
+	let first_wall = first_room.first_wall(&geometry);
+	let second_wall = first_wall.next_wall(&geometry).next_wall(&geometry);
+
+	let new_position_0 = Vec2::from_x(0.2);
+	let new_position_1 = -0.5 * geometry.wall_center(second_wall); // - Vec2::from_x(0.2);
+	// geometry.split_wall(first_wall, new_position_0);
+	geometry.split_wall(second_wall, new_position_1);
+
+	process_geometry(&mut geometry);
+
+	model::world::validation::validate_geometry(&geometry);
+
+	assert_eq!(geometry.rooms.len(), 2);
+	assert_eq!(geometry.walls.len(), 7);
+	assert_eq!(geometry.vertices.len(), 5);
+}
