@@ -227,45 +227,53 @@ pub struct RoomInfo {
 
 
 fn process_geometry(geometry: &mut WorldGeometry) {
-	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
-	let mut visited_walls = std::collections::HashSet::new();
-
 	log::debug!("process_geometry");
 
+	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
+
 	'next_room: while let Some(current_room) = room_queue.pop() {
-		let mut current_wall = current_room.first_wall(geometry);
-		let mut current_direction = geometry.wall_direction(current_wall);
+		loop {
+			log::debug!("- Starting {current_room:?}");
 
-		visited_walls.clear();
-		log::debug!("- Starting {current_room:?}");
+			let first_wall = current_room.first_wall(geometry);
+			let mut current_wall = first_wall;
 
-		'next_wall: loop {
-			visited_walls.insert(current_wall);
-			let mut next_wall = current_wall.next_wall(geometry);
-			let mut next_direction = geometry.wall_direction(next_wall);
+			// Check that the whole room is convex.
 
-			log::debug!("--- Checking {current_wall:?}");
+			let mut counter = 50u32;
 
-			if current_direction.wedge(next_direction) <= 0.0 {
-				if visited_walls.contains(&next_wall) {
-					log::debug!("--- --- next wall is first wall, continuing to next room");
-					continue 'next_room;
-				} else {
-					log::debug!("--- --- {current_wall:?} is fine, next wall is {next_wall:?}");
-					current_wall = next_wall;
-					current_direction = next_direction;
-					continue 'next_wall;
+			'next_wall: loop {
+				let next_wall = current_wall.next_wall(geometry);
+				log::debug!("--- Checking {current_wall:?} -> {next_wall:?}");
+
+				counter = counter.checked_sub(1).expect("Overflow!");
+
+				let current_direction = geometry.wall_direction(current_wall);
+				let next_direction = geometry.wall_direction(next_wall);
+
+				if current_direction.wedge(next_direction) > 0.0 {
+					log::debug!("--- --- {current_wall:?} is NOT FINE");
+					break 'next_wall;
 				}
+
+				if next_wall == first_wall {
+					log::debug!("--- --- room loop complete");
+					continue 'next_room;
+				}
+
+				current_wall = next_wall;
+				log::debug!("--- --- fine, moving to {next_wall:?}");
 			}
 
-			log::debug!("--- --- {current_wall:?} is NOT FINE: {current_direction:?} ^ {next_direction:?} = {:?}", current_direction.wedge(next_direction));
+			// Room is concave, search for the next vertex that would make a convex room.
+			let current_wall_end_vertex = current_wall.next_vertex(geometry);
+			let start_position = current_wall_end_vertex.position(geometry);
+			let current_direction = geometry.wall_direction(current_wall);
 
-			// concavity detected, find next vertex that is clockwise from target vertex of the current wall
-			let current_vertex = current_wall.next_vertex(geometry);
-			let current_position = current_vertex.position(geometry);
+			let mut next_wall = current_wall;
 
 			// TODO(pat.m): this checks the same initial vertex multiple times. can do better
-			while current_direction.wedge(next_direction) > 0.0 {
+			loop {
 				next_wall.move_next(geometry);
 
 				log::debug!("--- --- --- Checking {next_wall:?}");
@@ -278,10 +286,12 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 					return;
 				}
 
-				let next_vertex = next_wall.vertex(geometry);
-				let next_position = next_vertex.position(geometry);
+				let next_position = next_wall.vertex(geometry).position(geometry);
 
-				next_direction = (next_position - current_position).normalize();
+				let next_direction = (next_position - start_position).normalize();
+				if current_direction.wedge(next_direction) <= 0.0 {
+					break;
+				}
 			}
 
 			let new_room_first_wall = current_wall.next_wall(geometry);
@@ -289,7 +299,7 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 
 			// hopefully by this point we've found a valid candidate, so insert a wall bridging the two vertices
 			let new_wall_current_room = geometry.walls.insert(WallDef {
-				source_vertex: current_vertex,
+				source_vertex: current_wall_end_vertex,
 				prev_wall: current_wall,
 				next_wall: next_wall,
 				room: current_room,
@@ -302,7 +312,7 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 
 			current_wall.get_mut(geometry).next_wall = new_wall_current_room;
 			next_wall.get_mut(geometry).prev_wall = new_wall_current_room;
-			current_vertex.get_mut(geometry).outgoing_wall = new_wall_current_room;
+			current_wall_end_vertex.get_mut(geometry).outgoing_wall = new_wall_current_room;
 
 			// Set current rooms first wall to our newly created wall, to avoid the case where it was previously
 			// one of the split off walls.
@@ -325,33 +335,65 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 
 			log::debug!("--- --- Inserted {new_wall_new_room:?}");
 
+			new_room_first_wall.get_mut(geometry).prev_wall = new_wall_new_room;
+			new_room_last_wall.get_mut(geometry).next_wall = new_wall_new_room;
 			new_room.get_mut(geometry).first_wall = new_wall_new_room;
-
-			// Connect new rooms
-			// new_wall_new_room.get_mut(geometry).connected_wall = Some(new_wall_current_room);
-			// new_wall_current_room.get_mut(geometry).connected_wall = Some(new_wall_new_room);
 
 			// Make sure all walls in new room point to new room
 			{
-				let mut wall_it = new_room_first_wall;
+				let mut counter = 50u32;
+				let mut wall_it = new_wall_new_room;
+
+				print!("{new_room:?}: {wall_it:?}");
+
 				loop {
+					wall_it.move_next(geometry);
 					wall_it.get_mut(geometry).room = new_room;
-					if wall_it == new_room_last_wall {
+
+					counter = counter.checked_sub(1).expect("Overflow!");
+					if wall_it == new_wall_new_room {
 						break
 					}
 
-					wall_it.move_next(geometry);
+					print!(" -> {wall_it:?}");
 				}
+
+				println!();
 			}
 
-			room_queue.push(new_room);
+			// Connect new rooms
+			new_wall_new_room.get_mut(geometry).connected_wall = Some(new_wall_current_room);
+			new_wall_current_room.get_mut(geometry).connected_wall = Some(new_wall_new_room);
 
-			current_wall = next_wall;
-			current_direction = geometry.wall_direction(current_wall);
+			// Queue new room
+			room_queue.push(new_room);
 		}
 	}
 
 	model::world::validation::validate_geometry(geometry);
+
+	println!("Validated");
+
+	for room_id in geometry.rooms.keys() {
+		let mut counter = 50u32;
+		let first_wall = room_id.first_wall(geometry);
+
+		let mut wall_it = first_wall;
+		print!("{room_id:?}: {wall_it:?}");
+
+		loop {
+			wall_it.move_next(geometry);
+
+			counter = counter.checked_sub(1).expect("Overflow!");
+			if wall_it == first_wall {
+				break
+			}
+
+			print!(" -> {wall_it:?}");
+		}
+
+		println!();
+	}
 
 	log::debug!("Done");
 }

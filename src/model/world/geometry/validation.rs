@@ -4,6 +4,7 @@ use model::*;
 pub fn validate_geometry(geometry: &WorldGeometry) {
 	for room_id in geometry.rooms.keys() {
 		validate_room_loop(geometry, room_id);
+		validate_room_convex(geometry, room_id);
 	}
 
 	for vertex_id in geometry.vertices.keys() {
@@ -11,6 +12,28 @@ pub fn validate_geometry(geometry: &WorldGeometry) {
 	}
 }
 
+
+pub fn validate_room_convex(geometry: &WorldGeometry, room_id: RoomId) {
+	let first_wall = room_id.first_wall(geometry);
+	let mut wall_it = first_wall;
+
+	loop {
+		let next_wall = wall_it.next_wall(geometry);
+
+		let current_direction = geometry.wall_direction(wall_it);
+		let next_direction = geometry.wall_direction(next_wall);
+
+		if current_direction.wedge(next_direction) > 0.0 {
+			panic!("{wall_it:?} to {next_wall:?} creates a concavity!");
+		}
+
+		if next_wall == first_wall {
+			return;
+		}
+
+		wall_it = next_wall;
+	}
+}
 
 pub fn validate_room_loop(geometry: &WorldGeometry, room_id: RoomId) {
 	let first_wall = room_id.first_wall(geometry);
