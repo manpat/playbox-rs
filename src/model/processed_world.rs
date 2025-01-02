@@ -9,6 +9,7 @@ pub struct ProcessedWorld {
 	room_infos: SecondaryMap<RoomId, RoomInfo>,
 
 	geometry: WorldGeometry,
+	// TODO(pat.m): map from processed geometry back to source for editing
 
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
