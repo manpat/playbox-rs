@@ -270,7 +270,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		EditorWorldEditCmd::SetPlayerSpawn => {
 			transaction.describe("Set player spawn");
 			transaction.update_world(|model, world| {
-				world.player_spawn = model.player.placement;
+				world.player_spawn = model.processed_world.to_source_placement(model.player.placement);
 				Ok(())
 			})?;
 			transaction.submit();

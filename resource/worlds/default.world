@@ -12,8 +12,8 @@
           "version": 1
         },
         "position": [
-          -2.0,
-          -2.0
+          -1.627433,
+          -3.1177013
         ]
       },
       "version": 1
@@ -38,8 +38,8 @@
           "version": 1
         },
         "position": [
-          2.0,
-          2.0
+          3.694037,
+          1.9643362
         ]
       },
       "version": 1
@@ -51,8 +51,8 @@
           "version": 1
         },
         "position": [
-          0.42978013,
-          -0.8885108
+          3.7470458,
+          0.18567696
         ]
       },
       "version": 1
@@ -64,8 +64,8 @@
           "version": 1
         },
         "position": [
-          1.1274823,
-          -4.3380513
+          2.9903178,
+          -4.710618
         ]
       },
       "version": 1
@@ -77,8 +77,8 @@
           "version": 1
         },
         "position": [
-          -0.49958524,
-          -0.9503669
+          0.81732666,
+          0.43111938
         ]
       },
       "version": 1
@@ -90,8 +90,8 @@
           "version": 1
         },
         "position": [
-          -0.5394064,
-          -1.5195763
+          0.5782945,
+          -1.5506235
         ]
       },
       "version": 1
@@ -103,8 +103,8 @@
           "version": 1
         },
         "position": [
-          1.3144121,
-          -1.5923059
+          2.3079245,
+          4.6171455
         ]
       },
       "version": 1
@@ -116,8 +116,8 @@
           "version": 1
         },
         "position": [
-          2.7808735,
-          -3.0848477
+          2.9671574,
+          3.4661233
         ]
       },
       "version": 1
@@ -131,6 +131,19 @@
         "position": [
           -0.6193014,
           0.07077206
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 11,
+          "version": 1
+        },
+        "position": [
+          0.97740054,
+          -1.6335591
         ]
       },
       "version": 1
@@ -328,7 +341,7 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 8,
+          "idx": 11,
           "version": 1
         },
         "prev_wall": {
@@ -362,7 +375,7 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 7,
+          "idx": 11,
           "version": 1
         },
         "connected_wall": null,
@@ -423,6 +436,36 @@
         },
         "prev_wall": {
           "idx": 1,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 11,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 8,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 7,
           "version": 1
         },
         "connected_wall": null,
@@ -502,10 +545,10 @@
       "version": 1
     },
     "position": [
-      0.5677773,
-      0.029907333
+      -0.79972833,
+      1.4629469
     ],
-    "yaw": -1.5819675
+    "yaw": -5.3352933
   },
   "fog": {
     "color": {
