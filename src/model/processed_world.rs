@@ -9,7 +9,8 @@ pub struct ProcessedWorld {
 	room_infos: SecondaryMap<RoomId, RoomInfo>,
 
 	geometry: WorldGeometry,
-	new_rooms_to_source: SecondaryMap<RoomId, RoomId>,
+	processed_to_source_rooms: SecondaryMap<RoomId, RoomId>,
+	source_to_processed_rooms: SecondaryMap<RoomId, SmallVec<[RoomId; 4]>>,
 
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
@@ -21,7 +22,8 @@ impl ProcessedWorld {
 			room_infos: SecondaryMap::new(),
 
 			geometry: WorldGeometry::new(),
-			new_rooms_to_source: SecondaryMap::new(),
+			processed_to_source_rooms: SecondaryMap::new(),
+			source_to_processed_rooms: SecondaryMap::new(),
 
 			world_change_sub: message_bus.subscribe(),
 		};
@@ -77,44 +79,51 @@ impl ProcessedWorld {
 			.map(move |idx| &world.objects[idx])
 	}
 
-	pub fn to_source_placement(&self, new_placement: Placement) -> Placement {
+	pub fn to_source_placement(&self, processed_placement: Placement) -> Placement {
 		Placement {
-			room_id: self.to_source_room(new_placement.room_id),
-			.. new_placement
+			room_id: self.to_source_room(processed_placement.room_id),
+			.. processed_placement
 		}
 	}
 
-	pub fn to_source_room(&self, new_room_id: RoomId) -> RoomId {
-		assert!(new_room_id.is_valid(&self.geometry), "RoomId given to to_source_room that doesn't exist in processed geometry");
+	pub fn to_source_room(&self, processed_room_id: RoomId) -> RoomId {
+		assert!(processed_room_id.is_valid(&self.geometry), "RoomId given to to_source_room that doesn't exist in processed geometry");
 
 		// Any rooms not in the map but are in the processed geometry already existed in the original geometry.
-		self.new_rooms_to_source.get(new_room_id)
+		self.processed_to_source_rooms.get(processed_room_id)
 			.cloned()
-			.unwrap_or(new_room_id)
+			.unwrap_or(processed_room_id)
+	}
+
+	pub fn to_processed_rooms(&self, source_room_id: RoomId) -> SmallVec<[RoomId; 4]> {
+		let mut rooms = self.source_to_processed_rooms.get(source_room_id).cloned().unwrap_or_default();
+		rooms.push(source_room_id);
+		rooms
 	}
 
 	fn rebuild_world(&mut self, world: &World) {
 		self.room_infos.clear();
 		self.wall_infos.clear();
-		self.new_rooms_to_source.clear();
+		self.processed_to_source_rooms.clear();
+		self.source_to_processed_rooms.clear();
 
 		let mut new_geometry = world.geometry.clone();
-		if split_concave_rooms(&mut new_geometry, &mut self.new_rooms_to_source) {
+		if split_concave_rooms(&mut new_geometry, &mut self.processed_to_source_rooms) {
 			self.geometry = new_geometry;
+
+			invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
+
 		} else {
 			log::error!("Failed to process geometry");
 			self.geometry = world.geometry.clone();
-			self.new_rooms_to_source.clear();
+			self.processed_to_source_rooms.clear();
 		}
 
 		for room_id in self.geometry.rooms.keys() {
-			log::debug!("Building {room_id:?}");
-
 			let mut connecting_walls = Vec::new();
 
 			// Collect walls
 			for wall_id in self.geometry.room_walls(room_id) {
-				log::debug!("--- Collecting {wall_id:?}");
 				let connection_info = wall_id.connected_wall(&self.geometry)
 					.map(|target_id| ConnectionInfo::new(&self.geometry, wall_id, target_id));
 
@@ -145,8 +154,6 @@ impl ProcessedWorld {
 				connecting_walls,
 			});
 		}
-
-		log::debug!("Done");
 	}
 }
 
@@ -251,7 +258,7 @@ pub struct RoomInfo {
 }
 
 
-fn split_concave_rooms(geometry: &mut WorldGeometry, new_rooms_to_source: &mut SecondaryMap<RoomId, RoomId>) -> bool {
+fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> bool {
 	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
 
 	'next_room: while let Some(current_room) = room_queue.pop() {
@@ -380,10 +387,10 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, new_rooms_to_source: &mut S
 			new_wall_current_room.get_mut(geometry).connected_wall = Some(new_wall_new_room);
 
 			// Link new room back to room in original geometry
-			if let Some(&source_room) = new_rooms_to_source.get(current_room) {
-				new_rooms_to_source.insert(new_room, source_room);
+			if let Some(&source_room) = processed_to_source_rooms.get(current_room) {
+				processed_to_source_rooms.insert(new_room, source_room);
 			} else {
-				new_rooms_to_source.insert(new_room, current_room);
+				processed_to_source_rooms.insert(new_room, current_room);
 			}
 
 			// Queue new room, just in case.
@@ -397,6 +404,19 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, new_rooms_to_source: &mut S
 
 	true
 }
+
+
+fn invert_processed_to_source_room_map(
+	source_to_processed_rooms: &mut SecondaryMap<RoomId, SmallVec<[RoomId; 4]>>,
+	processed_to_source_rooms: &SecondaryMap<RoomId, RoomId>)
+{
+	for (processed_id, &source_id) in processed_to_source_rooms.iter() {
+		source_to_processed_rooms.entry(source_id).unwrap()
+			.or_default()
+			.push(processed_id);
+	}
+}
+
 
 #[test]
 fn split_concave_rooms_noop_for_simple_geometry() {

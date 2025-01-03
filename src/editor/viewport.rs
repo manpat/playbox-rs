@@ -167,6 +167,7 @@ impl<'c> Viewport<'c> {
 
 	pub fn add_room(&mut self, room_id: RoomId, room_to_world: Mat2x3, flags: ViewportItemFlags) {
 		let geometry = &self.world.geometry;
+		let processed_geometry = self.processed_world.geometry();
 
 		let interaction_flags = flags.intersection(ViewportItemFlags::BASIC_INTERACTIONS);
 
@@ -190,17 +191,31 @@ impl<'c> Viewport<'c> {
 			});
 		}
 
-		// Pick walls
-		for wall_id in geometry.room_walls(room_id) {
-			let (start, end) = geometry.wall_vertices(wall_id);
+		// Add walls
+		for processed_room_id in self.processed_world.to_processed_rooms(room_id) {
+			for wall_id in processed_geometry.room_walls(processed_room_id) {
+				let (start, end) = processed_geometry.wall_vertices(wall_id);
 
-			self.items.push(ViewportItem {
-				shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
-				item: Some(Item::Wall(wall_id)),
-				color: geometry.walls[wall_id].color,
-				room_to_world,
-				flags: wall_interaction_flags,
-			});
+				// Check if this wall exists in the source data (and so can be modified),
+				// or was generated.
+				if wall_id.is_valid(geometry) {
+					self.items.push(ViewportItem {
+						shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
+						item: Some(Item::Wall(wall_id)),
+						color: wall_id.get(geometry).color,
+						room_to_world,
+						flags: wall_interaction_flags,
+					});
+				} else {
+					self.items.push(ViewportItem {
+						shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
+						item: None,
+						color: Color::rgba(0.2, 0.1, 0.1, 0.5),
+						room_to_world,
+						flags: ViewportItemFlags::empty(),
+					});
+				}
+			}
 		}
 
 		// Pick room

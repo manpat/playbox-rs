@@ -167,7 +167,7 @@ fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
 	if changed {
 		ctx.message_bus.emit(EditorWorldEditCmd::SetFogParams(fog));
 	}
-	
+
 	use egui::emath::Numeric;
 
 	fn slider_widget<N: Numeric>(ui: &mut egui::Ui, value: &mut N, range: std::ops::RangeInclusive<N>) -> bool {
