@@ -156,6 +156,14 @@ impl GameScene {
 
 		processed_world.update(&world, &progress, ctx.bus);
 
+		// TODO(pat.m): needs to happen somewhere else, but has to happen after processed world update
+		{
+			// Make sure player doesn't suddenly end up in a room that no longer exists.
+			if !player.placement.room_id.is_valid(processed_world.geometry()) {
+				player.placement = world.player_spawn;
+			}
+		}
+
 		if !ctx.show_editor && !ctx.console.is_visible() || self.force_game_controls {
 			player.handle_input(ctx, &processed_world, &hud);
 			interactions.update(&player, &world, &processed_world, ctx.bus);
@@ -334,7 +342,10 @@ impl GameScene {
 
 				// if changes made to current world, check save
 
+				// TODO(pat.m): this is jank as hell. the model really needs to be split up so the source data
+				// can just be replaced wholesale
 				self.model.world = model::World::new();
+				self.model.player.placement = self.model.world.player_spawn;
 				ctx.bus.emit(model::WorldChangedEvent);
 
 				ui.close_menu();

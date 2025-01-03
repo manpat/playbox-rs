@@ -9,7 +9,7 @@ pub struct ProcessedWorld {
 	room_infos: SecondaryMap<RoomId, RoomInfo>,
 
 	geometry: WorldGeometry,
-	// TODO(pat.m): map from processed geometry back to source for editing
+	new_rooms_to_source: SecondaryMap<RoomId, RoomId>,
 
 	world_change_sub: Subscription<WorldChangedEvent>,
 }
@@ -21,6 +21,7 @@ impl ProcessedWorld {
 			room_infos: SecondaryMap::new(),
 
 			geometry: WorldGeometry::new(),
+			new_rooms_to_source: SecondaryMap::new(),
 
 			world_change_sub: message_bus.subscribe(),
 		};
@@ -76,12 +77,27 @@ impl ProcessedWorld {
 			.map(move |idx| &world.objects[idx])
 	}
 
+	pub fn room_id_to_source(&self, new_room_id: RoomId) -> RoomId {
+		assert!(new_room_id.is_valid(&self.geometry), "RoomId given to room_id_to_source that doesn't exist in processed geometry");
+
+		// Any rooms not in the map but are in the processed geometry already existed in the original geometry.
+		self.new_rooms_to_source.get(new_room_id)
+			.cloned()
+			.unwrap_or(new_room_id)
+	}
+
 	fn rebuild_world(&mut self, world: &World) {
 		self.room_infos.clear();
 		self.wall_infos.clear();
+		self.new_rooms_to_source.clear();
 
-		self.geometry = world.geometry.clone();
-		process_geometry(&mut self.geometry);
+		let mut new_geometry = world.geometry.clone();
+		if process_geometry(&mut new_geometry, &mut self.new_rooms_to_source) {
+			self.geometry = new_geometry;
+		} else {
+			log::error!("Failed to process geometry");
+			self.geometry = world.geometry.clone();
+		}
 
 		for room_id in self.geometry.rooms.keys() {
 			log::debug!("Building {room_id:?}");
@@ -227,7 +243,7 @@ pub struct RoomInfo {
 }
 
 
-fn process_geometry(geometry: &mut WorldGeometry) {
+fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut SecondaryMap<RoomId, RoomId>) -> bool {
 	log::debug!("process_geometry");
 
 	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
@@ -282,7 +298,7 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 					log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
 					log::error!("current_wall: {current_wall:?}");
 					log::error!("{geometry:#?}");
-					return;
+					return false;
 				}
 
 				let test_vertex = last_fully_visible_wall.vertex(geometry);
@@ -300,7 +316,7 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 						log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
 						log::error!("current_wall: {current_wall:?}");
 						log::error!("{geometry:#?}");
-						return;
+						return false;
 					}
 
 					break;
@@ -386,6 +402,9 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 			new_wall_new_room.get_mut(geometry).connected_wall = Some(new_wall_current_room);
 			new_wall_current_room.get_mut(geometry).connected_wall = Some(new_wall_new_room);
 
+			// Link new room back to room in original geometry
+			new_rooms_to_source.insert(new_room, current_room);
+
 			// Queue new room
 			room_queue.push(new_room);
 		}
@@ -419,12 +438,14 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 	}
 
 	log::debug!("Done");
+
+	true
 }
 
 #[test]
 fn process_geometry_noop_for_simple_geometry() {
 	let mut geometry = WorldGeometry::new_square(1.0);
-	process_geometry(&mut geometry);
+	assert!(process_geometry(&mut geometry));
 
 	assert_eq!(geometry.rooms.len(), 1);
 	assert_eq!(geometry.walls.len(), 4);
@@ -456,12 +477,10 @@ fn process_geometry_with_very_concave_geometry() {
 	let first_wall = first_room.first_wall(&geometry);
 	let second_wall = first_wall.next_wall(&geometry).next_wall(&geometry);
 
-	let new_position_0 = Vec2::from_x(0.2);
-	let new_position_1 = -0.5 * geometry.wall_center(second_wall); // - Vec2::from_x(0.2);
-	// geometry.split_wall(first_wall, new_position_0);
-	geometry.split_wall(second_wall, new_position_1);
+	let new_position = -0.5 * geometry.wall_center(second_wall);
+	geometry.split_wall(second_wall, new_position);
 
-	process_geometry(&mut geometry);
+	assert!(process_geometry(&mut geometry));
 
 	model::world::validation::validate_geometry(&geometry);
 
@@ -492,7 +511,7 @@ fn process_geometry_with_self_intersecting_geometry() {
 	assert_eq!(geometry.walls.len(), 10);
 	assert_eq!(geometry.vertices.len(), 10);
 
-	process_geometry(&mut geometry);
+	assert!(process_geometry(&mut geometry));
 
 	assert_eq!(geometry.rooms.len(), 4);
 	assert_eq!(geometry.walls.len(), 16);

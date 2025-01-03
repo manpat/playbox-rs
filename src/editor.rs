@@ -106,11 +106,6 @@ fn validate_model(state: &mut State, model: &mut Model) {
 		state.inner.focused_room_id = Some(first_room);
 	}
 
-	// TODO(pat.m): needs to happen somewhere else
-	// if !model.player.placement.room_id.is_valid(geometry) {
-	// 	model.player.placement.room_id = first_room;
-	// }
-
 	// Yuck
 	if !model.world.player_spawn.room_id.is_valid(geometry) {
 		model.world.player_spawn.room_id = first_room;
