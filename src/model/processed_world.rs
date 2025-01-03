@@ -99,7 +99,7 @@ impl ProcessedWorld {
 		self.new_rooms_to_source.clear();
 
 		let mut new_geometry = world.geometry.clone();
-		if process_geometry(&mut new_geometry, &mut self.new_rooms_to_source) {
+		if split_concave_rooms(&mut new_geometry, &mut self.new_rooms_to_source) {
 			self.geometry = new_geometry;
 		} else {
 			log::error!("Failed to process geometry");
@@ -251,7 +251,7 @@ pub struct RoomInfo {
 }
 
 
-fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut SecondaryMap<RoomId, RoomId>) -> bool {
+fn split_concave_rooms(geometry: &mut WorldGeometry, new_rooms_to_source: &mut SecondaryMap<RoomId, RoomId>) -> bool {
 	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
 
 	'next_room: while let Some(current_room) = room_queue.pop() {
@@ -399,11 +399,11 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 }
 
 #[test]
-fn process_geometry_noop_for_simple_geometry() {
+fn split_concave_rooms_noop_for_simple_geometry() {
 	let mut geometry = WorldGeometry::new_square(1.0);
 	let mut room_map = SecondaryMap::new();
 
-	assert!(process_geometry(&mut geometry, &mut room_map));
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
 	assert!(room_map.is_empty());
 	assert_eq!(geometry.rooms.len(), 1);
@@ -412,7 +412,7 @@ fn process_geometry_noop_for_simple_geometry() {
 }
 
 #[test]
-fn process_geometry_with_concave_geometry() {
+fn split_concave_rooms_with_concave_geometry() {
 	let mut geometry = WorldGeometry::new_square(1.0);
 	let mut room_map = SecondaryMap::new();
 
@@ -422,7 +422,7 @@ fn process_geometry_with_concave_geometry() {
 	let new_position = 0.5 * geometry.wall_center(first_wall);
 	let new_wall = geometry.split_wall(first_wall, new_position);
 
-	assert!(process_geometry(&mut geometry, &mut room_map));
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
 	model::world::validation::validate_geometry(&geometry);
 
@@ -433,7 +433,7 @@ fn process_geometry_with_concave_geometry() {
 }
 
 #[test]
-fn process_geometry_with_very_concave_geometry() {
+fn split_concave_rooms_with_very_concave_geometry() {
 	let mut geometry = WorldGeometry::new_square(1.0);
 	let mut room_map = SecondaryMap::new();
 
@@ -444,7 +444,7 @@ fn process_geometry_with_very_concave_geometry() {
 	let new_position = -0.5 * geometry.wall_center(second_wall);
 	geometry.split_wall(second_wall, new_position);
 
-	assert!(process_geometry(&mut geometry, &mut room_map));
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
 	model::world::validation::validate_geometry(&geometry);
 
@@ -455,7 +455,7 @@ fn process_geometry_with_very_concave_geometry() {
 }
 
 #[test]
-fn process_geometry_with_self_intersecting_geometry() {
+fn split_concave_rooms_with_self_intersecting_geometry() {
 	let mut geometry = WorldGeometry::new();
 	let mut room_map = SecondaryMap::new();
 
@@ -477,7 +477,7 @@ fn process_geometry_with_self_intersecting_geometry() {
 	assert_eq!(geometry.walls.len(), 10);
 	assert_eq!(geometry.vertices.len(), 10);
 
-	assert!(process_geometry(&mut geometry, &mut room_map));
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
 	assert_eq!(room_map.len(), 3);
 	assert_eq!(geometry.rooms.len(), 4);
