@@ -271,40 +271,59 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 			let start_position = current_wall_end_vertex.position(geometry);
 			let current_direction = geometry.wall_direction(current_wall);
 
-			let mut next_wall = current_wall;
+			let mut last_fully_visible_wall = current_wall.prev_wall(geometry);
 
-			// TODO(pat.m): this checks the same initial vertex multiple times. can do better
+			// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
+			// The vertex from this wall will be the source of the split.
 			loop {
-				next_wall.move_next(geometry);
+				log::debug!("--- --- --- Checking {last_fully_visible_wall:?}");
 
-				log::debug!("--- --- --- Checking {next_wall:?}");
-
-				if next_wall == current_wall.prev_wall(geometry) {
-					log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}. next == prev(current)");
+				if last_fully_visible_wall == current_wall.next_wall(geometry) {
+					log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
 					log::error!("current_wall: {current_wall:?}");
-					log::error!("next wall: {next_wall:?}");
 					log::error!("{geometry:#?}");
 					return;
 				}
 
-				let next_position = next_wall.vertex(geometry).position(geometry);
+				let test_vertex = last_fully_visible_wall.vertex(geometry);
+				let start_vertex_position = test_vertex.position(geometry);
+				let next_direction = (start_vertex_position - start_position).normalize();
 
-				// TODO(pat.m): this isn't really good enough. we also need info on 'visibility' between vertices.
-				// otherwise self-intersecting rooms will misbehave.
-				let next_direction = (next_position - start_position).normalize();
-				if current_direction.wedge(next_direction) <= 0.0 && current_direction.dot(next_direction) > 0.0 {
+				// If the wall current_wall_end_vertex->test_vertex would be concave, then undo the last move_prev.
+				// If last_fully_visible_wall != current_wall then we can make a new convex room here.
+				if current_direction.wedge(next_direction) > 0.0 {
+					last_fully_visible_wall.move_next(geometry);
+
+					if last_fully_visible_wall == current_wall {
+						// TODO(pat.m): its possible that we could just skip this wall and try others first?
+						// although I'm not sure in what circumstances this could happen.
+						log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
+						log::error!("current_wall: {current_wall:?}");
+						log::error!("{geometry:#?}");
+						return;
+					}
+
 					break;
 				}
+
+				last_fully_visible_wall.move_prev(geometry);
+				// TODO(pat.m): do we have to stop at first_wall? I don't think we can guarantee visibility otherwise
 			}
 
-			let new_room_first_wall = current_wall.next_wall(geometry);
-			let new_room_last_wall = next_wall.prev_wall(geometry);
+			let new_room_first_wall = last_fully_visible_wall;
+			let new_room_last_wall = current_wall;
+
+			let current_room_first_wall = current_wall.next_wall(geometry);
+			let current_room_last_wall = last_fully_visible_wall.prev_wall(geometry);
+
+			let current_room_new_wall_vertex = new_room_first_wall.vertex(geometry);
+			let new_room_new_wall_vertex = current_room_first_wall.vertex(geometry);
 
 			// hopefully by this point we've found a valid candidate, so insert a wall bridging the two vertices
 			let new_wall_current_room = geometry.walls.insert(WallDef {
-				source_vertex: current_wall_end_vertex,
-				prev_wall: current_wall,
-				next_wall: next_wall,
+				source_vertex: current_room_new_wall_vertex,
+				prev_wall: current_room_last_wall,
+				next_wall: current_room_first_wall,
 				room: current_room,
 				connected_wall: None,
 
@@ -313,9 +332,8 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 
 			log::debug!("--- --- Inserted {new_wall_current_room:?}");
 
-			current_wall.get_mut(geometry).next_wall = new_wall_current_room;
-			next_wall.get_mut(geometry).prev_wall = new_wall_current_room;
-			current_wall_end_vertex.get_mut(geometry).outgoing_wall = new_wall_current_room;
+			current_room_last_wall.get_mut(geometry).next_wall = new_wall_current_room;
+			current_room_first_wall.get_mut(geometry).prev_wall = new_wall_current_room;
 
 			// Set current rooms first wall to our newly created wall, to avoid the case where it was previously
 			// one of the split off walls.
@@ -327,7 +345,7 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 			log::debug!("--- --- Inserted {new_room:?}");
 
 			let new_wall_new_room = geometry.walls.insert(WallDef {
-				source_vertex: next_wall.vertex(geometry),
+				source_vertex: new_room_new_wall_vertex,
 				room: new_room,
 				prev_wall: new_room_last_wall,
 				next_wall: new_room_first_wall,
@@ -373,29 +391,31 @@ fn process_geometry(geometry: &mut WorldGeometry) {
 		}
 	}
 
-	model::world::validation::validate_geometry(geometry);
+	if !cfg!(test) {
+		model::world::validation::validate_geometry(geometry);
 
-	println!("Validated");
+		println!("Validated");
 
-	for room_id in geometry.rooms.keys() {
-		let mut counter = 50u32;
-		let first_wall = room_id.first_wall(geometry);
+		for room_id in geometry.rooms.keys() {
+			let mut counter = 50u32;
+			let first_wall = room_id.first_wall(geometry);
 
-		let mut wall_it = first_wall;
-		print!("{room_id:?}: {wall_it:?}");
+			let mut wall_it = first_wall;
+			print!("{room_id:?}: {wall_it:?}");
 
-		loop {
-			wall_it.move_next(geometry);
+			loop {
+				wall_it.move_next(geometry);
 
-			counter = counter.checked_sub(1).expect("Overflow!");
-			if wall_it == first_wall {
-				break
+				counter = counter.checked_sub(1).expect("Overflow!");
+				if wall_it == first_wall {
+					break
+				}
+
+				print!(" -> {wall_it:?}");
 			}
 
-			print!(" -> {wall_it:?}");
+			println!();
 		}
-
-		println!();
 	}
 
 	log::debug!("Done");
@@ -430,7 +450,7 @@ fn process_geometry_with_concave_geometry() {
 }
 
 #[test]
-fn process_geometry_with_complex_geometry() {
+fn process_geometry_with_very_concave_geometry() {
 	let mut geometry = WorldGeometry::new_square(1.0);
 	let first_room = geometry.first_room();
 	let first_wall = first_room.first_wall(&geometry);
@@ -445,7 +465,38 @@ fn process_geometry_with_complex_geometry() {
 
 	model::world::validation::validate_geometry(&geometry);
 
-	assert_eq!(geometry.rooms.len(), 2);
-	assert_eq!(geometry.walls.len(), 7);
+	assert_eq!(geometry.rooms.len(), 3);
+	assert_eq!(geometry.walls.len(), 9);
 	assert_eq!(geometry.vertices.len(), 5);
+}
+
+#[test]
+fn process_geometry_with_self_intersecting_geometry() {
+	let mut geometry = WorldGeometry::new();
+
+	// Some kinda P shape
+	geometry.insert_room_from_positions(&[
+		Vec2::new(1.0, 0.0),
+		Vec2::new(1.0, 4.0),
+		Vec2::new(4.0, 4.0),
+		Vec2::new(4.0, 1.0),
+		Vec2::new(0.0, 1.0),
+		Vec2::new(0.0, 2.0),
+		Vec2::new(3.0, 2.0),
+		Vec2::new(3.0, 3.0),
+		Vec2::new(2.0, 3.0),
+		Vec2::new(2.0, 0.0),
+	]);
+
+	assert_eq!(geometry.rooms.len(), 1);
+	assert_eq!(geometry.walls.len(), 10);
+	assert_eq!(geometry.vertices.len(), 10);
+
+	process_geometry(&mut geometry);
+
+	assert_eq!(geometry.rooms.len(), 4);
+	assert_eq!(geometry.walls.len(), 16);
+	assert_eq!(geometry.vertices.len(), 10);
+
+	model::world::validation::validate_geometry(&geometry);
 }

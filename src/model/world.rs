@@ -58,47 +58,6 @@ impl World {
 }
 
 
-// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-// pub struct Room {
-// 	pub walls: Vec<Wall>,
-// 	pub wall_vertices: Vec<Vec2>,
-// 	pub floor_color: Color,
-// 	pub ceiling_color: Color,
-// 	pub height: f32,
-// }
-
-// impl Room {
-// 	pub fn new_square(wall_length: f32) -> Room {
-// 		let wall_extent = wall_length / 2.0;
-
-// 		Room {
-// 			wall_vertices: vec![
-// 				Vec2::new( wall_extent, -wall_extent),
-// 				Vec2::new(-wall_extent, -wall_extent),
-// 				Vec2::new(-wall_extent,  wall_extent),
-// 				Vec2::new( wall_extent,  wall_extent),
-// 			],
-
-// 			walls: vec![Wall::new(); 4],
-// 			floor_color: Color::grey(0.5),
-// 			ceiling_color: Color::grey(0.5),
-
-// 			height: 1.0,
-// 		}
-// 	}
-
-// 	pub fn wall_vertices(&self, wall_index: usize) -> (Vec2, Vec2) {
-// 		let end_vertex_idx = (wall_index+1) % self.wall_vertices.len();
-// 		(self.wall_vertices[wall_index], self.wall_vertices[end_vertex_idx])
-// 	}
-
-// 	pub fn bounds(&self) -> Aabb2 {
-// 		Aabb2::from_points(&self.wall_vertices)
-// 	}
-// }
-
-
-
 // TODO(pat.m): would be good to move some of the below into a higher level model that can cache transforms, since
 // transforms between connected rooms will always be the same.
 
