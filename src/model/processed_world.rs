@@ -252,56 +252,42 @@ pub struct RoomInfo {
 
 
 fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut SecondaryMap<RoomId, RoomId>) -> bool {
-	log::debug!("process_geometry");
-
 	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
 
 	'next_room: while let Some(current_room) = room_queue.pop() {
+		// Retry each room until it is completely cut up into smaller convex rooms.
 		loop {
-			log::debug!("- Starting {current_room:?}");
-
 			let first_wall = current_room.first_wall(geometry);
 			let mut current_wall = first_wall;
 
 			// Check that the whole room is convex.
-
-			let mut counter = 50u32;
-
 			'next_wall: loop {
 				let next_wall = current_wall.next_wall(geometry);
-				log::debug!("--- Checking {current_wall:?} -> {next_wall:?}");
-
-				counter = counter.checked_sub(1).expect("Overflow!");
-
 				let current_direction = geometry.wall_direction(current_wall);
 				let next_direction = geometry.wall_direction(next_wall);
 
+				// If the next vertex is concave then move on to the next stage.
 				if current_direction.wedge(next_direction) > 0.0 {
-					log::debug!("--- --- {current_wall:?} is NOT FINE");
 					break 'next_wall;
 				}
 
+				// If we're back at the first wall then we're done, move on to the next room.
 				if next_wall == first_wall {
-					log::debug!("--- --- room loop complete");
 					continue 'next_room;
 				}
 
 				current_wall = next_wall;
-				log::debug!("--- --- fine, moving to {next_wall:?}");
 			}
 
-			// Room is concave, search for the next vertex that would make a convex room.
-			let current_wall_end_vertex = current_wall.next_vertex(geometry);
-			let start_position = current_wall_end_vertex.position(geometry);
+			// Room is concave, search for an appropriate vertex to split off a convex chunk of the current room.
+			let start_position = current_wall.next_vertex(geometry).position(geometry);
 			let current_direction = geometry.wall_direction(current_wall);
 
 			let mut last_fully_visible_wall = current_wall.prev_wall(geometry);
 
 			// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
 			// The vertex from this wall will be the source of the split.
-			loop {
-				log::debug!("--- --- --- Checking {last_fully_visible_wall:?}");
-
+			'find_largest_convex: loop {
 				if last_fully_visible_wall == current_wall.next_wall(geometry) {
 					log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
 					log::error!("current_wall: {current_wall:?}");
@@ -313,7 +299,7 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 				let start_vertex_position = test_vertex.position(geometry);
 				let next_direction = (start_vertex_position - start_position).normalize();
 
-				// If the wall current_wall_end_vertex->test_vertex would be concave, then undo the last move_prev.
+				// If the wall start_position->test_vertex would be concave, then undo the last move_prev.
 				// If last_fully_visible_wall != current_wall then we can make a new convex room here.
 				if current_direction.wedge(next_direction) > 0.0 {
 					last_fully_visible_wall.move_next(geometry);
@@ -327,13 +313,13 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 						return false;
 					}
 
-					break;
+					break 'find_largest_convex;
 				}
 
 				last_fully_visible_wall.move_prev(geometry);
-				// TODO(pat.m): do we have to stop at first_wall? I don't think we can guarantee visibility otherwise
 			}
 
+			// Now that we know two vertices we can bridge to make a convex room, start doing that.
 			let new_room_first_wall = last_fully_visible_wall;
 			let new_room_last_wall = current_wall;
 
@@ -343,18 +329,14 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 			let current_room_new_wall_vertex = new_room_first_wall.vertex(geometry);
 			let new_room_new_wall_vertex = current_room_first_wall.vertex(geometry);
 
-			// hopefully by this point we've found a valid candidate, so insert a wall bridging the two vertices
 			let new_wall_current_room = geometry.walls.insert(WallDef {
 				source_vertex: current_room_new_wall_vertex,
 				prev_wall: current_room_last_wall,
 				next_wall: current_room_first_wall,
 				room: current_room,
 				connected_wall: None,
-
 				.. current_wall.get(geometry).clone()
 			});
-
-			log::debug!("--- --- Inserted {new_wall_current_room:?}");
 
 			current_room_last_wall.get_mut(geometry).next_wall = new_wall_current_room;
 			current_room_first_wall.get_mut(geometry).prev_wall = new_wall_current_room;
@@ -363,10 +345,8 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 			// one of the split off walls.
 			current_room.get_mut(geometry).first_wall = new_wall_current_room;
 
-			// Split 'lump' into a new room.
+			// Split convex 'chunk' into a new room, with same attributes as current room.
 			let new_room = geometry.rooms.insert(current_room.get(geometry).clone());
-
-			log::debug!("--- --- Inserted {new_room:?}");
 
 			let new_wall_new_room = geometry.walls.insert(WallDef {
 				source_vertex: new_room_new_wall_vertex,
@@ -374,36 +354,25 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 				prev_wall: new_room_last_wall,
 				next_wall: new_room_first_wall,
 				connected_wall: None,
-
 				.. current_wall.get(geometry).clone()
 			});
-
-			log::debug!("--- --- Inserted {new_wall_new_room:?}");
 
 			new_room_first_wall.get_mut(geometry).prev_wall = new_wall_new_room;
 			new_room_last_wall.get_mut(geometry).next_wall = new_wall_new_room;
 			new_room.get_mut(geometry).first_wall = new_wall_new_room;
 
-			// Make sure all walls in new room point to new room
+			// Make sure all walls in new room point to it
 			{
-				let mut counter = 50u32;
 				let mut wall_it = new_wall_new_room;
 
-				print!("{new_room:?}: {wall_it:?}");
-
 				loop {
-					wall_it.move_next(geometry);
 					wall_it.get_mut(geometry).room = new_room;
+					wall_it.move_next(geometry);
 
-					counter = counter.checked_sub(1).expect("Overflow!");
 					if wall_it == new_wall_new_room {
 						break
 					}
-
-					print!(" -> {wall_it:?}");
 				}
-
-				println!();
 			}
 
 			// Connect new rooms
@@ -417,39 +386,14 @@ fn process_geometry(geometry: &mut WorldGeometry, new_rooms_to_source: &mut Seco
 				new_rooms_to_source.insert(new_room, current_room);
 			}
 
-			// Queue new room
+			// Queue new room, just in case.
 			room_queue.push(new_room);
 		}
 	}
 
 	if !cfg!(test) {
 		model::world::validation::validate_geometry(geometry);
-
-		println!("Validated");
-
-		for room_id in geometry.rooms.keys() {
-			let mut counter = 50u32;
-			let first_wall = room_id.first_wall(geometry);
-
-			let mut wall_it = first_wall;
-			print!("{room_id:?}: {wall_it:?}");
-
-			loop {
-				wall_it.move_next(geometry);
-
-				counter = counter.checked_sub(1).expect("Overflow!");
-				if wall_it == first_wall {
-					break
-				}
-
-				print!(" -> {wall_it:?}");
-			}
-
-			println!();
-		}
 	}
-
-	log::debug!("Done");
 
 	true
 }
