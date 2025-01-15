@@ -490,7 +490,8 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		{
 			let offset_transform = Mat2x3::translate(wall_info.normal * neighbouring_room_margin) * connection_info.target_to_source;
 
-			neighbouring_rooms.push((connection_info.target_room, offset_transform));
+			let source_room_id = context.model.processed_world.to_source_room(connection_info.target_room);
+			neighbouring_rooms.push((source_room_id, offset_transform));
 		}
 	}
 
@@ -502,9 +503,9 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 	viewport.add_room(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
 	viewport.add_room_connections(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS);
 
-	for (room_index, transform) in neighbouring_rooms {
-		viewport.add_room(room_index, transform, ViewportItemFlags::BASIC_INTERACTIONS);
-		viewport.add_room_connections(room_index, transform, ViewportItemFlags::empty());
+	for (room_id, transform) in neighbouring_rooms {
+		viewport.add_room(room_id, transform, ViewportItemFlags::BASIC_INTERACTIONS);
+		viewport.add_room_connections(room_id, transform, ViewportItemFlags::empty());
 	}
 
 	for (object_index, object) in world.objects.iter().enumerate() {

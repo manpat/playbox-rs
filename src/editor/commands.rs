@@ -364,21 +364,27 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		}
 
 		EditorWorldEditCmd::ConnectWall(source_wall_id, target_wall_id) => {
-			anyhow::bail!("Not implemented");
-			// transaction.describe(format!("Connect {source_wall_id} -> {target_wall_id}"));
-			// transaction.update_connections(|_, connections| {
-			// 	// Remove any connections to either the source or target walls
-			// 	connections.retain(|&(wall_a, wall_b)| {
-			// 		wall_a != source_wall_id && wall_b != source_wall_id
-			// 		&& wall_a != target_wall_id && wall_b != target_wall_id
-			// 	});
+			anyhow::ensure!(source_wall_id != target_wall_id, "Trying to connect wall to itself");
+			anyhow::ensure!(source_wall_id.is_valid(&transaction.model().world.geometry));
+			anyhow::ensure!(target_wall_id.is_valid(&transaction.model().world.geometry));
 
-			// 	// Connect
-			// 	connections.push((source_wall_id, target_wall_id));
+			transaction.describe(format!("Connect {source_wall_id:?} -> {target_wall_id:?}"));
+			transaction.update_geometry(|_, geometry| {
+				// Disconnect potential previous targets
+				if let Some(old_target) = source_wall_id.connected_wall(geometry) {
+					old_target.get_mut(geometry).connected_wall = None;
+				}
+				if let Some(old_target) = target_wall_id.connected_wall(geometry) {
+					old_target.get_mut(geometry).connected_wall = None;
+				}
 
-			// 	Ok(())
-			// })?;
-			// transaction.submit();
+				// Connect new targets
+				source_wall_id.get_mut(geometry).connected_wall = Some(target_wall_id);
+				target_wall_id.get_mut(geometry).connected_wall = Some(source_wall_id);
+
+				Ok(())
+			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
