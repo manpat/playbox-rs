@@ -350,17 +350,15 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			// transaction.submit();
 		}
 
-		EditorWorldEditCmd::DisconnectRoom(room_index) => {
-			anyhow::bail!("Not implemented");
-			// transaction.describe(format!("Disconnect Room #{room_index}"));
-			// transaction.update_connections(|_, connections| {
-			// 	connections.retain(|&(wall_a, wall_b)| {
-			// 		wall_a.room_index != room_index && wall_b.room_index != room_index
-			// 	});
-
-			// 	Ok(())
-			// })?;
-			// transaction.submit();
+		EditorWorldEditCmd::DisconnectRoom(room_id) => {
+			transaction.describe(format!("Disconnect {room_id:?}"));
+			transaction.update_geometry(|model, geometry| {
+				for wall in model.world.geometry.room_walls(room_id) {
+					geometry.connect_wall(wall, None);
+				}
+				Ok(())
+			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::ConnectWall(source_wall_id, target_wall_id) => {
@@ -370,30 +368,18 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 			transaction.describe(format!("Connect {source_wall_id:?} -> {target_wall_id:?}"));
 			transaction.update_geometry(|_, geometry| {
-				// Disconnect potential previous targets
-				if let Some(old_target) = source_wall_id.connected_wall(geometry) {
-					old_target.get_mut(geometry).connected_wall = None;
-				}
-				if let Some(old_target) = target_wall_id.connected_wall(geometry) {
-					old_target.get_mut(geometry).connected_wall = None;
-				}
-
-				// Connect new targets
-				source_wall_id.get_mut(geometry).connected_wall = Some(target_wall_id);
-				target_wall_id.get_mut(geometry).connected_wall = Some(source_wall_id);
-
+				geometry.connect_wall(source_wall_id, target_wall_id);
 				Ok(())
 			})?;
 			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectWall(wall_id) => {
+			anyhow::ensure!(wall_id.is_valid(&transaction.model().world.geometry));
+
 			transaction.describe(format!("Disconnect {wall_id:?}"));
 			transaction.update_geometry(|_, geometry| {
-				if let Some(target) = wall_id.connected_wall(geometry) {
-					target.get_mut(geometry).connected_wall = None;
-					wall_id.get_mut(geometry).connected_wall = None;
-				}
+				geometry.connect_wall(wall_id, None);
 				Ok(())
 			})?;
 			transaction.submit();

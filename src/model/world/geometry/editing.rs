@@ -22,4 +22,33 @@ impl WorldGeometry {
 
 		new_wall
 	}
+
+	pub fn connect_wall(&mut self, wall_id: WallId, new_target: impl Into<Option<WallId>>) {
+		let new_target = new_target.into();
+
+		assert!(new_target != Some(wall_id), "Can't connect wall to itself");
+
+		if let Some(old_target) = wall_id.connected_wall(self) {
+			if new_target == Some(old_target) {
+				// Already connected, early out
+				return;
+			}
+
+			// Disconnect previous target
+			old_target.get_mut(self).connected_wall = None;
+		}
+
+		if let Some(new_target) = new_target {
+			// If our new target was already connected, disconnect it.
+			if let Some(old_target) = new_target.connected_wall(self) {
+				old_target.get_mut(self).connected_wall = None;
+			}
+
+			// Point target to us
+			new_target.get_mut(self).connected_wall = Some(wall_id);
+		}
+
+		// Point to target
+		wall_id.get_mut(self).connected_wall = new_target;
+	}
 }
