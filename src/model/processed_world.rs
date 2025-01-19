@@ -479,7 +479,7 @@ fn split_concave_rooms_with_self_intersecting_geometry() {
 	let mut geometry = WorldGeometry::new();
 	let mut room_map = SecondaryMap::new();
 
-	// Some kinda P shape
+	// Some kinda self-intersecting P shape
 	geometry.insert_room_from_positions(&[
 		Vec2::new(1.0, 0.0),
 		Vec2::new(1.0, 4.0),
@@ -503,6 +503,34 @@ fn split_concave_rooms_with_self_intersecting_geometry() {
 	assert_eq!(geometry.rooms.len(), 4);
 	assert_eq!(geometry.walls.len(), 16);
 	assert_eq!(geometry.vertices.len(), 10);
+
+	model::world::validation::validate_geometry(&geometry);
+}
+
+#[test]
+fn split_concave_rooms_with_failure_case_1() {
+	let mut geometry = WorldGeometry::new();
+	let mut room_map = SecondaryMap::new();
+
+	geometry.insert_room_from_positions(&[
+		Vec2::new(2.0, 0.0),
+		Vec2::new(2.1, 1.0), // This slight concavity breaks the algorithm at time of writing.
+		Vec2::new(2.0, 2.0),
+
+		Vec2::new(0.0, 1.5),
+		Vec2::new(1.0, 1.5),
+	]);
+
+	assert_eq!(geometry.rooms.len(), 1);
+	assert_eq!(geometry.walls.len(), 5);
+	assert_eq!(geometry.vertices.len(), 5);
+
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+
+	// assert_eq!(room_map.len(), 3);
+	// assert_eq!(geometry.rooms.len(), 4);
+	// assert_eq!(geometry.walls.len(), 16);
+	// assert_eq!(geometry.vertices.len(), 10);
 
 	model::world::validation::validate_geometry(&geometry);
 }
