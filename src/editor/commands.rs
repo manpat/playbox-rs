@@ -404,7 +404,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::DeleteVertex(vertex_id) => {
+		EditorWorldEditCmd::DeleteVertex(_vertex_id) => {
 			anyhow::bail!("Not implemented");
 			// transaction.describe(format!("Remove Vertex {vertex_id}"));
 

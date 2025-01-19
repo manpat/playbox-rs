@@ -259,13 +259,15 @@ pub struct RoomInfo {
 
 
 fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> bool {
-	let mut room_queue: SmallVec<[RoomId; 16]> = geometry.rooms.keys().collect();
+	let mut room_queue: SmallVec<[(RoomId, Option<WallId>); 16]> = geometry.rooms.keys()
+		.map(|room| (room, None))
+		.collect();
 
-	'next_room: while let Some(current_room) = room_queue.pop() {
+	'next_room: while let Some((current_room, maybe_start_wall)) = room_queue.pop() {
 		// Retry each room until it is completely cut up into smaller convex rooms.
 		loop {
-			let first_wall = current_room.first_wall(geometry);
-			let mut current_wall = first_wall;
+			let start_wall = maybe_start_wall.unwrap_or_else(|| current_room.first_wall(geometry));
+			let mut current_wall = start_wall;
 
 			// Check that the whole room is convex.
 			'next_wall: loop {
@@ -279,7 +281,7 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 				}
 
 				// If we're back at the first wall then we're done, move on to the next room.
-				if next_wall == first_wall {
+				if next_wall == start_wall {
 					continue 'next_room;
 				}
 
@@ -287,31 +289,45 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 			}
 
 			// Room is concave, search for an appropriate vertex to split off a convex chunk of the current room.
-			let start_position = current_wall.next_vertex(geometry).position(geometry);
-			let current_direction = geometry.wall_direction(current_wall);
-
 			let mut last_fully_visible_wall = current_wall.prev_wall(geometry);
 
-			// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
-			// The vertex from this wall will be the source of the split.
-			'find_largest_convex: loop {
-				if last_fully_visible_wall == current_wall.next_wall(geometry) {
-					log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
-					log::error!("current_wall: {current_wall:?}");
-					log::error!("{geometry:#?}");
-					return false;
-				}
+			{
+				let start_position = current_wall.next_vertex(geometry).position(geometry);
+				let current_direction = geometry.wall_direction(current_wall);
 
-				let test_vertex = last_fully_visible_wall.vertex(geometry);
-				let start_vertex_position = test_vertex.position(geometry);
-				let next_direction = (start_vertex_position - start_position).normalize();
+				// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
+				// The vertex from this wall will be the source of the split.
+				'find_largest_convex: loop {
+					if last_fully_visible_wall == current_wall.next_wall(geometry) {
+						log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
+						log::error!("current_wall: {current_wall:?}");
+						log::error!("{geometry:#?}");
+						return false;
+					}
 
-				// If the wall start_position->test_vertex would be concave, then undo the last move_prev.
-				// If last_fully_visible_wall != current_wall then we can make a new convex room here.
-				if current_direction.wedge(next_direction) > 0.0 {
-					last_fully_visible_wall.move_next(geometry);
+					let test_vertex = last_fully_visible_wall.vertex(geometry);
+					let start_vertex_position = test_vertex.position(geometry);
+					let next_direction = (start_vertex_position - start_position).normalize();
 
-					if last_fully_visible_wall == current_wall {
+					// If the wall start_position->test_vertex would be concave, then undo the last move_prev.
+					// If last_fully_visible_wall != current_wall then we can make a new convex room here.
+					if current_direction.wedge(next_direction) > 0.0 {
+						last_fully_visible_wall.move_next(geometry);
+
+						if last_fully_visible_wall != current_wall {
+							break 'find_largest_convex;
+						}
+
+						let next_start_wall = start_wall.next_wall(geometry);
+						if next_start_wall != current_room.first_wall(geometry) {
+							// Try again, skipping the first wall to see if we can find a better candidate.
+							room_queue.insert(0, (current_room, Some(next_start_wall)));
+							continue 'next_room;
+						}
+
+						// At this point, we've (theoretically) tried starting from every wall in the room.
+						// If none of them have a candidate wall 
+
 						// TODO(pat.m): its possible that we could just skip this wall and try others first?
 						// although I'm not sure in what circumstances this could happen.
 						log::error!("Failed to de-concavify wall {current_wall:?} while processing {current_room:?}.");
@@ -320,10 +336,8 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 						return false;
 					}
 
-					break 'find_largest_convex;
+					last_fully_visible_wall.move_prev(geometry);
 				}
-
-				last_fully_visible_wall.move_prev(geometry);
 			}
 
 			// Now that we know two vertices we can bridge to make a convex room, start doing that.
@@ -394,7 +408,7 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 			}
 
 			// Queue new room, just in case.
-			room_queue.push(new_room);
+			room_queue.push((new_room, None));
 		}
 	}
 
@@ -440,7 +454,7 @@ fn split_concave_rooms_with_concave_geometry() {
 	let first_wall = first_room.first_wall(&geometry);
 
 	let new_position = 0.5 * geometry.wall_center(first_wall);
-	let new_wall = geometry.split_wall(first_wall, new_position);
+	let _new_wall = geometry.split_wall(first_wall, new_position);
 
 	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
@@ -513,12 +527,12 @@ fn split_concave_rooms_with_failure_case_1() {
 	let mut room_map = SecondaryMap::new();
 
 	geometry.insert_room_from_positions(&[
-		Vec2::new(2.0, 0.0),
-		Vec2::new(2.1, 1.0), // This slight concavity breaks the algorithm at time of writing.
 		Vec2::new(2.0, 2.0),
+		Vec2::new(2.1, 1.0), // This slight concavity breaks the algorithm at time of writing.
+		Vec2::new(2.0, 0.0),
 
-		Vec2::new(0.0, 1.5),
-		Vec2::new(1.0, 1.5),
+		Vec2::new(0.0, 0.5),
+		Vec2::new(1.0, 0.5),
 	]);
 
 	assert_eq!(geometry.rooms.len(), 1);
