@@ -433,7 +433,8 @@ impl Viewport<'_> {
 		{
 			self.viewport_state.current_operation = Some(Operation::Drag {
 				item,
-				room_to_world: self.viewport_state.hovered_item_transform
+				room_to_world: self.viewport_state.hovered_item_transform,
+				click_to_confirm: false,
 			});
 		}
 
@@ -490,6 +491,20 @@ impl Viewport<'_> {
 						let insert_pos = self.world.geometry.wall_center(wall_id);
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
+						ui.close_menu();
+					}
+
+					if ui.button("Extrude").clicked() {
+						let geometry = &self.world.geometry;
+
+						self.message_bus.emit(EditorWorldEditCmd::SplitVertex(wall_id.vertex(geometry)));
+						self.message_bus.emit(EditorWorldEditCmd::SplitVertex(wall_id.next_vertex(geometry)));
+
+						self.viewport_state.current_operation = Some(Operation::Drag{
+							item: Item::Wall(wall_id),
+							room_to_world: self.viewport_state.hovered_item_transform,
+							click_to_confirm: true,
+						});
 						ui.close_menu();
 					}
 
@@ -731,14 +746,27 @@ impl Viewport<'_> {
 
 	fn handle_operation(&mut self) {
 		match self.viewport_state.current_operation {
-			Some(Operation::Drag{item, room_to_world}) => {
-				let world_delta = self.viewport_metrics.widget_to_world_delta(self.response.drag_delta());
+			Some(Operation::Drag{item, room_to_world, click_to_confirm}) => {
+				let delta = match click_to_confirm {
+					true => self.response.ctx.input(|input| input.pointer.delta()),
+					false => self.response.drag_delta(),
+				};
+
+				let world_delta = self.viewport_metrics.widget_to_world_delta(delta);
 				let room_delta = room_to_world.inverse() * world_delta.extend(0.0);
 
 				self.message_bus.emit(EditorWorldEditCmd::TranslateItem(item, room_delta));
 				self.response.mark_changed();
 
-				if self.response.ctx.input(|input| input.pointer.primary_released()) {
+				// TODO(pat.m): do I actually need this? maybe just release is fine
+				let confirmed = match click_to_confirm {
+					true => self.response.clicked(),
+					false => self.response.ctx.input(|input| input.pointer.primary_released()),
+				};
+
+				// TODO(pat.m): cancellation
+
+				if confirmed {
 					self.viewport_state.current_operation = None;
 				}
 			}
@@ -835,6 +863,7 @@ enum Operation {
 	Drag {
 		item: Item,
 		room_to_world: Mat2x3,
+		click_to_confirm: bool,
 	},
 
 	ConnectWall {
@@ -845,6 +874,6 @@ enum Operation {
 
 impl Operation {
 	fn consumes_clicks(&self) -> bool {
-		matches!(self, Self::ConnectWall{..})
+		matches!(self, Self::ConnectWall{..} | Self::Drag{click_to_confirm: true, ..})
 	}
 }

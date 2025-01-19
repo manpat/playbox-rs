@@ -38,6 +38,7 @@ pub enum EditorWorldEditCmd {
 	DisconnectWall(WallId),
 
 	SplitWall(WallId, Vec2),
+	SplitVertex(VertexId),
 	DeleteVertex(VertexId),
 
 
@@ -354,7 +355,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			transaction.describe(format!("Disconnect {room_id:?}"));
 			transaction.update_geometry(|model, geometry| {
 				for wall in model.world.geometry.room_walls(room_id) {
-					geometry.connect_wall(wall, None);
+					geometry.connect_wall(wall, None)?;
 				}
 				Ok(())
 			})?;
@@ -368,7 +369,7 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 			transaction.describe(format!("Connect {source_wall_id:?} -> {target_wall_id:?}"));
 			transaction.update_geometry(|_, geometry| {
-				geometry.connect_wall(source_wall_id, target_wall_id);
+				geometry.connect_wall(source_wall_id, target_wall_id)?;
 				Ok(())
 			})?;
 			transaction.submit();
@@ -379,16 +380,25 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 			transaction.describe(format!("Disconnect {wall_id:?}"));
 			transaction.update_geometry(|_, geometry| {
-				geometry.connect_wall(wall_id, None);
+				geometry.connect_wall(wall_id, None)?;
 				Ok(())
 			})?;
 			transaction.submit();
 		}
 
 		EditorWorldEditCmd::SplitWall(wall_id, new_position) => {
-			transaction.describe(format!("Split Wall {wall_id:?}"));
+			transaction.describe(format!("Split {wall_id:?}"));
 			transaction.update_geometry(|_, geometry| {
 				geometry.split_wall(wall_id, new_position);
+				Ok(())
+			})?;
+			transaction.submit();
+		}
+
+		EditorWorldEditCmd::SplitVertex(vertex_id) => {
+			transaction.describe(format!("Split {vertex_id:?}"));
+			transaction.update_geometry(|_, geometry| {
+				geometry.split_vertex(vertex_id)?;
 				Ok(())
 			})?;
 			transaction.submit();
