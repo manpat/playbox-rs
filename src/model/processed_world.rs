@@ -318,12 +318,12 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 							break 'find_largest_convex;
 						}
 
-						let next_start_wall = start_wall.next_wall(geometry);
-						if next_start_wall != current_room.first_wall(geometry) {
-							// Try again, skipping the first wall to see if we can find a better candidate.
-							room_queue.insert(0, (current_room, Some(next_start_wall)));
-							continue 'next_room;
-						}
+						// let next_start_wall = start_wall.next_wall(geometry);
+						// if next_start_wall != current_room.first_wall(geometry) {
+						// 	// Try again, skipping the first wall to see if we can find a better candidate.
+						// 	room_queue.insert(0, (current_room, Some(next_start_wall)));
+						// 	continue 'next_room;
+						// }
 
 						// At this point, we've (theoretically) tried starting from every wall in the room.
 						// If none of them have a candidate wall 
@@ -527,12 +527,13 @@ fn split_concave_rooms_with_failure_case_1() {
 	let mut room_map = SecondaryMap::new();
 
 	geometry.insert_room_from_positions(&[
-		Vec2::new(2.0, 2.0),
-		Vec2::new(2.1, 1.0), // This slight concavity breaks the algorithm at time of writing.
-		Vec2::new(2.0, 0.0),
+		Vec2::new(1.0, 1.5),
 
-		Vec2::new(0.0, 0.5),
-		Vec2::new(1.0, 0.5),
+		Vec2::new(2.0, 0.0),
+		Vec2::new(2.1, 1.0), // This slight concavity breaks the algorithm at time of writing.
+		Vec2::new(2.0, 2.0),
+
+		Vec2::new(0.0, 1.5),
 	]);
 
 	assert_eq!(geometry.rooms.len(), 1);
