@@ -258,20 +258,24 @@ pub struct RoomInfo {
 }
 
 
+fn is_next_vertex_concave(geometry: &WorldGeometry, wall: WallId) -> bool {
+	let current_direction = geometry.wall_direction(wall);
+	let next_direction = geometry.wall_direction(wall.next_wall(geometry));
+
+	current_direction.wedge(next_direction) > 0.0
+}
+
 fn find_concave_wall(geometry: &WorldGeometry, start_wall: WallId) -> Option<WallId> {
 	let mut current_wall = start_wall;
 
 	loop {
-		let next_wall = current_wall.next_wall(geometry);
-		let current_direction = geometry.wall_direction(current_wall);
-		let next_direction = geometry.wall_direction(next_wall);
-
 		// If the next vertex is concave then move on to the next stage.
-		if current_direction.wedge(next_direction) > 0.0 {
+		if is_next_vertex_concave(geometry, current_wall) {
 			return Some(current_wall);
 		}
 
 		// If we're back at the first wall then we're done, room is convex.
+		let next_wall = current_wall.next_wall(geometry);
 		if next_wall == start_wall {
 			return None;
 		}
@@ -356,100 +360,125 @@ fn split_room_by_walls(geometry: &mut WorldGeometry, new_loop_start: WallId, new
 }
 
 fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> bool {
-	// TODO(pat.m): is this good enough?
-	let mut wall_queue: SmallVec<[WallId; 128]> = geometry.rooms.keys()
-		.map(|room| room.first_wall(geometry))
+	let mut wall_queue: SmallVec<[WallId; 128]> = geometry.walls.keys()
 		.collect();
-	// let mut wall_queue: SmallVec<[WallId; 128]> = geometry.walls.keys()
-	// 	.chain(geometry.walls.keys())
-	// 	.collect();
 
-	let mut failed_walls: SmallVec<[WallId; 32]> = SmallVec::new();
+	let mut loop_guard = 1000u32;
 
-	'next_room: while let Some(start_wall) = wall_queue.pop() {
-		// Retry each room until it is completely cut up into smaller convex rooms.
-		loop {
-			// Check that the whole room is convex.
-			let Some(pre_concave_wall) = find_concave_wall(geometry, start_wall) else {
-				continue 'next_room
-			};
+	'next_wall: while let Some(start_wall) = wall_queue.pop() {
+		if let Some(next) = loop_guard.checked_sub(1) {
+			loop_guard = next;
+		} else {
+			println!("Stuck in a loop");
+			println!("{geometry:#?}");
 
-			// Room is concave, search for an appropriate vertex to split off a convex chunk of the current room.
-			let current_room = start_wall.room(geometry);
-			let mut last_fully_visible_wall = pre_concave_wall.prev_wall(geometry);
-
-			println!("{current_room:?} concave, trying to split off {pre_concave_wall:?}");
-
-			{
-				let start_position = pre_concave_wall.next_vertex(geometry).position(geometry);
-				let current_direction = geometry.wall_direction(pre_concave_wall);
-
-				// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
-				// The vertex from this wall will be the source of the split.
-				'find_largest_convex: loop {
-					if last_fully_visible_wall == pre_concave_wall.next_wall(geometry) {
-						println!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?}.");
-						println!("pre_concave_wall: {pre_concave_wall:?}");
-						println!("{geometry:#?}");
-						return false;
-					}
-
-					let test_vertex = last_fully_visible_wall.vertex(geometry);
-					let start_vertex_position = test_vertex.position(geometry);
-					let next_direction = (start_vertex_position - start_position).normalize();
-
-					// If the wall start_position->test_vertex would be concave, then undo the last move_prev.
-					// If last_fully_visible_wall != pre_concave_wall then we can make a new convex room here.
-					if current_direction.wedge(next_direction) > 0.0 {
-						last_fully_visible_wall.move_next(geometry);
-
-						if last_fully_visible_wall != pre_concave_wall {
-							break 'find_largest_convex;
-						}
-
-						// At this point, we've (theoretically) tried starting from every wall in the room.
-						// If none of them have a candidate wall 
-
-						// TODO(pat.m): its possible that we could just skip this wall and try others first?
-						// although I'm not sure in what circumstances this could happen.
-						println!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?}.");
-						println!("pre_concave_wall: {pre_concave_wall:?}");
-						println!("{geometry:#?}");
-						// return false;
-
-						if !failed_walls.contains(&start_wall) {
-							failed_walls.push(start_wall);
-							wall_queue.push(start_wall);
-							continue 'next_room;
-						} else {
-							return false;
-						}
-					}
-
-					last_fully_visible_wall.move_prev(geometry);
-				}
+			let walls: Vec<_> = geometry.walls.keys().collect();
+			for &wall in walls.iter() {
+				let start_vert = wall.vertex(&geometry);
+				let end_vert = wall.next_vertex(&geometry);
+				let next_concave = find_concave_wall(&geometry, wall);
+				println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 			}
-
-			// Now that we know two vertices we can bridge to make a convex room, start doing that.
-			let new_loop_joining_wall = split_room_by_walls(geometry, last_fully_visible_wall, pre_concave_wall);
-			let new_room = new_loop_joining_wall.room(geometry);
-
-			// Link new room back to room in original geometry
-			if let Some(&source_room) = processed_to_source_rooms.get(current_room) {
-				processed_to_source_rooms.insert(new_room, source_room);
-			} else {
-				processed_to_source_rooms.insert(new_room, current_room);
-			}
-
-			// Queue new room, just in case.
-			wall_queue.push(new_loop_joining_wall);
-			wall_queue.push(new_loop_joining_wall.connected_wall(geometry).unwrap());
+			return false;
 		}
-	}
 
-	if !failed_walls.is_empty() {
-		eprintln!("Not all walls succeeded!");
-		eprintln!("{failed_walls:?}");
+		// Check that the whole room is convex.
+		let Some(pre_concave_wall) = find_concave_wall(geometry, start_wall) else {
+			// Nothing found, check next wall in queue.
+			continue 'next_wall
+		};
+
+		// Room is concave, search for an appropriate vertex to split off a convex chunk of the current room.
+		let current_room = start_wall.room(geometry);
+		let mut test_wall = pre_concave_wall.prev_wall(geometry);
+
+		println!("{current_room:?} concave, trying to split off {pre_concave_wall:?}");
+
+		{
+			let start_position = pre_concave_wall.next_vertex(geometry).position(geometry);
+			let start_direction = geometry.wall_direction(pre_concave_wall);
+
+			// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
+			// The vertex from this wall will be the source of the split.
+			'find_largest_convex: loop {
+				if test_wall == pre_concave_wall.next_wall(geometry) {
+					println!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?} - room fully concave");
+					println!("pre_concave_wall: {pre_concave_wall:?}");
+					println!("{geometry:#?}");
+
+					let walls: Vec<_> = geometry.walls.keys().collect();
+					for &wall in walls.iter() {
+						let start_vert = wall.vertex(&geometry);
+						let end_vert = wall.next_vertex(&geometry);
+						let next_concave = find_concave_wall(&geometry, wall);
+						println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
+					}
+
+					return false;
+				}
+
+				let test_wall_source_vertex_offset = test_wall.vertex(geometry).position(geometry) - start_position;
+				let wall_crosses_start_vector = start_direction.wedge(test_wall_source_vertex_offset) > 0.0;
+
+				let is_target_vertex_concave = is_next_vertex_concave(geometry, test_wall);
+
+				if wall_crosses_start_vector || is_target_vertex_concave {
+					test_wall.move_next(geometry);
+
+					if test_wall != pre_concave_wall {
+						break 'find_largest_convex;
+					}
+
+					let prev_wall = test_wall.prev_wall(geometry);
+					let is_source_vertex_concave = is_next_vertex_concave(geometry, prev_wall);
+					if prev_wall != pre_concave_wall && !is_source_vertex_concave {
+						break 'find_largest_convex
+					}
+
+					println!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?} - ????");
+					// println!("{geometry:#?}");
+
+					for wall in geometry.walls.keys() {
+						let start_vert = wall.vertex(&geometry);
+						let end_vert = wall.next_vertex(&geometry);
+						let next_concave = find_concave_wall(&geometry, wall);
+						println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
+					}
+
+					for room in geometry.rooms.keys() {
+						let first_wall = room.first_wall(geometry);
+						print!("{room:?}: {first_wall:?}");
+
+						let mut cursor = first_wall.next_wall(geometry);
+						while cursor != first_wall {
+							print!(" -> {cursor:?}");
+							cursor.move_next(geometry);
+						}
+
+						println!();
+					}
+
+					return false;
+				}
+
+				test_wall.move_prev(geometry);
+			}
+		}
+
+		// Now that we know two vertices we can bridge to make a convex room, start doing that.
+		let new_loop_joining_wall = split_room_by_walls(geometry, test_wall, pre_concave_wall);
+		let new_room = new_loop_joining_wall.room(geometry);
+
+		// Link new room back to room in original geometry
+		if let Some(&source_room) = processed_to_source_rooms.get(current_room) {
+			processed_to_source_rooms.insert(new_room, source_room);
+		} else {
+			processed_to_source_rooms.insert(new_room, current_room);
+		}
+
+		// Queue new walls, just in case.
+		wall_queue.push(new_loop_joining_wall);
+		wall_queue.push(new_loop_joining_wall.connected_wall(geometry).unwrap());
 	}
 
 	if !cfg!(test) {
@@ -566,6 +595,40 @@ fn split_concave_rooms_with_self_intersecting_geometry() {
 }
 
 #[test]
+fn split_concave_rooms_with_self_intersecting_geometry_reverse() {
+	let mut geometry = WorldGeometry::new();
+	let mut room_map = SecondaryMap::new();
+
+	// Some kinda self-intersecting P shape
+	geometry.insert_room_from_positions(&[
+		Vec2::new(-2.0, 0.0),
+		Vec2::new(-2.0, 3.0),
+		Vec2::new(-3.0, 3.0),
+		Vec2::new(-3.0, 2.0),
+		Vec2::new(-0.0, 2.0),
+		Vec2::new(-0.0, 1.0),
+		Vec2::new(-4.0, 1.0),
+		Vec2::new(-4.0, 4.0),
+		Vec2::new(-1.0, 4.0),
+		Vec2::new(-1.0, 0.0),
+	]);
+
+	assert_eq!(geometry.rooms.len(), 1);
+	assert_eq!(geometry.walls.len(), 10);
+	assert_eq!(geometry.vertices.len(), 10);
+
+	assert!(!room_is_convex(&geometry, geometry.first_room()));
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+
+	assert_eq!(room_map.len(), 3);
+	assert_eq!(geometry.rooms.len(), 4);
+	assert_eq!(geometry.walls.len(), 16);
+	assert_eq!(geometry.vertices.len(), 10);
+
+	model::world::validation::validate_geometry(&geometry);
+}
+
+#[test]
 fn split_concave_rooms_with_failure_case_1() {
 	let mut geometry = WorldGeometry::new();
 	let mut room_map = SecondaryMap::new();
@@ -589,7 +652,12 @@ fn split_concave_rooms_with_failure_case_1() {
 	let walls: Vec<_> = geometry.walls.keys().collect();
 	println!("{walls:?}");
 	for &wall in walls.iter() {
-		println!("{wall:?} -> {:?}", find_concave_wall(&geometry, wall));
+		let start_vert = wall.vertex(&geometry);
+		let end_vert = wall.next_vertex(&geometry);
+
+		let next_concave = find_concave_wall(&geometry, wall);
+
+		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 	}
 
 	assert_eq!(find_concave_wall(&geometry, walls[0]), Some(walls[0]));
@@ -597,6 +665,43 @@ fn split_concave_rooms_with_failure_case_1() {
 	assert_eq!(find_concave_wall(&geometry, walls[2]), Some(walls[3]));
 	assert_eq!(find_concave_wall(&geometry, walls[3]), Some(walls[3]));
 	assert_eq!(find_concave_wall(&geometry, walls[4]), Some(walls[0]));
+
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+
+	model::world::validation::validate_geometry(&geometry);
+}
+
+#[test]
+fn split_concave_rooms_with_failure_case_1_reverse() {
+	let mut geometry = WorldGeometry::new();
+	let mut room_map = SecondaryMap::new();
+
+	geometry.insert_room_from_positions(&[
+		Vec2::new(-1.9, 1.0),
+		Vec2::new(-2.0, 3.0),
+
+		Vec2::new(-0.0, 2.0),
+		Vec2::new(-1.0, 2.0),
+
+		Vec2::new(-2.0, 0.0),
+	]);
+
+	assert_eq!(geometry.rooms.len(), 1);
+	assert_eq!(geometry.walls.len(), 5);
+	assert_eq!(geometry.vertices.len(), 5);
+
+	assert!(!room_is_convex(&geometry, geometry.first_room()));
+
+	let walls: Vec<_> = geometry.walls.keys().collect();
+	println!("{walls:?}");
+	for &wall in walls.iter() {
+		let start_vert = wall.vertex(&geometry);
+		let end_vert = wall.next_vertex(&geometry);
+
+		let next_concave = find_concave_wall(&geometry, wall);
+
+		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
+	}
 
 	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
@@ -635,6 +740,68 @@ fn split_concave_rooms_with_failure_case_2() {
 	assert_eq!(find_concave_wall(&geometry, walls[2]), Some(walls[3]));
 	assert_eq!(find_concave_wall(&geometry, walls[3]), Some(walls[3]));
 	assert_eq!(find_concave_wall(&geometry, walls[4]), Some(walls[0]));
+
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+
+	model::world::validation::validate_geometry(&geometry);
+}
+
+#[test]
+fn split_concave_rooms_with_failure_case_2_reverse() {
+	let mut geometry = WorldGeometry::new();
+	let mut room_map = SecondaryMap::new();
+
+	geometry.insert_room_from_positions(&[
+		Vec2::new(-2.5, 3.5),
+		Vec2::new(-4.0, 4.0),
+		Vec2::new(-0.0, 4.0),
+		Vec2::new(-1.5, 3.0),
+		Vec2::new(-2.0, 0.0),
+	]);
+
+	assert!(!room_is_convex(&geometry, geometry.first_room()));
+
+	let walls: Vec<_> = geometry.walls.keys().collect();
+	println!("{walls:?}");
+	for &wall in walls.iter() {
+		let start_vert = wall.vertex(&geometry);
+		let end_vert = wall.next_vertex(&geometry);
+
+		let next_concave = find_concave_wall(&geometry, wall);
+
+		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
+	}
+
+	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+
+	model::world::validation::validate_geometry(&geometry);
+}
+
+
+#[test]
+fn split_concave_rooms_with_failure_case_3() {
+	let mut geometry = WorldGeometry::new();
+	let mut room_map = SecondaryMap::new();
+
+	geometry.insert_room_from_positions(&[
+		Vec2::new(-2.0,-2.0),
+		Vec2::new(-2.0, 2.0),
+		Vec2::new( 2.0, 2.0),
+		Vec2::new(-1.5, 1.5),
+		Vec2::new(-1.0,-1.0),
+		Vec2::new(-0.8, 1.0),
+	]);
+
+	let walls: Vec<_> = geometry.walls.keys().collect();
+	println!("{walls:?}");
+	for &wall in walls.iter() {
+		let start_vert = wall.vertex(&geometry);
+		let end_vert = wall.next_vertex(&geometry);
+
+		let next_concave = find_concave_wall(&geometry, wall);
+
+		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
+	}
 
 	assert!(split_concave_rooms(&mut geometry, &mut room_map));
 
