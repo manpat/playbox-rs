@@ -108,15 +108,14 @@ impl ProcessedWorld {
 		self.source_to_processed_rooms.clear();
 
 		let mut new_geometry = world.geometry.clone();
-		if split_concave_rooms(&mut new_geometry, &mut self.processed_to_source_rooms) {
-			self.geometry = new_geometry;
-
-			invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
-
-		} else {
-			log::error!("Failed to process geometry");
+		if let Err(err) = split_concave_rooms(&mut new_geometry, &mut self.processed_to_source_rooms) {
+			log::error!("Failed to process geometry: {err}");
 			self.geometry = world.geometry.clone();
 			self.processed_to_source_rooms.clear();
+
+		} else {
+			self.geometry = new_geometry;
+			invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
 		}
 
 		for room_id in self.geometry.rooms.keys() {
@@ -359,7 +358,7 @@ fn split_room_by_walls(geometry: &mut WorldGeometry, new_loop_start: WallId, new
 	new_wall_new_room
 }
 
-fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> bool {
+fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> anyhow::Result<()> {
 	let mut wall_queue: SmallVec<[WallId; 128]> = geometry.walls.keys()
 		.collect();
 
@@ -379,7 +378,8 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 				let next_concave = find_concave_wall(&geometry, wall);
 				println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 			}
-			return false;
+
+			anyhow::bail!("Stuck in a loop");
 		}
 
 		// Check that the whole room is convex.
@@ -425,7 +425,7 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 						println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 					}
 
-					return false;
+					anyhow::bail!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?} - room fully concave");
 				}
 
 				let test_wall_source_vertex_offset = test_wall.vertex(geometry).position(geometry) - start_position;
@@ -483,8 +483,6 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 		let new_loop_joining_wall = split_room_by_walls(geometry, test_wall, pre_concave_wall);
 		let new_room = new_loop_joining_wall.room(geometry);
 
-		assert!(room_is_convex(geometry, new_room));
-
 		// Link new room back to room in original geometry
 		if let Some(&source_room) = processed_to_source_rooms.get(current_room) {
 			processed_to_source_rooms.insert(new_room, source_room);
@@ -498,10 +496,10 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 	}
 
 	if !cfg!(test) {
-		model::world::validation::validate_geometry(geometry);
+		model::world::validation::validate_geometry(geometry)?;
 	}
 
-	true
+	Ok(())
 }
 
 
@@ -523,7 +521,7 @@ fn split_concave_rooms_noop_for_simple_geometry() {
 	let mut room_map = SecondaryMap::new();
 
 	assert!(room_is_convex(&geometry, geometry.first_room()));
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
 	assert!(room_map.is_empty());
 	assert_eq!(geometry.rooms.len(), 1);
@@ -543,9 +541,9 @@ fn split_concave_rooms_with_concave_geometry() {
 	let _new_wall = geometry.split_wall(first_wall, new_position);
 
 	assert!(!room_is_convex(&geometry, geometry.first_room()));
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 
 	assert_eq!(room_map.len(), 1);
 	assert_eq!(geometry.rooms.len(), 2);
@@ -566,9 +564,9 @@ fn split_concave_rooms_with_very_concave_geometry() {
 	geometry.split_wall(second_wall, new_position);
 
 	assert!(!room_is_convex(&geometry, geometry.first_room()));
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 
 	assert_eq!(room_map.len(), 2);
 	assert_eq!(geometry.rooms.len(), 3);
@@ -600,14 +598,14 @@ fn split_concave_rooms_with_self_intersecting_geometry() {
 	assert_eq!(geometry.vertices.len(), 10);
 
 	assert!(!room_is_convex(&geometry, geometry.first_room()));
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
 	assert_eq!(room_map.len(), 3);
 	assert_eq!(geometry.rooms.len(), 4);
 	assert_eq!(geometry.walls.len(), 16);
 	assert_eq!(geometry.vertices.len(), 10);
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
 #[test]
@@ -634,14 +632,14 @@ fn split_concave_rooms_with_self_intersecting_geometry_reverse() {
 	assert_eq!(geometry.vertices.len(), 10);
 
 	assert!(!room_is_convex(&geometry, geometry.first_room()));
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
 	assert_eq!(room_map.len(), 3);
 	assert_eq!(geometry.rooms.len(), 4);
 	assert_eq!(geometry.walls.len(), 16);
 	assert_eq!(geometry.vertices.len(), 10);
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
 #[test]
@@ -682,9 +680,9 @@ fn split_concave_rooms_with_failure_case_1() {
 	assert_eq!(find_concave_wall(&geometry, walls[3]), Some(walls[3]));
 	assert_eq!(find_concave_wall(&geometry, walls[4]), Some(walls[0]));
 
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
 #[test]
@@ -719,9 +717,9 @@ fn split_concave_rooms_with_failure_case_1_reverse() {
 		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 	}
 
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
 
@@ -757,9 +755,9 @@ fn split_concave_rooms_with_failure_case_2() {
 	assert_eq!(find_concave_wall(&geometry, walls[3]), Some(walls[3]));
 	assert_eq!(find_concave_wall(&geometry, walls[4]), Some(walls[0]));
 
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
 #[test]
@@ -788,9 +786,9 @@ fn split_concave_rooms_with_failure_case_2_reverse() {
 		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 	}
 
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
 
@@ -819,8 +817,8 @@ fn split_concave_rooms_with_failure_case_3() {
 		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 	}
 
-	assert!(split_concave_rooms(&mut geometry, &mut room_map));
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
 
-	model::world::validation::validate_geometry(&geometry);
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
 
