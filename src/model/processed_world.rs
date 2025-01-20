@@ -110,8 +110,11 @@ impl ProcessedWorld {
 		let mut new_geometry = world.geometry.clone();
 		if let Err(err) = split_concave_rooms(&mut new_geometry, &mut self.processed_to_source_rooms) {
 			log::error!("Failed to process geometry: {err}");
-			self.geometry = world.geometry.clone();
-			self.processed_to_source_rooms.clear();
+			// self.geometry = world.geometry.clone();
+			// self.processed_to_source_rooms.clear();
+
+			self.geometry = new_geometry;
+			invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
 
 		} else {
 			self.geometry = new_geometry;
@@ -303,8 +306,6 @@ fn split_room_by_walls(geometry: &mut WorldGeometry, new_loop_start: WallId, new
 	let current_room_new_wall_vertex = new_room_first_wall.vertex(geometry);
 	let new_room_new_wall_vertex = current_room_first_wall.vertex(geometry);
 
-	println!("=== splitting {current_room_new_wall_vertex:?} -> {new_room_new_wall_vertex:?}");
-
 	let new_wall_current_room = geometry.walls.insert(WallDef {
 		source_vertex: current_room_new_wall_vertex,
 		prev_wall: current_room_last_wall,
@@ -358,8 +359,10 @@ fn split_room_by_walls(geometry: &mut WorldGeometry, new_loop_start: WallId, new
 	new_wall_new_room
 }
 
+
 fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> anyhow::Result<()> {
 	let mut wall_queue: SmallVec<[WallId; 128]> = geometry.walls.keys()
+		.filter(|wall| is_next_vertex_concave(geometry, *wall))
 		.collect();
 
 	let mut loop_guard = 1000u32;
@@ -384,24 +387,13 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 
 		// Check that the whole room is convex.
 		let Some(pre_concave_wall) = find_concave_wall(geometry, start_wall) else {
-			println!("--- skippng {start_wall:?}");
 			// Nothing found, check next wall in queue.
 			continue 'next_wall
 		};
 
-		if !is_next_vertex_concave(geometry, pre_concave_wall) {
-			println!("--- skippng {start_wall:?}");
-			// Nothing found, check next wall in queue.
-			continue 'next_wall
-		}
-
-		// let pre_concave_wall = start_wall;
-
 		// Room is concave, search for an appropriate vertex to split off a convex chunk of the current room.
 		let current_room = start_wall.room(geometry);
 		let mut test_wall = pre_concave_wall.prev_wall(geometry);
-
-		println!("{current_room:?} concave, trying to split off {pre_concave_wall:?}");
 
 		{
 			let start_position = pre_concave_wall.next_vertex(geometry).position(geometry);
@@ -410,8 +402,6 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 			// Iterate backwards from the concave vertex looking for the last wall that can be seen fully from the current wall.
 			// The vertex from this wall will be the source of the split.
 			'find_largest_convex: loop {
-				println!("--- testing {test_wall:?}");
-
 				if test_wall == pre_concave_wall.next_wall(geometry) {
 					println!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?} - room fully concave");
 					println!("pre_concave_wall: {pre_concave_wall:?}");
@@ -433,8 +423,6 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 
 				let is_target_vertex_concave = is_next_vertex_concave(geometry, test_wall);
 
-				dbg!(wall_crosses_start_vector, is_target_vertex_concave);
-
 				if wall_crosses_start_vector || is_target_vertex_concave {
 					test_wall.move_next(geometry);
 
@@ -442,36 +430,6 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 						break 'find_largest_convex;
 					}
 
-					// let prev_wall = test_wall.prev_wall(geometry);
-					// let is_source_vertex_concave = is_next_vertex_concave(geometry, prev_wall);
-					// if prev_wall != pre_concave_wall && !is_source_vertex_concave {
-					// 	break 'find_largest_convex
-					// }
-
-					println!("Failed to de-concavify wall {pre_concave_wall:?} while processing {current_room:?} - ????");
-					// println!("{geometry:#?}");
-
-					for wall in geometry.walls.keys() {
-						let start_vert = wall.vertex(&geometry);
-						let end_vert = wall.next_vertex(&geometry);
-						let next_concave = find_concave_wall(&geometry, wall);
-						println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
-					}
-
-					for room in geometry.rooms.keys() {
-						let first_wall = room.first_wall(geometry);
-						print!("{room:?}: {first_wall:?} ({:?})", first_wall.vertex(geometry));
-
-						let mut cursor = first_wall.next_wall(geometry);
-						while cursor != first_wall {
-							print!(" -> {cursor:?} ({:?})", cursor.vertex(geometry));
-							cursor.move_next(geometry);
-						}
-
-						println!();
-					}
-
-					// return false;
 					continue 'next_wall;
 				}
 
@@ -491,8 +449,9 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 		}
 
 		// Queue new walls, just in case.
+		let old_loop_joining_wall = new_loop_joining_wall.connected_wall(geometry).unwrap();
 		wall_queue.push(new_loop_joining_wall);
-		wall_queue.push(new_loop_joining_wall.connected_wall(geometry).unwrap());
+		wall_queue.push(old_loop_joining_wall);
 	}
 
 	if !cfg!(test) {
@@ -790,35 +749,3 @@ fn split_concave_rooms_with_failure_case_2_reverse() {
 
 	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
-
-
-#[test]
-fn split_concave_rooms_with_failure_case_3() {
-	let mut geometry = WorldGeometry::new();
-	let mut room_map = SecondaryMap::new();
-
-	geometry.insert_room_from_positions(&[
-		Vec2::new(-2.0,-2.0),
-		Vec2::new(-2.0, 2.0),
-		Vec2::new( 2.0, 2.0),
-		Vec2::new(-1.5, 1.5),
-		Vec2::new(-1.0,-1.0),
-		Vec2::new(-0.8, 1.0),
-	]);
-
-	let walls: Vec<_> = geometry.walls.keys().collect();
-	println!("{walls:?}");
-	for &wall in walls.iter() {
-		let start_vert = wall.vertex(&geometry);
-		let end_vert = wall.next_vertex(&geometry);
-
-		let next_concave = find_concave_wall(&geometry, wall);
-
-		println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
-	}
-
-	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
-
-	model::world::validation::validate_geometry(&geometry).expect("validation failed");
-}
-
