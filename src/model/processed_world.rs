@@ -110,16 +110,10 @@ impl ProcessedWorld {
 		let mut new_geometry = world.geometry.clone();
 		if let Err(err) = split_concave_rooms(&mut new_geometry, &mut self.processed_to_source_rooms) {
 			log::error!("Failed to process geometry: {err}");
-			// self.geometry = world.geometry.clone();
-			// self.processed_to_source_rooms.clear();
-
-			self.geometry = new_geometry;
-			invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
-
-		} else {
-			self.geometry = new_geometry;
-			invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
 		}
+
+		self.geometry = new_geometry;
+		invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
 
 		for room_id in self.geometry.rooms.keys() {
 			let mut connecting_walls = Vec::new();
@@ -420,8 +414,9 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 
 				let test_wall_source_vertex_offset = test_wall.vertex(geometry).position(geometry) - start_position;
 				let wall_crosses_start_vector = start_direction.wedge(test_wall_source_vertex_offset) > 0.0;
-
 				let is_target_vertex_concave = is_next_vertex_concave(geometry, test_wall);
+
+				// TODO(pat.m): check for intermediate intersections!
 
 				if wall_crosses_start_vector || is_target_vertex_concave {
 					test_wall.move_next(geometry);

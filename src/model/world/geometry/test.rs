@@ -4,8 +4,8 @@ use model::validation::validate_geometry;
 
 #[test]
 fn basic_geometry() {
-	let mut geometry = WorldGeometry::new_square(1.0);
-	validate_geometry(&geometry);
+	let geometry = WorldGeometry::new_square(1.0);
+	validate_geometry(&geometry).unwrap();
 
 	let first_room = geometry.first_room();
 	let num_walls = geometry.room_walls(first_room).count();
@@ -22,7 +22,7 @@ fn split_wall() {
 	let new_position = 1.5 * geometry.wall_center(first_wall);
 	let new_wall = geometry.split_wall(first_wall, new_position);
 
-	validate_geometry(&geometry);
+	validate_geometry(&geometry).unwrap();
 
 	let num_walls = geometry.room_walls(first_room).count();
 	assert_eq!(num_walls, 5);
