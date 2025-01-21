@@ -86,6 +86,18 @@ impl ProcessedWorld {
 		}
 	}
 
+	pub fn to_processed_placement(&self, source_placement: Placement) -> Placement {
+		for room_id in self.to_processed_rooms(source_placement.room_id) {
+			if self.geometry.room_contains_point(room_id, source_placement.position) {
+				return Placement {
+					room_id, .. source_placement
+				};
+			}
+		}
+
+		panic!("Placement doesn't exist in processed world");
+	}
+
 	pub fn to_source_room(&self, processed_room_id: RoomId) -> RoomId {
 		assert!(processed_room_id.is_valid(&self.geometry), "RoomId given to to_source_room that doesn't exist in processed geometry");
 

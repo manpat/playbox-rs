@@ -166,6 +166,18 @@ impl WorldGeometry {
 		}
 	}
 
+	pub fn room_contains_point(&self, room_id: RoomId, point: Vec2) -> bool {
+		for wall in self.room_walls(room_id) {
+			let (start, end) = self.wall_vertices(wall);
+			let direction = end - start;
+			if direction.wedge(point - start) > 0.0 {
+				return false
+			}
+		}
+
+		true
+	}
+
 	pub fn room_vertices(&self, room_id: RoomId) -> impl Iterator<Item=VertexId> + DoubleEndedIterator + ExactSizeIterator + use<'_> {
 		self.room_walls(room_id)
 			.map(|wall_id| self.walls[wall_id].source_vertex)

@@ -96,7 +96,7 @@ impl GameScene {
 
 			model: model::Model {
 				player: model::Player {
-					placement: world.player_spawn,
+					placement: processed_world.to_processed_placement(world.player_spawn),
 					pitch: 0.0,
 
 					step_accumulator: 0.0,
@@ -129,7 +129,7 @@ impl GameScene {
 	}
 
 	pub fn switch_world(&mut self, ctx: &mut Context<'_>, new_world: model::World) {
-		self.model.player.placement = new_world.player_spawn;
+		self.model.player.placement = self.model.processed_world.to_processed_placement(new_world.player_spawn);
 		self.model.world = new_world;
 		ctx.bus.emit(model::WorldChangedEvent);
 
@@ -160,7 +160,7 @@ impl GameScene {
 		{
 			// Make sure player doesn't suddenly end up in a room that no longer exists.
 			if !player.placement.room_id.is_valid(processed_world.geometry()) {
-				player.placement = world.player_spawn;
+				player.placement = processed_world.to_processed_placement(world.player_spawn);
 			}
 		}
 

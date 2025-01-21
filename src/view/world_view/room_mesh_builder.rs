@@ -126,28 +126,58 @@ impl RoomMeshBuilder<'_> {
 			self.build_object(object);
 		}
 
-		// Lights in neighboring rooms
-		for connection in self.processed_world.connections_for_room(room_id) {
-			let target_room = connection.target_room;
+		// Collect lights in neighboring rooms
+		{
+			struct QueueEntry {
+				room_id: RoomId,
+				from_wall: WallId,
+				transform: Mat3x4,
+				depth: u32,
+			}
 
-			let [x,z,w] = connection.target_to_source.columns();
-			let transform = Mat3x4::from_columns([
-				x.to_x0y(),
-				Vec3::from_y(1.0),
-				z.to_x0y(),
-				w.to_x0y() + Vec3::from_y(connection.height_difference)
-			]);
+			fn to_transform(target_to_source: Mat2x3, height_difference: f32) -> Mat3x4 {
+				let [x,z,w] = target_to_source.columns();
+				Mat3x4::from_columns([
+					x.to_x0y(),
+					Vec3::from_y(1.0),
+					z.to_x0y(),
+					w.to_x0y() + Vec3::from_y(height_difference)
+				])
+			}
 
-			// TODO(pat.m): recurse into all rooms touched by light
-			for object in self.processed_world.objects_in_room(target_room, self.world) {
-				let Some(light) = object.as_light() else { continue };
+			let mut room_queue = SmallVec::<[QueueEntry; 16]>::new();
+			room_queue.extend(self.processed_world.connections_for_room(room_id)
+				.map(|connection| QueueEntry {
+					room_id: connection.target_room,
+					from_wall: connection.target_wall.connected_wall(self.processed_world.geometry()).unwrap(),
+					transform: to_transform(connection.target_to_source, connection.height_difference),
+					depth: 1,
+				}));
 
-				self.lights.push(RoomLight {
-					local_pos: transform * object.placement.position.to_xny(light.height),
-					radius: light.radius,
-					color: light.color.into(),
-					power: light.power,
-				});
+			while let Some(entry) = room_queue.pop() {
+				// TODO(pat.m): recurse into all rooms touched by light
+				for object in self.processed_world.objects_in_room(entry.room_id, self.world) {
+					let Some(light) = object.as_light() else { continue };
+
+					// TODO(pat.m): range check
+					// TODO(pat.m): cull!
+
+					self.lights.push(RoomLight {
+						local_pos: entry.transform * object.placement.position.to_xny(light.height),
+						radius: light.radius,
+						color: light.color.into(),
+						power: light.power,
+					});
+				}
+
+				room_queue.extend(self.processed_world.connections_for_room(entry.room_id)
+					.filter(|connection| connection.target_wall != entry.from_wall)
+					.filter_map(|connection| Some(QueueEntry {
+						room_id: connection.target_room,
+						from_wall: connection.target_wall.connected_wall(self.processed_world.geometry()).unwrap(),
+						transform: entry.transform * to_transform(connection.target_to_source, connection.height_difference),
+						depth: entry.depth.checked_sub(1)?,
+					})));
 			}
 		}
 
