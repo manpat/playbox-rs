@@ -286,74 +286,6 @@ fn room_is_convex(geometry: &WorldGeometry, room_id: RoomId) -> bool {
 }
 
 
-fn split_room_by_walls(geometry: &mut WorldGeometry, new_loop_start: WallId, new_loop_end: WallId) -> WallId {
-	// Now that we know two vertices we can bridge to make a convex room, start doing that.
-	let new_room_first_wall = new_loop_start;
-	let new_room_last_wall = new_loop_end;
-
-	let wall_def = new_loop_start.get(geometry).clone();
-	let current_room = new_loop_start.room(geometry);
-
-	let current_room_first_wall = new_room_last_wall.next_wall(geometry);
-	let current_room_last_wall = new_room_first_wall.prev_wall(geometry);
-
-	let current_room_new_wall_vertex = new_room_first_wall.vertex(geometry);
-	let new_room_new_wall_vertex = current_room_first_wall.vertex(geometry);
-
-	let new_wall_current_room = geometry.walls.insert(WallDef {
-		source_vertex: current_room_new_wall_vertex,
-		prev_wall: current_room_last_wall,
-		next_wall: current_room_first_wall,
-		room: current_room,
-		connected_wall: None,
-		.. wall_def.clone()
-	});
-
-	current_room_last_wall.get_mut(geometry).next_wall = new_wall_current_room;
-	current_room_first_wall.get_mut(geometry).prev_wall = new_wall_current_room;
-
-	// Set current rooms first wall to our newly created wall, to avoid the case where it was previously
-	// one of the split off walls.
-	current_room.get_mut(geometry).first_wall = new_wall_current_room;
-
-	// Split convex 'chunk' into a new room, with same attributes as current room.
-	let new_room = geometry.rooms.insert(current_room.get(geometry).clone());
-
-	let new_wall_new_room = geometry.walls.insert(WallDef {
-		source_vertex: new_room_new_wall_vertex,
-		room: new_room,
-		prev_wall: new_room_last_wall,
-		next_wall: new_room_first_wall,
-		connected_wall: None,
-		.. wall_def.clone()
-	});
-
-	new_room_first_wall.get_mut(geometry).prev_wall = new_wall_new_room;
-	new_room_last_wall.get_mut(geometry).next_wall = new_wall_new_room;
-	new_room.get_mut(geometry).first_wall = new_wall_new_room;
-
-	// Make sure all walls in new room point to it
-	{
-		let mut wall_it = new_wall_new_room;
-
-		loop {
-			wall_it.get_mut(geometry).room = new_room;
-			wall_it.move_next(geometry);
-
-			if wall_it == new_wall_new_room {
-				break
-			}
-		}
-	}
-
-	// Connect new rooms
-	new_wall_new_room.get_mut(geometry).connected_wall = Some(new_wall_current_room);
-	new_wall_current_room.get_mut(geometry).connected_wall = Some(new_wall_new_room);
-
-	new_wall_new_room
-}
-
-
 fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: &mut SecondaryMap<RoomId, RoomId>) -> anyhow::Result<()> {
 	let mut wall_queue: SmallVec<[WallId; 128]> = geometry.walls.keys()
 		.filter(|wall| is_next_vertex_concave(geometry, *wall))
@@ -433,7 +365,7 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 		}
 
 		// Now that we know two vertices we can bridge to make a convex room, start doing that.
-		let new_loop_joining_wall = split_room_by_walls(geometry, test_wall, pre_concave_wall);
+		let new_loop_joining_wall = geometry.split_room(test_wall, pre_concave_wall)?;
 		let new_room = new_loop_joining_wall.room(geometry);
 
 		// Link new room back to room in original geometry

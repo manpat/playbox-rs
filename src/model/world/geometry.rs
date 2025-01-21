@@ -156,9 +156,9 @@ impl WorldGeometry {
 		self.rooms.keys().next().unwrap()
 	}
 
-	pub fn room_walls(&self, room_id: RoomId) -> iterator::RoomWallIterator<'_> {
+	pub fn room_walls(&self, room_id: RoomId) -> iterator::WallLoopIterator<'_> {
 		let room = &self.rooms[room_id];
-		iterator::RoomWallIterator {
+		iterator::WallLoopIterator {
 			geometry: self,
 			first_wall: room.first_wall,
 			last_wall: room.first_wall.prev_wall(self),

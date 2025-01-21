@@ -67,4 +67,74 @@ impl WorldGeometry {
 
 		Ok(())
 	}
+
+	/// Splits wall loop off into a new room, connecting it to the original room via `new_loop_start.vertex` and
+	/// `new_loop_end.next_vertex`. Returns new wall closing the passed loop.
+	// TODO(pat.m): verify that this operation doesn't create any intersections
+	pub fn split_room(&mut self, new_loop_start: WallId, new_loop_end: WallId) -> anyhow::Result<WallId> {
+		anyhow::ensure!(new_loop_start != new_loop_end, "Trying to create flat room");
+		anyhow::ensure!(new_loop_start.room(self) == new_loop_end.room(self), "Trying to split room with walls from different rooms");
+		anyhow::ensure!(new_loop_start != new_loop_end.next_wall(self), "Trying to split room with entire room loop");
+
+		let wall_def = new_loop_start.get(self).clone();
+		let current_room = new_loop_start.room(self);
+
+		let old_loop_start = new_loop_end.next_wall(self);
+		let old_loop_end = new_loop_start.prev_wall(self);
+
+		let current_room_new_wall_vertex = new_loop_start.vertex(self);
+		let new_room_new_wall_vertex = old_loop_start.vertex(self);
+
+		let new_wall_current_room = self.walls.insert(WallDef {
+			source_vertex: current_room_new_wall_vertex,
+			prev_wall: old_loop_end,
+			next_wall: old_loop_start,
+			room: current_room,
+			connected_wall: None,
+			.. wall_def.clone()
+		});
+
+		old_loop_start.get_mut(self).prev_wall = new_wall_current_room;
+		old_loop_end.get_mut(self).next_wall = new_wall_current_room;
+
+		// Set current rooms first wall to our newly created wall, to avoid the case where it was previously
+		// one of the split off walls.
+		current_room.get_mut(self).first_wall = new_wall_current_room;
+
+		// Split convex 'chunk' into a new room, with same attributes as current room.
+		let new_room = self.rooms.insert(current_room.get(self).clone());
+
+		let new_wall_new_room = self.walls.insert(WallDef {
+			source_vertex: new_room_new_wall_vertex,
+			room: new_room,
+			prev_wall: new_loop_end,
+			next_wall: new_loop_start,
+			connected_wall: None,
+			.. wall_def.clone()
+		});
+
+		new_loop_start.get_mut(self).prev_wall = new_wall_new_room;
+		new_loop_end.get_mut(self).next_wall = new_wall_new_room;
+		new_room.get_mut(self).first_wall = new_wall_new_room;
+
+		// Make sure all walls in new room point to it
+		{
+			let mut wall_it = new_wall_new_room;
+
+			loop {
+				wall_it.get_mut(self).room = new_room;
+				wall_it.move_next(self);
+
+				if wall_it == new_wall_new_room {
+					break
+				}
+			}
+		}
+
+		// Connect new rooms
+		new_wall_new_room.get_mut(self).connected_wall = Some(new_wall_current_room);
+		new_wall_current_room.get_mut(self).connected_wall = Some(new_wall_new_room);
+
+		Ok(new_wall_new_room)
+	}
 }

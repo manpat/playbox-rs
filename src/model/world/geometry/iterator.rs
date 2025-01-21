@@ -3,14 +3,14 @@ use model::world::geometry::*;
 
 
 #[derive(Clone)]
-pub struct RoomWallIterator<'g> {
+pub struct WallLoopIterator<'g> {
 	pub(super) geometry: &'g WorldGeometry,
 	pub(super) first_wall: WallId,
 	pub(super) last_wall: WallId,
 	pub(super) fused: bool,
 }
 
-impl Iterator for RoomWallIterator<'_> {
+impl Iterator for WallLoopIterator<'_> {
 	type Item = WallId;
 
 	fn next(&mut self) -> Option<WallId> {
@@ -44,7 +44,7 @@ impl Iterator for RoomWallIterator<'_> {
 	}
 }
 
-impl DoubleEndedIterator for RoomWallIterator<'_> {
+impl DoubleEndedIterator for WallLoopIterator<'_> {
 	fn next_back(&mut self) -> Option<WallId> {
 		if self.fused {
 			return None
@@ -60,4 +60,4 @@ impl DoubleEndedIterator for RoomWallIterator<'_> {
 	}
 }
 
-impl ExactSizeIterator for RoomWallIterator<'_> {}
+impl ExactSizeIterator for WallLoopIterator<'_> {}
