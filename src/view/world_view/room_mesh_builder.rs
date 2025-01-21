@@ -128,6 +128,10 @@ impl RoomMeshBuilder<'_> {
 
 		// Collect lights in neighboring rooms
 		{
+			// Maybe instead of trying to do this per room, it would be better to do some kinda scatter-gather type thing.
+			// figure out which rooms are visible from each light, and _then_ invert that to get a list of lights visible from each room.
+			// Maybe WorldView::build_visibility_graph can be generalised?
+
 			struct QueueEntry {
 				room_id: RoomId,
 				from_wall: WallId,
