@@ -129,7 +129,8 @@ impl GameScene {
 	}
 
 	pub fn switch_world(&mut self, ctx: &mut Context<'_>, new_world: model::World) {
-		self.model.player.placement = self.model.processed_world.to_processed_placement(new_world.player_spawn);
+		// TODO(pat.m): player placement has to be resolved against the processed world - but that doesn't exist yet.
+		self.model.player.placement = new_world.player_spawn;
 		self.model.world = new_world;
 		ctx.bus.emit(model::WorldChangedEvent);
 

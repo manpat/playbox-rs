@@ -688,3 +688,68 @@ fn split_concave_rooms_with_failure_case_2_reverse() {
 
 	model::world::validation::validate_geometry(&geometry).expect("validation failed");
 }
+
+
+#[test]
+fn split_concave_rooms_with_failure_case_3() {
+	let mut geometry = WorldGeometry::new();
+	let mut room_map = SecondaryMap::new();
+
+	let vertices = [
+		Vec2::new(-2.0, -2.0),
+		Vec2::new(-2.0, 2.0),
+		Vec2::new(2.0, 2.0),
+		Vec2::new(2.1721814, -2.002598),
+		Vec2::new(-1.1619593, -2.0092072),
+		Vec2::new(1.0678722, 0.097930536),
+		Vec2::new(0.96893615, -0.5993577),
+		Vec2::new(-1.0940874, 0.08872329),
+		Vec2::new(-1.5745739, -3.183587),
+		Vec2::new(-0.33184546, -1.5009848),
+		Vec2::new(2.909154, -2.3008654),
+	];
+
+	let vertices: Vec<_> = vertices.into_iter()
+		.map(|position| {
+			geometry.vertices.insert(VertexDef{ position, outgoing_wall: WallId::default() })
+		})
+		.collect();
+
+	let room = geometry.rooms.insert(RoomDef::default());
+
+	let walls: Vec<_> = vertices.iter()
+		.map(|&source_vertex| geometry.walls.insert(WallDef{ source_vertex, room, ..WallDef::default() }))
+		.collect();
+
+	room.get_mut(&mut geometry).first_wall = walls[0];
+
+	let mut set_adjacent = |wall_index: usize, prev, next| {
+		let wall_id = walls[wall_index];
+		vertices[wall_index].get_mut(&mut geometry).outgoing_wall = wall_id;
+
+		let wall = wall_id.get_mut(&mut geometry);
+		wall.next_wall = walls[next];
+		wall.prev_wall = walls[prev];
+	};
+
+	set_adjacent( 0,  8,  1);
+	set_adjacent( 1,  0,  2);
+	set_adjacent( 2,  1, 10);
+	set_adjacent( 3, 10,  9);
+	set_adjacent( 4,  7,  8);
+	set_adjacent( 5,  6,  7);
+	set_adjacent( 6,  9,  5);
+	set_adjacent( 7,  5,  4);
+	set_adjacent( 8,  4,  0);
+	set_adjacent( 9,  3,  6);
+	set_adjacent(10,  2,  3);
+
+	model::world::validation::validate_ids(&geometry).expect("id validation failed");
+	model::world::validation::validate_room_loop(&geometry, room).expect("room loop validation failed");
+
+	assert!(!room_is_convex(&geometry, room));
+
+	split_concave_rooms(&mut geometry, &mut room_map).expect("split_concave_rooms failed");
+
+	model::world::validation::validate_geometry(&geometry).expect("validation failed");
+}

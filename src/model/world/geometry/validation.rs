@@ -2,6 +2,8 @@ use crate::prelude::*;
 use model::*;
 
 pub fn validate_geometry(geometry: &WorldGeometry) -> anyhow::Result<()> {
+	validate_ids(geometry)?;
+
 	for room_id in geometry.rooms.keys() {
 		validate_room_loop(geometry, room_id)?;
 		validate_room_convex(geometry, room_id)?;
@@ -14,6 +16,28 @@ pub fn validate_geometry(geometry: &WorldGeometry) -> anyhow::Result<()> {
 	Ok(())
 }
 
+pub fn validate_ids(geometry: &WorldGeometry) -> anyhow::Result<()> {
+	for (room_id, room) in geometry.rooms.iter() {
+		anyhow::ensure!(room.first_wall.is_valid(geometry), "{room_id:?} has invalid outgoing wall");
+	}
+
+	for (wall_id, wall) in geometry.walls.iter() {
+		anyhow::ensure!(wall.source_vertex.is_valid(geometry), "{wall_id:?} has invalid source_vertex");
+		anyhow::ensure!(wall.next_wall.is_valid(geometry), "{wall_id:?} has invalid next_wall");
+		anyhow::ensure!(wall.prev_wall.is_valid(geometry), "{wall_id:?} has invalid prev_wall");
+		anyhow::ensure!(wall.room.is_valid(geometry), "{wall_id:?} has invalid room");
+
+		if let Some(connected_wall) = wall.connected_wall {
+			anyhow::ensure!(connected_wall.is_valid(geometry), "{wall_id:?} has invalid connected_wall");
+		}
+	}
+
+	for (vertex_id, vertex) in geometry.vertices.iter() {
+		anyhow::ensure!(vertex.outgoing_wall.is_valid(geometry), "{vertex_id:?} has invalid connected_wall");
+	}
+
+	Ok(())
+}
 
 pub fn validate_room_convex(geometry: &WorldGeometry, room_id: RoomId) -> anyhow::Result<()> {
 	let first_wall = room_id.first_wall(geometry);
