@@ -12,7 +12,10 @@ mod undo;
 use undo::*;
 
 mod world_editor;
-pub use world_editor::draw_world_editor;
+mod inspector;
+
+use world_editor::do_world_editor;
+use inspector::do_inspector;
 
 use std::borrow::Cow;
 use egui::widgets::Slider;
@@ -141,3 +144,95 @@ fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
 	}
 }
 
+
+
+pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
+	// TODO(pat.m): modal world load/save flows
+	let modal_active = false;
+
+	if !modal_active {
+		let undo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Z);
+		let redo_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::Z);
+
+		ui_ctx.input_mut(|input| {
+			if input.consume_shortcut(&redo_shortcut) {
+				message_bus.emit(UndoCmd::Redo);
+			}
+
+			if input.consume_shortcut(&undo_shortcut) {
+				message_bus.emit(UndoCmd::Undo);
+			}
+		});
+	}
+
+
+
+	if state.inner.focused_room_id.is_none() {
+		let first_room = model.world.geometry.first_room();
+		state.inner.focused_room_id = Some(first_room);
+	}
+
+	egui::Window::new("Undo Stack")
+		.enabled(!modal_active)
+		.show(ui_ctx, |ui| do_undo_stack_widget(ui, &state.undo_stack, message_bus));
+
+	let mut context = Context {
+		state: &mut state.inner,
+		model,
+		message_bus,
+	};
+
+	egui::SidePanel::right("Inspector")
+		.show(ui_ctx, |ui| {
+			ui.add_enabled_ui(!modal_active, |ui| {
+				do_inspector(ui, &mut context);
+			});
+		});
+
+	// TODO(pat.m): toggle
+	// egui::Window::new("Geometry")
+
+	let frame = egui::Frame::dark_canvas(&ui_ctx.style()).multiply_with_opacity(0.9);
+	egui::CentralPanel::default()
+		.frame(frame)
+		.show(ui_ctx, |ui| do_world_editor(ui, &mut context));
+}
+
+pub fn do_undo_stack_widget(ui: &mut egui::Ui, undo_stack: &UndoStack, message_bus: &MessageBus) {
+	ui.horizontal(|ui| {
+		if ui.button("Undo").clicked() {
+			message_bus.emit(UndoCmd::Undo);
+		}
+
+		ui.label(format!("{} / {}", undo_stack.index(), undo_stack.len()));
+
+		if ui.button("Redo").clicked() {
+			message_bus.emit(UndoCmd::Redo);
+		}
+	});
+
+	let text_style = egui::TextStyle::Body;
+	let row_height = ui.text_style_height(&text_style);
+
+	egui::ScrollArea::vertical()
+		.show_rows(ui, row_height, undo_stack.len(), |ui, range| {
+			if range.start == 0 {
+				let active = undo_stack.index() == 0;
+
+				if ui.selectable_label(active, "<base>").clicked() {
+					message_bus.emit(UndoCmd::SetIndex(0));
+				}
+			}
+
+			for index in range {
+				let active = undo_stack.index() == index+1;
+				if ui.selectable_label(active, undo_stack.describe(index)).clicked() {
+					message_bus.emit(UndoCmd::SetIndex(index+1));
+				}
+			}
+		});
+
+	ui.collapsing("Debug", |ui| {
+		ui.label(format!("{:#?}", undo_stack));
+	});
+}

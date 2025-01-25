@@ -144,7 +144,7 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!ctx.show_editor || self.force_game_controls);
 
 		if ctx.show_editor {
-			editor::draw_world_editor(&ctx.egui, &mut self.editor_state, &self.model, ctx.bus);
+			editor::do_editor(&ctx.egui, &mut self.editor_state, &self.model, ctx.bus);
 			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, ctx.bus);
 		}
 

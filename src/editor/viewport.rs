@@ -354,7 +354,7 @@ impl Viewport<'_> {
 		let rect = self.response.rect;
 		let center = self.response.rect.center();
 
-		self.painter.rect_filled(rect, 0.0, egui::Color32::BLACK);
+		// self.painter.rect_filled(rect, 0.0, egui::Color32::BLACK.gamma_multiply(0.5));
 		self.painter.hline(rect.x_range(), center.y, (1.0, egui::Color32::DARK_GRAY));
 		self.painter.vline(center.x, rect.y_range(), (1.0, egui::Color32::DARK_GRAY));
 	}
