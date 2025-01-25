@@ -545,27 +545,29 @@ impl Viewport<'_> {
 
 				Item::Vertex(vertex_id) => {
 					if ui.button("Bevel").clicked() {
-						todo!();
-						// let outgoing_wall = vertex_id.to_wall_id();
-						// let incoming_wall = self.world.prev_wall(outgoing_wall);
+						let geometry = &self.world.geometry;
 
-						// let incoming_start = self.world.vertex(incoming_wall.to_vertex_id());
-						// let (original_vertex, outgoing_end) = self.world.wall_vertices(outgoing_wall);
+						// TODO(pat.m): assert that vertex has only single outgoing wall
+						let outgoing_wall = vertex_id.wall(geometry);
+						let incoming_wall = outgoing_wall.prev_wall(geometry);
 
-						// let incoming_direction = incoming_start - original_vertex;
-						// let outgoing_direction = outgoing_end - original_vertex;
+						let incoming_start = incoming_wall.vertex(geometry).position(geometry);
+						let (original_vertex, outgoing_end) = geometry.wall_vertices(outgoing_wall);
 
-						// // Bevel to half way along the shortest wall
-						// let bevel_dist = incoming_direction.length().min(outgoing_direction.length()) / 2.0;
+						let incoming_direction = incoming_start - original_vertex;
+						let outgoing_direction = outgoing_end - original_vertex;
 
-						// let start_vertex = original_vertex + incoming_direction.normalize() * bevel_dist;
-						// let end_vertex_delta = outgoing_direction.normalize() * bevel_dist;
+						// Bevel to half way along the shortest wall
+						let bevel_dist = incoming_direction.length().min(outgoing_direction.length()) / 2.0;
 
-						// // Translate the original vertex along the _incoming_ wall
-						// self.message_bus.emit(EditorWorldEditCmd::TranslateItem(Item::Vertex(vertex_id), end_vertex_delta));
+						let start_vertex = original_vertex + incoming_direction.normalize() * bevel_dist;
+						let end_vertex_delta = outgoing_direction.normalize() * bevel_dist;
 
-						// // Split the _outgoing_ wall and place the new vertex at the end pos.
-						// self.message_bus.emit(EditorWorldEditCmd::SplitWall(incoming_wall, start_vertex));
+						// Translate the original vertex along the _incoming_ wall
+						self.message_bus.emit(EditorWorldEditCmd::TranslateItem(Item::Vertex(vertex_id), end_vertex_delta));
+
+						// Split the _outgoing_ wall and place the new vertex at the end pos.
+						self.message_bus.emit(EditorWorldEditCmd::SplitWall(incoming_wall, start_vertex));
 
 						ui.close_menu();
 					}
