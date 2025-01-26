@@ -98,9 +98,11 @@ struct ViewportState {
 	camera_pivot: Vec2,
 
 	context_menu_target: Option<Item>,
+	context_menu_target_interact_pos: Vec2,
 
 	hovered_item_flags: ViewportItemFlags,
 	hovered_item_transform: Mat2x3,
+	hovered_item_hover_pos: Vec2,
 
 	current_operation: Option<Operation>,
 }
@@ -132,10 +134,13 @@ impl<'c> Viewport<'c> {
 				camera_pivot: Vec2::zero(),
 
 				context_menu_target: None,
-				current_operation: None,
+				context_menu_target_interact_pos: Vec2::zero(),
 
 				hovered_item_flags: ViewportItemFlags::empty(),
 				hovered_item_transform: Mat2x3::identity(),
+				hovered_item_hover_pos: Vec2::zero(),
+
+				current_operation: None,
 			});
 
 		let mut tracked_location = None;
@@ -166,7 +171,7 @@ impl<'c> Viewport<'c> {
 	}
 
 	pub fn add_room(&mut self, room_id: RoomId, room_to_world: Mat2x3, flags: ViewportItemFlags) {
-		let geometry = &self.world.geometry;
+		let source_geometry = &self.world.geometry;
 		let processed_geometry = self.processed_world.geometry();
 
 		let interaction_flags = flags.intersection(ViewportItemFlags::BASIC_INTERACTIONS);
@@ -179,8 +184,8 @@ impl<'c> Viewport<'c> {
 		let wall_interaction_flags = interaction_flags | ViewportItemFlags::CONNECTABLE;
 
 		// Add vertices
-		for vertex_id in geometry.room_vertices(room_id) {
-			let position = geometry.vertices[vertex_id].position;
+		for vertex_id in source_geometry.room_vertices(room_id) {
+			let position = source_geometry.vertices[vertex_id].position;
 
 			self.items.push(ViewportItem {
 				shape: ViewportItemShape::Vertex(room_to_world * position),
@@ -198,11 +203,11 @@ impl<'c> Viewport<'c> {
 
 				// Check if this wall exists in the source data (and so can be modified),
 				// or was generated.
-				if wall_id.is_valid(geometry) {
+				if wall_id.is_valid(source_geometry) {
 					self.items.push(ViewportItem {
 						shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
 						item: Some(Item::Wall(wall_id)),
-						color: wall_id.get(geometry).color,
+						color: wall_id.get(source_geometry).color,
 						room_to_world,
 						flags: wall_interaction_flags,
 					});
@@ -219,9 +224,9 @@ impl<'c> Viewport<'c> {
 		}
 
 		// Pick room
-		let num_walls = geometry.room_walls(room_id).count();
-		let room_center = geometry.room_vertices(room_id)
-			.map(|vertex_id| geometry.vertices[vertex_id].position)
+		let num_walls = source_geometry.room_walls(room_id).count();
+		let room_center = source_geometry.room_vertices(room_id)
+			.map(|vertex_id| source_geometry.vertices[vertex_id].position)
 			.sum::<Vec2>() / num_walls as f32;
 
 		self.items.push(ViewportItem {
@@ -374,6 +379,7 @@ impl Viewport<'_> {
 				self.editor_state.hovered = item;
 				self.viewport_state.hovered_item_transform = room_to_world;
 				self.viewport_state.hovered_item_flags = flags;
+				self.viewport_state.hovered_item_hover_pos = room_to_world.inverse() * hover_pos_world;
 				min_distance = distance;
 			}
 		}
@@ -442,12 +448,13 @@ impl Viewport<'_> {
 			self.editor_state.selection = self.editor_state.hovered;
 		}
 
-		if is_hovered_has_context_menu {
-			if self.response.secondary_clicked() {
+		if self.response.secondary_clicked() {
+			if is_hovered_has_context_menu {
 				self.viewport_state.context_menu_target = self.editor_state.hovered;
+				self.viewport_state.context_menu_target_interact_pos = self.viewport_state.hovered_item_hover_pos;
+			} else {
+				self.viewport_state.context_menu_target = None;
 			}
-		} else if self.response.secondary_clicked() {
-			self.viewport_state.context_menu_target = None;
 		}
 	}
 
@@ -487,9 +494,25 @@ impl Viewport<'_> {
 
 					ui.separator();
 
-					if ui.button("Split").clicked() {
-						let insert_pos = self.world.geometry.wall_center(wall_id);
+					if ui.button("Split Wall").clicked() {
+						let interact_pos = self.viewport_state.context_menu_target_interact_pos;
+						let (start, end) = self.world.geometry.wall_vertices(wall_id);
+						let length = (end - start).length();
+						let direction = (end - start) / length;
+
+						let distance_along = (interact_pos - start).dot(direction);
+						let insert_pos = start + direction * distance_along.clamp(0.01, length-0.01);
+
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
+
+						ui.close_menu();
+					}
+
+					if ui.button("Split Room").clicked() {
+						self.viewport_state.current_operation = Some(Operation::SplitRoom {
+							source_wall: wall_id,
+							room_to_world: self.viewport_state.hovered_item_transform,
+						});
 
 						ui.close_menu();
 					}
@@ -723,6 +746,35 @@ impl Viewport<'_> {
 				}
 			}
 
+			&Operation::SplitRoom{source_wall, room_to_world} => {
+				let geometry = &self.world.geometry;
+				let source_vertex_position = source_wall.vertex(geometry).position(geometry);
+				let line_start = self.viewport_metrics.world_to_widget_position(room_to_world * source_vertex_position);
+
+				match self.editor_state.hovered {
+					Some(Item::Wall(target_wall)) /*if valid_connection(source_wall, target_wall)*/ => {
+						let target_vertex_position = target_wall.next_vertex(geometry).position(geometry);
+						let line_end = self.viewport_metrics.world_to_widget_position(room_to_world * target_vertex_position);
+
+						self.painter.line_segment([line_start, line_end], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+					}
+
+					Some(Item::Vertex(target_vertex)) /*if valid_connection(source_wall, target_wall)*/ => {
+						let target_vertex_position = target_vertex.position(geometry);
+						let line_end = self.viewport_metrics.world_to_widget_position(room_to_world * target_vertex_position);
+
+						self.painter.line_segment([line_start, line_end], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+					}
+
+					_ => {
+						let line_end = self.response.ctx.input(|input| input.pointer.latest_pos())
+							.unwrap_or(egui::pos2(0.0, 0.0));
+
+						self.painter.line_segment([line_start, line_end], (1.0, WALL_CONNECTION_COLOR.to_egui_rgba()));
+					}
+				}
+			}
+
 			_ => {}
 		}
 	}
@@ -741,6 +793,16 @@ impl Viewport<'_> {
 				}
 				else {
 					None
+				}
+			}
+
+			Operation::SplitRoom{source_wall, ..} => {
+				let geometry = &self.world.geometry;
+
+				match self.editor_state.hovered {
+					Some(Item::Wall(target_wall)) if target_wall != *source_wall => Some(egui::CursorIcon::PointingHand),
+					Some(Item::Vertex(target_vertex)) if target_vertex.wall(geometry).prev_wall(geometry) != *source_wall => Some(egui::CursorIcon::PointingHand),
+					_ => None
 				}
 			}
 		}
@@ -784,6 +846,42 @@ impl Viewport<'_> {
 						&& self.viewport_state.hovered_item_flags.contains(ViewportItemFlags::CONNECTABLE)
 					{
 						self.message_bus.emit(EditorWorldEditCmd::ConnectWall(source_wall, target_wall));
+					}
+
+					self.viewport_state.current_operation = None;
+				}
+
+				// Cancel if clicked outside the widget or right clicked
+				if self.response.clicked_elsewhere() || is_secondary_pressed {
+					self.viewport_state.current_operation = None;
+				}
+			}
+
+			Some(Operation::SplitRoom{source_wall, ..}) => {
+				let is_primary_pressed = self.response.ctx.input(|input| input.pointer.primary_pressed());
+				let is_secondary_pressed = self.response.ctx.input(|input| input.pointer.secondary_pressed());
+
+				// If left clicked either commit if hovering a wall or cancel
+				if is_primary_pressed {
+					match self.editor_state.hovered {
+						Some(Item::Wall(target_wall)) => {
+							// TODO(pat.m): if valid_split
+							if target_wall != source_wall {
+								self.message_bus.emit(EditorWorldEditCmd::SplitRoom(source_wall, target_wall));
+							}
+						}
+
+						Some(Item::Vertex(target_vertex)) => {
+							let geometry = &self.world.geometry;
+							let target_wall = target_vertex.wall(geometry).prev_wall(geometry);
+
+							// TODO(pat.m): if valid_split
+							if target_wall != source_wall && target_wall.room(geometry) == source_wall.room(geometry) {
+								self.message_bus.emit(EditorWorldEditCmd::SplitRoom(source_wall, target_wall));
+							}
+						}
+
+						_ => {}
 					}
 
 					self.viewport_state.current_operation = None;
@@ -872,10 +970,19 @@ enum Operation {
 		source_wall: WallId,
 		room_to_world: Mat2x3,
 	},
+
+	SplitRoom {
+		source_wall: WallId,
+		room_to_world: Mat2x3,
+	},
 }
 
 impl Operation {
 	fn consumes_clicks(&self) -> bool {
-		matches!(self, Self::ConnectWall{..} | Self::Drag{click_to_confirm: true, ..})
+		match self {
+			Self::ConnectWall{..} | Self::SplitRoom{..} => true,
+			Self::Drag{click_to_confirm, ..} => *click_to_confirm,
+			_ => false,
+		}
 	}
 }

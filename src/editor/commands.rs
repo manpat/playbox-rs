@@ -34,6 +34,8 @@ pub enum EditorWorldEditCmd {
 	RemoveRoom(RoomId),
 	DisconnectRoom(RoomId),
 
+	SplitRoom(WallId, WallId),
+
 	ConnectWall(WallId, WallId),
 	DisconnectWall(WallId),
 
@@ -357,6 +359,23 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				for wall in model.world.geometry.room_walls(room_id) {
 					geometry.connect_wall(wall, None)?;
 				}
+				Ok(())
+			})?;
+			transaction.submit();
+		}
+
+		EditorWorldEditCmd::SplitRoom(source_wall_id, target_wall_id) => {
+			let geometry = &transaction.model().world.geometry;
+
+			anyhow::ensure!(source_wall_id != target_wall_id);
+			anyhow::ensure!(source_wall_id.is_valid(geometry));
+			anyhow::ensure!(target_wall_id.is_valid(geometry));
+
+			let room = source_wall_id.room(geometry);
+
+			transaction.describe(format!("Split {room:?} by {source_wall_id:?} -> {target_wall_id:?}"));
+			transaction.update_geometry(|_, geometry| {
+				geometry.split_room(source_wall_id, target_wall_id)?;
 				Ok(())
 			})?;
 			transaction.submit();
