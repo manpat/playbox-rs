@@ -124,19 +124,19 @@ fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
 	let num_objects = model.world.objects.len();
 
 	match maybe_item {
-		Some(item) if !geometry.rooms.contains_key(item.room_id(&model.world)) => {
-			*maybe_item = None;
-		}
-
 		&mut Some(Item::Object(object_index)) if object_index >= num_objects => {
 			*maybe_item = None;
 		}
 
-		&mut Some(Item::Wall(wall_id)) if !geometry.walls.contains_key(wall_id) => {
+		&mut Some(Item::Wall(wall_id)) if !wall_id.is_valid(geometry) => {
 			*maybe_item = None;
 		}
 
-		&mut Some(Item::Vertex(vertex_id)) if !geometry.vertices.contains_key(vertex_id) => {
+		&mut Some(Item::Vertex(vertex_id)) if !vertex_id.is_valid(geometry) => {
+			*maybe_item = None;
+		}
+
+		Some(item) if !item.room_id(&model.world).is_valid(geometry) => {
 			*maybe_item = None;
 		}
 

@@ -982,7 +982,6 @@ impl Operation {
 		match self {
 			Self::ConnectWall{..} | Self::SplitRoom{..} => true,
 			Self::Drag{click_to_confirm, ..} => *click_to_confirm,
-			_ => false,
 		}
 	}
 }

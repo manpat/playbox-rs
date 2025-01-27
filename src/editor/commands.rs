@@ -423,46 +423,54 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::DeleteVertex(_vertex_id) => {
-			anyhow::bail!("Not implemented");
-			// transaction.describe(format!("Remove Vertex {vertex_id}"));
+		EditorWorldEditCmd::DeleteVertex(vertex_id) => {
+			transaction.describe(format!("Remove Vertex {vertex_id:?}"));
 
-			// // Remove vertex and adjacent wall
-			// transaction.update_room(vertex_id.room_index, |_, room| {
-			// 	if vertex_id.vertex_index >= room.walls.len() {
-			// 		anyhow::bail!("Trying to delete invalid vertex");
-			// 	}
+			transaction.update_geometry(|_, geometry| {
+				let wall_id = vertex_id.wall(geometry);
+				let room_id = wall_id.room(geometry);
 
-			// 	room.walls.remove(vertex_id.vertex_index);
-			// 	room.wall_vertices.remove(vertex_id.vertex_index);
+				let prev_wall = wall_id.prev_wall(geometry);
+				let next_wall = wall_id.next_wall(geometry);
+				let connected_wall = wall_id.connected_wall(geometry);
 
-			// 	Ok(())
-			// })?;
+				// Only allow deleting vertices with a single incoming and single outgoing wall
+				if let Some(connected_wall) = prev_wall.connected_wall(geometry)
+					&& connected_wall.vertex(geometry) == vertex_id
+				{
+					anyhow::bail!("Trying to remove multiply connected vertex")
+				}
 
-			// // Remove connections to adjacent wall
-			// transaction.update_connections(|_, connections| {
-			// 	let wall_id = vertex_id.to_wall_id();
+				if let Some(connected_wall) = connected_wall
+					&& connected_wall.next_vertex(geometry) == vertex_id
+				{
+					anyhow::bail!("Trying to remove multiply connected vertex")
+				}
 
-			// 	// Remove connections to deleted wall
-			// 	connections.retain(|&(wall_a, wall_b)| {
-			// 		wall_a != wall_id && wall_b != wall_id
-			// 	});
+				// Disconnect wall
+				geometry.connect_wall(wall_id, None)?;
 
-			// 	// Update all connections with corrected wall ids
-			// 	for (wall_a, wall_b) in connections.iter_mut() {
-			// 		if wall_a.room_index == vertex_id.room_index && wall_a.wall_index > vertex_id.vertex_index {
-			// 			wall_a.wall_index -= 1;
-			// 		}
+				// Make sure room no longer points to wall.
+				let room = room_id.get_mut(geometry);
+				if room.first_wall == wall_id {
+					room.first_wall = next_wall;
+				}
 
-			// 		if wall_b.room_index == vertex_id.room_index && wall_b.wall_index > vertex_id.vertex_index {
-			// 			wall_b.wall_index -= 1;
-			// 		}
-			// 	}
+				// Bridge prev and next walls
+				prev_wall.get_mut(geometry).next_wall = next_wall;
+				next_wall.get_mut(geometry).prev_wall = prev_wall;
 
-			// 	Ok(())
-			// })?;
+				// Finally remove
+				geometry.walls.remove(wall_id);
+				geometry.vertices.remove(vertex_id);
 
-			// transaction.submit();
+				model::validation::validate_ids(geometry)?;
+				model::validation::validate_room_loop(geometry, room_id)?;
+
+				Ok(())
+			})?;
+
+			transaction.submit();
 		}
 
 
