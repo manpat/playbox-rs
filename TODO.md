@@ -1,3 +1,14 @@
+REFACTOR TODO
+=============
+
+Editor
+------
+
+[ ] Better visualisation for geometry editor
+[ ] Need a way make vertices 'unique' after splitting a room - maybe they should just never share vertices
+	[ ] + vis for shared vertices
+
+
 PLAYBOX TODO
 ============
 

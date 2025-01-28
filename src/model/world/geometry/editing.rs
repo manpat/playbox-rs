@@ -37,6 +37,51 @@ impl WorldGeometry {
 		Ok(self.split_wall(prev_incoming, vertex_id.position(self)))
 	}
 
+	/// Delete a vertex and its outgoing wall, if vertex is unique.
+	pub fn collapse_vertex(&mut self, vertex_id: VertexId) -> anyhow::Result<()> {
+		let wall_id = vertex_id.wall(geometry);
+		let room_id = wall_id.room(geometry);
+
+		let prev_wall = wall_id.prev_wall(geometry);
+		let next_wall = wall_id.next_wall(geometry);
+		let connected_wall = wall_id.connected_wall(geometry);
+
+		// Only allow deleting vertices with a single incoming and single outgoing wall
+		if let Some(connected_wall) = prev_wall.connected_wall(geometry)
+			&& connected_wall.vertex(geometry) == vertex_id
+		{
+			anyhow::bail!("Trying to remove multiply connected vertex")
+		}
+
+		if let Some(connected_wall) = connected_wall
+			&& connected_wall.next_vertex(geometry) == vertex_id
+		{
+			anyhow::bail!("Trying to remove multiply connected vertex")
+		}
+
+		// Disconnect wall
+		geometry.connect_wall(wall_id, None)?;
+
+		// Make sure room no longer points to wall.
+		let room = room_id.get_mut(geometry);
+		if room.first_wall == wall_id {
+			room.first_wall = next_wall;
+		}
+
+		// Bridge prev and next walls
+		prev_wall.get_mut(geometry).next_wall = next_wall;
+		next_wall.get_mut(geometry).prev_wall = prev_wall;
+
+		// Finally remove
+		geometry.walls.remove(wall_id);
+		geometry.vertices.remove(vertex_id);
+
+		model::validation::validate_ids(geometry)?;
+		model::validation::validate_room_loop(geometry, room_id)?;
+
+		Ok(())
+	}
+
 	pub fn connect_wall(&mut self, wall_id: WallId, new_target: impl Into<Option<WallId>>) -> anyhow::Result<()> {
 		let new_target = new_target.into();
 
