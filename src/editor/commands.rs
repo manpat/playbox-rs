@@ -375,7 +375,11 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 
 			transaction.describe(format!("Split {room:?} by {source_wall_id:?} -> {target_wall_id:?}"));
 			transaction.update_geometry(|_, geometry| {
-				geometry.split_room(source_wall_id, target_wall_id)?;
+				let new_loop_connecting_wall = geometry.split_room(source_wall_id, target_wall_id)?;
+
+				// Make sure walls in the source model all have unique vertices.
+				geometry.make_wall_vertex_unique(new_loop_connecting_wall)?;
+				geometry.make_wall_vertex_unique(new_loop_connecting_wall.next_wall(geometry))?;
 				Ok(())
 			})?;
 			transaction.submit();

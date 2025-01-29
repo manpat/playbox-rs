@@ -39,45 +39,45 @@ impl WorldGeometry {
 
 	/// Delete a vertex and its outgoing wall, if vertex is unique.
 	pub fn collapse_vertex(&mut self, vertex_id: VertexId) -> anyhow::Result<()> {
-		let wall_id = vertex_id.wall(geometry);
-		let room_id = wall_id.room(geometry);
+		let wall_id = vertex_id.wall(self);
+		let room_id = wall_id.room(self);
 
-		let prev_wall = wall_id.prev_wall(geometry);
-		let next_wall = wall_id.next_wall(geometry);
-		let connected_wall = wall_id.connected_wall(geometry);
+		let prev_wall = wall_id.prev_wall(self);
+		let next_wall = wall_id.next_wall(self);
+		let connected_wall = wall_id.connected_wall(self);
 
 		// Only allow deleting vertices with a single incoming and single outgoing wall
-		if let Some(connected_wall) = prev_wall.connected_wall(geometry)
-			&& connected_wall.vertex(geometry) == vertex_id
+		if let Some(connected_wall) = prev_wall.connected_wall(self)
+			&& connected_wall.vertex(self) == vertex_id
 		{
 			anyhow::bail!("Trying to remove multiply connected vertex")
 		}
 
 		if let Some(connected_wall) = connected_wall
-			&& connected_wall.next_vertex(geometry) == vertex_id
+			&& connected_wall.next_vertex(self) == vertex_id
 		{
 			anyhow::bail!("Trying to remove multiply connected vertex")
 		}
 
 		// Disconnect wall
-		geometry.connect_wall(wall_id, None)?;
+		self.connect_wall(wall_id, None)?;
 
 		// Make sure room no longer points to wall.
-		let room = room_id.get_mut(geometry);
+		let room = room_id.get_mut(self);
 		if room.first_wall == wall_id {
 			room.first_wall = next_wall;
 		}
 
 		// Bridge prev and next walls
-		prev_wall.get_mut(geometry).next_wall = next_wall;
-		next_wall.get_mut(geometry).prev_wall = prev_wall;
+		prev_wall.get_mut(self).next_wall = next_wall;
+		next_wall.get_mut(self).prev_wall = prev_wall;
 
 		// Finally remove
-		geometry.walls.remove(wall_id);
-		geometry.vertices.remove(vertex_id);
+		self.walls.remove(wall_id);
+		self.vertices.remove(vertex_id);
 
-		model::validation::validate_ids(geometry)?;
-		model::validation::validate_room_loop(geometry, room_id)?;
+		model::validation::validate_ids(self)?;
+		model::validation::validate_room_loop(self, room_id)?;
 
 		Ok(())
 	}
@@ -181,5 +181,50 @@ impl WorldGeometry {
 		new_wall_current_room.get_mut(self).connected_wall = Some(new_wall_new_room);
 
 		Ok(new_wall_new_room)
+	}
+
+	/// Ensures the source vertex of a wall is unique.
+	/// Returns whether or not a new vertex was created.
+	pub fn make_wall_vertex_unique(&mut self, wall_id: WallId) -> anyhow::Result<bool> {
+		let vertex_id = wall_id.vertex(self);
+
+		let adjacent_next_wall = wall_id.connected_wall(self).map(|wall| wall.next_wall(self));
+		let prev_adjacent_wall = wall_id.prev_wall(self).connected_wall(self);
+
+		let adjacent_next_vertex = adjacent_next_wall.map(|wall| wall.vertex(self));
+		let prev_adjacent_vertex = prev_adjacent_wall.map(|wall| wall.vertex(self));
+
+		let adjacent_next_shares_vertex = adjacent_next_vertex == Some(vertex_id);
+		let prev_adjacent_shares_vertex = prev_adjacent_vertex == Some(vertex_id);
+
+		// Already unique
+		if !adjacent_next_shares_vertex && !prev_adjacent_shares_vertex {
+			return Ok(false)
+		}
+
+		let vertex_def = vertex_id.get(self).clone();
+
+		if vertex_def.outgoing_wall == wall_id {
+			// We need to set the original vertexes outgoing wall to one of the other two wall
+			if adjacent_next_shares_vertex {
+				vertex_id.get_mut(self).outgoing_wall = adjacent_next_wall.unwrap();
+			} else {
+				assert!(prev_adjacent_wall.is_some());
+				vertex_id.get_mut(self).outgoing_wall = prev_adjacent_wall.unwrap();
+			}
+		}
+
+		// Create a new vertex and reseat the wall onto it.
+		let new_vertex_def = VertexDef {
+			outgoing_wall: wall_id,
+			.. vertex_def
+		};
+
+		let new_vertex_id = self.vertices.insert(new_vertex_def);
+		wall_id.get_mut(self).source_vertex = new_vertex_id;
+
+		model::validation::validate_room_loop(self, wall_id.room(self))?;
+
+		Ok(true)
 	}
 }
