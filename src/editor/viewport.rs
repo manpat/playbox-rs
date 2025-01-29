@@ -569,6 +569,16 @@ impl Viewport<'_> {
 				}
 
 				Item::Vertex(vertex_id) => {
+					if ui.button("Split Room").clicked() {
+						// TODO(pat.m): require that vertex is unique!
+						self.viewport_state.current_operation = Some(Operation::SplitRoom {
+							source_wall: vertex_id.wall(&self.world.geometry),
+							room_to_world: self.viewport_state.hovered_item_transform,
+						});
+
+						ui.close_menu();
+					}
+
 					if ui.button("Bevel").clicked() {
 						let geometry = &self.world.geometry;
 

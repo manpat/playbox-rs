@@ -12,8 +12,8 @@
           "version": 1
         },
         "position": [
-          -2.035876,
-          -0.29365253
+          -1.288821,
+          0.5471078
         ]
       },
       "version": 1
@@ -25,8 +25,8 @@
           "version": 1
         },
         "position": [
-          -1.9757262,
-          0.63095963
+          -1.2286718,
+          1.471722
         ]
       },
       "version": 1
@@ -38,8 +38,8 @@
           "version": 1
         },
         "position": [
-          2.0242739,
-          0.63095963
+          2.7713256,
+          1.471722
         ]
       },
       "version": 1
@@ -51,8 +51,8 @@
           "version": 1
         },
         "position": [
-          1.9676927,
-          -2.9912696
+          2.7147439,
+          -2.150508
         ]
       },
       "version": 1
@@ -77,8 +77,8 @@
           "version": 1
         },
         "position": [
-          -2.6462703,
-          -1.8000304
+          -1.8992155,
+          -0.9592698
         ]
       },
       "version": 1
@@ -90,8 +90,8 @@
           "version": 1
         },
         "position": [
-          1.5459857,
-          -1.1344421
+          2.293038,
+          -0.29368085
         ]
       },
       "version": 1
@@ -125,7 +125,7 @@
     {
       "value": {
         "outgoing_wall": {
-          "idx": 10,
+          "idx": 28,
           "version": 1
         },
         "position": [
@@ -155,8 +155,8 @@
           "version": 1
         },
         "position": [
-          -2.9352813,
-          0.022973536
+          -3.2137551,
+          0.25969553
         ]
       },
       "version": 1
@@ -168,8 +168,8 @@
           "version": 1
         },
         "position": [
-          3.943038,
-          1.127164
+          4.797736,
+          1.6730692
         ]
       },
       "version": 1
@@ -181,8 +181,8 @@
           "version": 1
         },
         "position": [
-          2.4431713,
-          0.17736743
+          1.8023782,
+          0.3194065
         ]
       },
       "version": 1
@@ -207,8 +207,8 @@
           "version": 1
         },
         "position": [
-          1.964372,
-          -2.3668952
+          2.7114227,
+          -1.5261334
         ]
       },
       "version": 1
@@ -220,8 +220,8 @@
           "version": 1
         },
         "position": [
-          -2.0323062,
-          -2.9912696
+          -1.2852517,
+          -2.150508
         ]
       },
       "version": 1
@@ -233,8 +233,8 @@
           "version": 1
         },
         "position": [
-          1.4632561,
-          -0.791448
+          2.210308,
+          0.049312893
         ]
       },
       "version": 1
@@ -255,7 +255,7 @@
     {
       "value": {
         "outgoing_wall": {
-          "idx": 20,
+          "idx": 32,
           "version": 1
         },
         "position": [
@@ -272,8 +272,8 @@
           "version": 1
         },
         "position": [
-          1.5612504,
-          -0.14542243
+          2.3083029,
+          0.695339
         ]
       },
       "version": 1
@@ -285,8 +285,8 @@
           "version": 1
         },
         "position": [
-          2.7392714,
-          -0.11803736
+          2.4835734,
+          -0.37992883
         ]
       },
       "version": 1
@@ -311,8 +311,8 @@
           "version": 1
         },
         "position": [
-          -2.022381,
-          -2.0362854
+          -1.2753267,
+          -1.1955253
         ]
       },
       "version": 1
@@ -324,8 +324,112 @@
           "version": 1
         },
         "position": [
-          -2.6568923,
-          -0.5972844
+          -1.9098375,
+          0.24347568
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 26,
+          "version": 1
+        },
+        "position": [
+          3.2551208,
+          1.9328053
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 27,
+          "version": 1
+        },
+        "position": [
+          4.7580476,
+          0.032173585
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 29,
+          "version": 1
+        },
+        "position": [
+          3.9530709,
+          0.009491801
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 10,
+          "version": 1
+        },
+        "position": [
+          2.8573556,
+          -0.34788957
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 30,
+          "version": 1
+        },
+        "position": [
+          3.943038,
+          1.127164
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 31,
+          "version": 1
+        },
+        "position": [
+          4.1098166,
+          2.4787111
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 33,
+          "version": 1
+        },
+        "position": [
+          3.2436554,
+          -0.16195354
+        ]
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "outgoing_wall": {
+          "idx": 20,
+          "version": 1
+        },
+        "position": [
+          3.1915572,
+          -1.0013378
         ]
       },
       "version": 1
@@ -352,7 +456,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -385,7 +489,7 @@
           "version": 1
         },
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -415,7 +519,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -448,7 +552,7 @@
           "version": 1
         },
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -511,7 +615,7 @@
           "version": 1
         },
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -532,7 +636,7 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 19,
+          "idx": 33,
           "version": 1
         },
         "prev_wall": {
@@ -541,7 +645,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -562,7 +666,7 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 20,
+          "idx": 32,
           "version": 1
         },
         "prev_wall": {
@@ -592,7 +696,7 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 13,
+          "idx": 30,
           "version": 1
         },
         "prev_wall": {
@@ -601,7 +705,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -618,7 +722,7 @@
     {
       "value": {
         "source_vertex": {
-          "idx": 10,
+          "idx": 29,
           "version": 1
         },
         "next_wall": {
@@ -626,12 +730,12 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 23,
+          "idx": 29,
           "version": 1
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -656,7 +760,7 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 13,
+          "idx": 28,
           "version": 1
         },
         "connected_wall": null,
@@ -694,7 +798,7 @@
           "version": 1
         },
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -715,16 +819,16 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 11,
+          "idx": 27,
           "version": 1
         },
         "prev_wall": {
-          "idx": 9,
+          "idx": 31,
           "version": 1
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -754,7 +858,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -784,7 +888,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -814,7 +918,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -844,7 +948,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -874,7 +978,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -899,7 +1003,7 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 7,
+          "idx": 32,
           "version": 1
         },
         "connected_wall": null,
@@ -921,7 +1025,7 @@
     {
       "value": {
         "source_vertex": {
-          "idx": 20,
+          "idx": 33,
           "version": 1
         },
         "next_wall": {
@@ -929,12 +1033,12 @@
           "version": 1
         },
         "prev_wall": {
-          "idx": 8,
+          "idx": 33,
           "version": 1
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -964,7 +1068,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -992,9 +1096,12 @@
           "idx": 10,
           "version": 1
         },
-        "connected_wall": null,
+        "connected_wall": {
+          "idx": 26,
+          "version": 1
+        },
         "room": {
-          "idx": 1,
+          "idx": 2,
           "version": 1
         },
         "color": {
@@ -1015,7 +1122,7 @@
           "version": 1
         },
         "next_wall": {
-          "idx": 10,
+          "idx": 28,
           "version": 1
         },
         "prev_wall": {
@@ -1054,7 +1161,7 @@
         },
         "connected_wall": null,
         "room": {
-          "idx": 1,
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -1084,7 +1191,262 @@
         },
         "connected_wall": null,
         "room": {
+          "idx": 3,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 26,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 31,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 30,
+          "version": 1
+        },
+        "connected_wall": {
+          "idx": 22,
+          "version": 1
+        },
+        "room": {
+          "idx": 2,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 27,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 29,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 13,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 2,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 10,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 11,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 23,
+          "version": 1
+        },
+        "connected_wall": {
+          "idx": 29,
+          "version": 1
+        },
+        "room": {
           "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 28,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 10,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 27,
+          "version": 1
+        },
+        "connected_wall": {
+          "idx": 28,
+          "version": 1
+        },
+        "room": {
+          "idx": 2,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 30,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 26,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 9,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 2,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 31,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 13,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 26,
+          "version": 1
+        },
+        "connected_wall": null,
+        "room": {
+          "idx": 2,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 20,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 19,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 8,
+          "version": 1
+        },
+        "connected_wall": {
+          "idx": 33,
+          "version": 1
+        },
+        "room": {
+          "idx": 1,
+          "version": 1
+        },
+        "color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "vertical_offset": 0.0,
+        "horizontal_offset": 0.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "source_vertex": {
+          "idx": 32,
+          "version": 1
+        },
+        "next_wall": {
+          "idx": 20,
+          "version": 1
+        },
+        "prev_wall": {
+          "idx": 7,
+          "version": 1
+        },
+        "connected_wall": {
+          "idx": 32,
+          "version": 1
+        },
+        "room": {
+          "idx": 3,
           "version": 1
         },
         "color": {
@@ -1107,7 +1469,51 @@
     {
       "value": {
         "first_wall": {
-          "idx": 1,
+          "idx": 32,
+          "version": 1
+        },
+        "floor_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "ceiling_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "height": 1.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "first_wall": {
+          "idx": 29,
+          "version": 1
+        },
+        "floor_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "ceiling_color": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "height": 1.0
+      },
+      "version": 1
+    },
+    {
+      "value": {
+        "first_wall": {
+          "idx": 33,
           "version": 1
         },
         "floor_color": {
@@ -1159,8 +1565,8 @@
         "version": 1
       },
       "position": [
-        -2.7127323,
-        0.52791345
+        -2.022594,
+        1.0281519
       ],
       "yaw": 1.6696988,
       "info": {
@@ -1172,7 +1578,7 @@
           "a": 1.0
         },
         "height": 0.5,
-        "power": 7.5,
+        "power": 3.5,
         "radius": 1.2
       }
     },
@@ -1251,14 +1657,14 @@
   ],
   "player_spawn": {
     "room_id": {
-      "idx": 1,
+      "idx": 3,
       "version": 1
     },
     "position": [
-      0.0,
-      0.0
+      0.50757277,
+      1.0556518
     ],
-    "yaw": 0.0
+    "yaw": 0.009599177
   },
   "fog": {
     "color": {

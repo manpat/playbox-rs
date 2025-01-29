@@ -77,7 +77,7 @@ impl State {
 				selection: None,
 
 				focused_room_id: None,
-				track_player: false,
+				track_player: true,
 			},
 
 			undo_stack: UndoStack::new(message_bus.clone()),

@@ -95,7 +95,9 @@ impl ProcessedWorld {
 			}
 		}
 
-		panic!("Placement doesn't exist in processed world");
+		log::error!("Placement doesn't exist in processed world");
+
+		source_placement
 	}
 
 	pub fn to_source_room(&self, processed_room_id: RoomId) -> RoomId {

@@ -382,6 +382,9 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 				geometry.make_wall_vertex_unique(new_loop_connecting_wall.next_wall(geometry))?;
 				Ok(())
 			})?;
+
+			// TODO(pat.m): make sure objects in original room end up in the correct room!
+
 			transaction.submit();
 		}
 
