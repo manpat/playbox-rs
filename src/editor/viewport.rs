@@ -2,7 +2,7 @@ use crate::prelude::*;
 use model::{World, ProcessedWorld, WallId, RoomId, Placement, Location};
 use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum ViewportItemShape {
 	Vertex(Vec2),
 	Line(Vec2, Vec2),
@@ -83,6 +83,7 @@ bitflags::bitflags! {
 	}
 }
 
+#[derive(Debug)]
 struct ViewportItem {
 	shape: ViewportItemShape,
 	item: Option<Item>,
@@ -146,7 +147,8 @@ impl<'c> Viewport<'c> {
 		let mut tracked_location = None;
 
 		if context.state.track_player {
-			tracked_location = Some(context.model.player.placement.location());
+			let player_src_placement = context.model.processed_world.to_source_placement(context.model.player.placement);
+			tracked_location = Some(player_src_placement.location());
 		}
 
 		let viewport_metrics = ViewportMetrics::new(response.rect, &viewport_state);
