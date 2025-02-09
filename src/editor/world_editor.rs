@@ -12,7 +12,7 @@ pub fn do_world_editor(ui: &mut egui::Ui, ctx: &mut Context) {
 		ui.with_layout(egui::Layout::right_to_left(egui::Align::Center) , |ui| {
 			ui.menu_button("...", |ui| {
 				if ui.button("Focus Player").clicked() {
-					ctx.state.selection = Some(Item::Room(ctx.model.processed_world.to_source_room(ctx.model.player.placement.room_id)));
+					ctx.state.selection = Some(Item::Room(ctx.source_player_placement.room_id));
 					// TODO(pat.m): recenter viewport
 					ui.close_menu();
 				}
@@ -48,32 +48,29 @@ fn draw_room_selector(ui: &mut egui::Ui, Context{model, state, ..}: &mut Context
 
 fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
 	let focused_room_id = match (context.state.track_player, &context.state.selection, context.state.focused_room_id) {
-		(true, _, _) => context.model.player.placement.room_id,
+		(true, _, _) => context.source_player_placement.room_id,
 		(false, Some(item), _) => item.room_id(&context.model.world),
 		(false, None, Some(focused_room_id)) => focused_room_id,
 		_ => todo!()
 	};
-
-	let focused_room_id = context.model.processed_world.to_source_room(focused_room_id);
 
 	let neighbouring_room_margin = 0.3;
 
 	let mut neighbouring_rooms = Vec::new();
 
 	for src_wall_id in context.model.world.geometry.room_walls(focused_room_id) {
-		if let Some(wall_info) = context.model.processed_world.wall_info(src_wall_id)
+		if let Some(wall_info) = context.runtime_model.processed_world.wall_info(src_wall_id)
 			&& let Some(connection_info) = &wall_info.connection_info
 		{
 			let offset_transform = Mat2x3::translate(wall_info.normal * neighbouring_room_margin) * connection_info.target_to_source;
 
-			let source_room_id = context.model.processed_world.to_source_room(connection_info.target_room);
+			let source_room_id = context.runtime_model.processed_world.to_source_room(connection_info.target_room);
 			neighbouring_rooms.push((source_room_id, offset_transform));
 		}
 	}
 
-	let player = &context.model.player;
 	let world = &context.model.world;
-	let processed_world = &context.model.processed_world;
+	let source_player_placement = context.source_player_placement;
 
 	let mut viewport = Viewport::new(ui, context);
 	viewport.add_room(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
@@ -84,12 +81,12 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		viewport.add_room_connections(room_id, transform, ViewportItemFlags::empty());
 	}
 
-	for (object_index, object) in world.objects.iter().enumerate() {
-		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
+	for (object_id, object) in world.objects.iter() {
+		viewport.add_object(object.placement, Item::Object(object_id), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
 	}
 
 	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
-	viewport.add_player_indicator(processed_world.to_source_placement(player.placement), None, Color::grey(0.8), ViewportItemFlags::empty());
+	viewport.add_player_indicator(source_player_placement, None, Color::grey(0.8), ViewportItemFlags::empty());
 
 	viewport.build()
 }
@@ -98,8 +95,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 
 fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Response {
 	let world = &context.model.world;
-	let player = &context.model.player;
-	let processed_world = &context.model.processed_world;
+	let source_player_placement = context.source_player_placement;
 
 	let mut viewport = Viewport::new(ui, context);
 	let mut position = Vec2::zero();
@@ -126,12 +122,12 @@ fn draw_all_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui::Res
 		}
 	}
 
-	for (object_index, object) in world.objects.iter().enumerate() {
-		viewport.add_object(object.placement, Item::Object(object_index), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
+	for (object_id, object) in world.objects.iter() {
+		viewport.add_object(object.placement, Item::Object(object_id), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
 	}
 
 	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
-	viewport.add_player_indicator(processed_world.to_source_placement(player.placement), None, Color::grey(0.8), ViewportItemFlags::empty());
+	viewport.add_player_indicator(source_player_placement, None, Color::grey(0.8), ViewportItemFlags::empty());
 
 	viewport.build()
 }

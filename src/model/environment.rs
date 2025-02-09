@@ -7,13 +7,13 @@ pub struct EnvironmentModel {
 }
 
 impl EnvironmentModel {
-	pub fn new(world: &World, _message_bus: &MessageBus) -> Self {
+	pub fn new(world: &ProcessedWorld, _message_bus: &MessageBus) -> Self {
 		EnvironmentModel {
 			fog: world.fog,
 		}
 	}
 
-	pub fn update(&mut self, world: &World, _message_bus: &MessageBus) {
+	pub fn update(&mut self, world: &ProcessedWorld, _message_bus: &MessageBus) {
 		// TODO(pat.m): respond to requests to change parameters
 		// TODO(pat.m): interpolate fog values
 

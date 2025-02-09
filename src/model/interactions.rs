@@ -3,7 +3,7 @@ use model::*;
 
 #[derive(Debug)]
 pub struct Interactions {
-	pub hovered_object: Option<usize>,
+	pub hovered_object: Option<ObjectId>,
 
 	player_cmd_sub: Subscription<PlayerCmd>,
 }
@@ -17,10 +17,10 @@ impl Interactions {
 		}
 	}
 
-	pub fn update(&mut self, player: &Player, world: &World, _processed_world: &ProcessedWorld, message_bus: &MessageBus) {
+	pub fn update(&mut self, player: &Player, world: &ProcessedWorld, message_bus: &MessageBus) {
 		if message_bus.poll(&self.player_cmd_sub).any(|msg| msg == PlayerCmd::Interact) {
-			if let Some(object_index) = self.hovered_object
-				&& let Some(object) = world.objects.get(object_index)
+			if let Some(object_id) = self.hovered_object
+				&& let Some(object) = world.objects.get(object_id)
 			{
 				log::info!("Interact '{}'", object.name);
 
@@ -44,7 +44,7 @@ impl Interactions {
 
 		self.hovered_object = None;
 
-		for (object_index, object) in world.objects.iter().enumerate() {
+		for (object_id, object) in world.objects.iter() {
 			if object.placement.room_id != player.placement.room_id {
 				continue
 			}
@@ -56,7 +56,7 @@ impl Interactions {
 
 			// TODO(pat.m): determine distance and angle based on size of object
 			if distance < 0.5 && player.placement.forward().dot(direction) > 0.7071 {
-				self.hovered_object = Some(object_index);
+				self.hovered_object = Some(object_id);
 				break
 			}
 		}

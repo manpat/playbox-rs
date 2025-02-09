@@ -32,7 +32,7 @@ pub struct WorldView {
 }
 
 impl WorldView {
-	pub fn new(gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld, message_bus: MessageBus) -> anyhow::Result<Self> {
+	pub fn new(gfx: &mut gfx::System, processed_world: &ProcessedWorld, message_bus: MessageBus) -> anyhow::Result<Self> {
 		let vbo = gfx.core.create_buffer();
 		let ebo = gfx.core.create_buffer();
 		let light_buffer = gfx.core.create_buffer();
@@ -41,7 +41,7 @@ impl WorldView {
 		gfx.core.set_debug_label(ebo, "Room index buffer");
 		gfx.core.set_debug_label(light_buffer, "Room light buffer");
 
-		let room_mesh_infos = build_room_buffers(gfx, world, processed_world, vbo, ebo, light_buffer);
+		let room_mesh_infos = build_room_buffers(gfx, processed_world, vbo, ebo, light_buffer);
 
 		Ok(Self {
 			room_mesh_infos,
@@ -67,7 +67,7 @@ impl WorldView {
 	}
 
 	#[instrument(skip_all, name="world_view draw")]
-	pub fn draw(&mut self, gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld, viewer_placement: Placement) {
+	pub fn draw(&mut self, gfx: &mut gfx::System, processed_world: &ProcessedWorld, viewer_placement: Placement) {
 		// Draw room you're in
 		// then for each wall,
 		// 	check if it has a neighbouring room, and if so
@@ -87,7 +87,7 @@ impl WorldView {
 			gfx.core.set_debug_label(self.ebo, "Room index buffer");
 			gfx.core.set_debug_label(self.light_buffer, "Room light buffer");
 
-			self.room_mesh_infos = build_room_buffers(gfx, world, processed_world, self.vbo, self.ebo, self.light_buffer);
+			self.room_mesh_infos = build_room_buffers(gfx, processed_world, self.vbo, self.ebo, self.light_buffer);
 		}
 
 		self.build_visibility_graph(processed_world, viewer_placement);
@@ -309,10 +309,10 @@ struct RoomInstance {
 
 
 
-fn build_room_buffers(gfx: &mut gfx::System, world: &World, processed_world: &ProcessedWorld,
+fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 	vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) -> SecondaryMap<RoomId, RoomMeshInfo>
 {
-	let mut room_builder = RoomMeshBuilder::new(world, processed_world);
+	let mut room_builder = RoomMeshBuilder::new(processed_world);
 
 	let mut room_mesh_infos = SecondaryMap::with_capacity(processed_world.geometry().rooms.len());
 

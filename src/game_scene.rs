@@ -22,6 +22,7 @@ pub struct GameScene {
 	world_view: view::WorldView,
 	hud_view: view::HudView,
 
+	source_model: model::SourceModel,
 	model: model::Model,
 
 	time: f32,
@@ -91,7 +92,7 @@ impl GameScene {
 
 			// toy_renderer,
 			// sprites: Sprites::new(&mut ctx.gfx)?,
-			world_view: view::WorldView::new(&mut ctx.gfx, &world, &processed_world, ctx.bus.clone())?,
+			world_view: view::WorldView::new(&mut ctx.gfx, &processed_world, ctx.bus.clone())?,
 			hud_view: view::HudView::new(&mut ctx.gfx, ctx.bus.clone())?,
 
 			model: model::Model {
@@ -111,12 +112,14 @@ impl GameScene {
 				},
 
 				interactions: model::Interactions::new(ctx.bus),
-				environment: model::EnvironmentModel::new(&world, ctx.bus),
+				environment: model::EnvironmentModel::new(&processed_world, ctx.bus),
 				hud: model::HudModel::new(ctx.bus),
 				processed_world,
 
 				progress: model::ProgressModel::default(),
+			},
 
+			source_model: model::SourceModel {
 				world,
 			},
 
@@ -131,7 +134,7 @@ impl GameScene {
 	pub fn switch_world(&mut self, ctx: &mut Context<'_>, new_world: model::World) {
 		// TODO(pat.m): player placement has to be resolved against the processed world - but that doesn't exist yet.
 		self.model.player.placement = new_world.player_spawn;
-		self.model.world = new_world;
+		self.source_model.world = new_world;
 		ctx.bus.emit(model::WorldChangedEvent);
 
 		self.editor_state.reset();
@@ -145,34 +148,35 @@ impl GameScene {
 		ctx.input.set_capture_mouse(!ctx.show_editor || self.force_game_controls);
 
 		if ctx.show_editor {
-			editor::do_editor(&ctx.egui, &mut self.editor_state, &self.model, ctx.bus);
-			editor::handle_editor_cmds(&mut self.editor_state, &mut self.model, ctx.bus);
+			editor::do_editor(&ctx.egui, &mut self.editor_state, &self.source_model, &self.model, ctx.bus);
+			editor::handle_editor_cmds(&mut self.editor_state, &mut self.source_model, ctx.bus);
 		}
 
 		if let Err(err) = self.handle_console(ctx) {
 			log::error!("{err:?}");
 		}
 
-		let model::Model { processed_world, world, player, progress, interactions, environment, hud, .. } = &mut self.model;
+		let model::Model { processed_world, player, progress, interactions, environment, hud, .. } = &mut self.model;
+		let source_world = &self.source_model.world;
 
-		processed_world.update(&world, &progress, ctx.bus);
+		processed_world.update(source_world, &progress, ctx.bus);
 
 		// TODO(pat.m): needs to happen somewhere else, but has to happen after processed world update
 		{
 			// Make sure player doesn't suddenly end up in a room that no longer exists.
 			if !player.placement.room_id.is_valid(processed_world.geometry()) {
-				player.placement = processed_world.to_processed_placement(world.player_spawn);
+				player.placement = processed_world.to_processed_placement(source_world.player_spawn);
 			}
 		}
 
 		if !ctx.show_editor && !ctx.console.is_visible() || self.force_game_controls {
 			player.handle_input(ctx, &processed_world, &hud);
-			interactions.update(&player, &world, &processed_world, ctx.bus);
+			interactions.update(&player, &processed_world, ctx.bus);
 		}
 
 		hud.update(ctx.bus);
 
-		environment.update(&world, ctx.bus);
+		environment.update(processed_world, ctx.bus);
 
 		// self.sprites.set_billboard_orientation(Vec3::from_y(1.0), Vec3::from_y_angle(player.placement.yaw));
 	}
@@ -206,14 +210,14 @@ impl GameScene {
 
 		let inverse_projection = projection.inverse();
 
-		gfx.frame_encoder.backbuffer_color(self.model.world.fog.color);
+		gfx.frame_encoder.backbuffer_color(self.model.processed_world.fog.color);
 		gfx.frame_encoder.bind_global_ubo(0, &[projection_view, inverse_projection]);
 		gfx.frame_encoder.bind_global_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
 		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 
-		self.world_view.draw(gfx, &self.model.world, &self.model.processed_world, player.placement);
+		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
 		self.hud_view.draw(gfx, ui_shared, &self.model);
 
 		// self.toy_renderer.draw(gfx);
@@ -345,8 +349,8 @@ impl GameScene {
 
 				// TODO(pat.m): this is jank as hell. the model really needs to be split up so the source data
 				// can just be replaced wholesale
-				self.model.world = model::World::new();
-				self.model.player.placement = self.model.world.player_spawn;
+				self.source_model.world = model::World::new();
+				self.model.player.placement = self.source_model.world.player_spawn;
 				ctx.bus.emit(model::WorldChangedEvent);
 
 				ui.close_menu();
@@ -364,7 +368,7 @@ impl GameScene {
 
 				let default_world_path = "worlds/default.world";
 
-				if let Err(error) = ctx.vfs.save_json_resource(default_world_path, &self.model.world) {
+				if let Err(error) = ctx.vfs.save_json_resource(default_world_path, &self.source_model.world) {
 					log::error!("Failed to save world to '{default_world_path}': {error}");
 				}
 
@@ -387,7 +391,7 @@ impl GameScene {
 				anyhow::bail!("'save' requires world name argument");
 			}
 
-			ctx.vfs.save_json_resource(format!("worlds/{world_name}.world"), &self.model.world)
+			ctx.vfs.save_json_resource(format!("worlds/{world_name}.world"), &self.source_model.world)
 				.with_context(|| format!("Failed to save world '{world_name}'"))?;
 
 			log::info!("World '{world_name}' saved successfully");

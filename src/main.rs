@@ -42,6 +42,7 @@ pub mod prelude {
 	pub use std::collections::HashMap;
 	pub use std::borrow::Cow;
 
+	pub use slotmap::SlotMap;
 	pub use smallvec::SmallVec;
 }
 

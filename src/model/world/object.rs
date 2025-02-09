@@ -2,6 +2,10 @@ use crate::prelude::*;
 
 use model::Placement;
 
+slotmap::new_key_type! {
+	pub struct ObjectId;
+}
+
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Object {

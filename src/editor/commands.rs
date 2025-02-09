@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-use model::{Model, RoomDef, Object, VertexId, WallId, RoomId, FogParameters};
+use model::{SourceModel, Placement, RoomDef, Object, ObjectId, VertexId, WallId, RoomId, FogParameters};
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -45,17 +45,17 @@ pub enum EditorWorldEditCmd {
 
 
 	// TODO(pat.m): could be an object
-	SetPlayerSpawn,
+	SetPlayerSpawn(Placement),
 
 	AddObject(Object),
-	RemoveObject(usize),
+	RemoveObject(ObjectId),
 
-	SetObjectName(usize, String),
-	EditObject(usize, EditObjectCallback),
+	SetObjectName(ObjectId, String),
+	EditObject(ObjectId, EditObjectCallback),
 }
 
 
-pub struct EditObjectCallback(Box<dyn FnOnce(&Model, &mut Object) -> anyhow::Result<()> + 'static>);
+pub struct EditObjectCallback(Box<dyn FnOnce(&SourceModel, &mut Object) -> anyhow::Result<()> + 'static>);
 
 impl std::fmt::Debug for EditObjectCallback {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -65,7 +65,7 @@ impl std::fmt::Debug for EditObjectCallback {
 
 impl EditObjectCallback {
 	pub fn new<F>(f: F) -> Self
-		where F: FnOnce(&Model, &mut Object) + 'static
+		where F: FnOnce(&SourceModel, &mut Object) + 'static
 	{
 		EditObjectCallback(Box::new(move |m, o| {
 			f(m, o);
@@ -74,18 +74,18 @@ impl EditObjectCallback {
 	}
 
 	pub fn new_fallible<F>(f: F) -> Self
-		where F: FnOnce(&Model, &mut Object) -> anyhow::Result<()> + 'static
+		where F: FnOnce(&SourceModel, &mut Object) -> anyhow::Result<()> + 'static
 	{
 		EditObjectCallback(Box::new(f))
 	}
 }
 
 impl EditorWorldEditCmd {
-	pub fn edit_object<F>(object_index: usize, f: F) -> Self
-		where F: FnOnce(&Model, &mut Object) + 'static
+	pub fn edit_object<F>(object_id: ObjectId, f: F) -> Self
+		where F: FnOnce(&SourceModel, &mut Object) + 'static
 	{
 		EditorWorldEditCmd::EditObject(
-			object_index,
+			object_id,
 			EditObjectCallback::new(f)
 		)
 	}
@@ -102,16 +102,16 @@ pub enum UndoCmd {
 }
 
 
-pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_bus: &MessageBus) {
+pub fn handle_editor_cmds(state: &mut State, source_model: &mut model::SourceModel, message_bus: &MessageBus) {
 	// Handle undo/redo
 	for cmd in message_bus.poll(&state.undo_cmd_sub) {
-		if let Err(err) = handle_undo_cmd(&mut state.undo_stack, model, cmd) {
+		if let Err(err) = handle_undo_cmd(&mut state.undo_stack, source_model, cmd) {
 			log::error!("{cmd:?} failed: {err}");
 		}
 	}
 
 	// Handle editor commands
-	let mut transaction = state.undo_stack.transaction(model, message_bus);
+	let mut transaction = state.undo_stack.transaction(source_model, message_bus);
 
 	for cmd in message_bus.poll_consume(&state.editor_world_edit_cmd_sub) {
 		if let Err(err) = handle_world_edit_cmd(&mut state.inner, &mut transaction, cmd) {
@@ -122,11 +122,11 @@ pub fn handle_editor_cmds(state: &mut State, model: &mut model::Model, message_b
 	drop(transaction);
 
 	// Make sure we haven't messed anything up
-	super::validate_model(state, model);
+	super::validate_model(state, source_model);
 }
 
 
-fn handle_undo_cmd(undo_stack: &mut UndoStack, model: &mut model::Model, cmd: UndoCmd) -> anyhow::Result<()> {
+fn handle_undo_cmd(undo_stack: &mut UndoStack, model: &mut model::SourceModel, cmd: UndoCmd) -> anyhow::Result<()> {
 	log::info!("{cmd:?}");
 
 	match cmd {
@@ -138,7 +138,7 @@ fn handle_undo_cmd(undo_stack: &mut UndoStack, model: &mut model::Model, cmd: Un
 	Ok(())
 }
 
-fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'_>, cmd: EditorWorldEditCmd) -> anyhow::Result<()> {
+fn handle_world_edit_cmd(_state: &mut InnerState, transaction: &mut Transaction<'_>, cmd: EditorWorldEditCmd) -> anyhow::Result<()> {
 	if !matches!(cmd, EditorWorldEditCmd::TranslateItem(..)) {
 		log::info!("{cmd:?}");
 	}
@@ -191,9 +191,9 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 					transaction.submit();
 				}
 
-				Item::Object(object_index) => {
-					transaction.describe(format!("Move Object #{object_index}"));
-					transaction.update_object(object_index, |_, object| {
+				Item::Object(object_id) => {
+					transaction.describe(format!("Move {object_id:?}"));
+					transaction.update_object(object_id, |_, object| {
 						// TODO(pat.m): need to be able to move between rooms!
 						object.placement.position += delta;
 						Ok(())
@@ -270,10 +270,10 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::SetPlayerSpawn => {
+		EditorWorldEditCmd::SetPlayerSpawn(placement) => {
 			transaction.describe("Set player spawn");
-			transaction.update_world(|model, world| {
-				world.player_spawn = model.processed_world.to_source_placement(model.player.placement);
+			transaction.update_world(move |_model, world| {
+				world.player_spawn = placement;
 				Ok(())
 			})?;
 			transaction.submit();
@@ -445,26 +445,26 @@ fn handle_world_edit_cmd(state: &mut InnerState, transaction: &mut Transaction<'
 		EditorWorldEditCmd::AddObject(object) => {
 			// TODO(pat.m): :(
 			transaction.describe("New Object");
-			transaction.update_world(|_, world| { world.objects.push(object); Ok(()) })?;
+			transaction.update_world(|_, world| { world.objects.insert(object); Ok(()) })?;
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::RemoveObject(object_index) => {
+		EditorWorldEditCmd::RemoveObject(object_id) => {
 			// TODO(pat.m): :(
-			transaction.describe(format!("Remove Object #{object_index}"));
-			transaction.update_world(|_, world| { world.objects.remove(object_index); Ok(()) })?;
+			transaction.describe(format!("Remove {object_id:?}"));
+			transaction.update_world(|_, world| { world.objects.remove(object_id); Ok(()) })?;
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::SetObjectName(object_index, object_name) => {
-			transaction.describe(format!("Change Object #{object_index}'s name"));
-			transaction.update_object(object_index, |_, object| { object.name = object_name; Ok(()) })?;
+		EditorWorldEditCmd::SetObjectName(object_id, object_name) => {
+			transaction.describe(format!("Change {object_id:?}'s name"));
+			transaction.update_object(object_id, |_, object| { object.name = object_name; Ok(()) })?;
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::EditObject(object_index, func) => {
-			transaction.describe(format!("Edit Object #{object_index}"));
-			transaction.update_object(object_index, func.0)?;
+		EditorWorldEditCmd::EditObject(object_id, func) => {
+			transaction.describe(format!("Edit {object_id:?}"));
+			transaction.update_object(object_id, func.0)?;
 			transaction.submit();
 		}
 	}

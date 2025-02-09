@@ -25,7 +25,7 @@ fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
 		ui.label(format!("{room_id:?} <{x:.1}, {y:.1}>, {:.1}°", yaw.to_degrees()));
 
 		if ui.button("Set Here").clicked() {
-			ctx.message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn);
+			ctx.message_bus.emit(EditorWorldEditCmd::SetPlayerSpawn(ctx.source_player_placement));
 		}
 	});
 
@@ -78,7 +78,7 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 		if ui.button("Debug").clicked() {
 			let object = model::Object {
 				name: "Debug Object".to_string(),
-				placement: ctx.model.processed_world.to_source_placement(ctx.model.player.placement),
+				placement: ctx.source_player_placement,
 				info: model::ObjectInfo::Debug,
 			};
 
@@ -88,7 +88,7 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 		if ui.button("Ladder").clicked() {
 			let object = model::Object {
 				name: "ladder".to_string(),
-				placement: ctx.model.processed_world.to_source_placement(ctx.model.player.placement),
+				placement: ctx.source_player_placement,
 				info: model::ObjectInfo::Ladder {
 					target_world: "world2".into(),
 					target_object: "ladder".into(),
@@ -101,7 +101,7 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 		if ui.button("Light").clicked() {
 			let object = model::Object {
 				name: "light".to_string(),
-				placement: ctx.model.processed_world.to_source_placement(ctx.model.player.placement),
+				placement: ctx.source_player_placement,
 				info: model::ObjectInfo::Light(LightObject{
 					color: Color::white(),
 					height: 0.5,
@@ -116,15 +116,15 @@ fn draw_object_list(ui: &mut egui::Ui, ctx: &mut Context) {
 
 	egui::ScrollArea::vertical()
 		.show(ui, |ui| {
-			for (object_index, object) in ctx.model.world.objects.iter().enumerate() {
-				let is_selected = ctx.state.selection == Some(Item::Object(object_index));
+			for (object_id, object) in ctx.model.world.objects.iter() {
+				let is_selected = ctx.state.selection == Some(Item::Object(object_id));
 				let response = ui.selectable_label(is_selected, match object.name.is_empty() {
 					true => "<no name>",
 					false => object.name.as_str(),
 				});
 
 				if response.clicked() {
-					ctx.state.selection = Some(Item::Object(object_index));
+					ctx.state.selection = Some(Item::Object(object_id));
 				}
 			}
 		});
@@ -152,8 +152,8 @@ fn draw_item_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 			draw_room_inspector(ui, ctx, room_id);
 		}
 
-		Some(Item::Object(object_index)) => {
-			draw_object_inspector(ui, ctx, object_index);
+		Some(Item::Object(object_id)) => {
+			draw_object_inspector(ui, ctx, object_id);
 		}
 
 		_ => {
@@ -241,19 +241,19 @@ fn draw_wall_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut 
 	});
 }
 
-fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, object_index: usize) {
-	let Some(object) = model.world.objects.get(object_index) else {
+fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mut Context, object_id: ObjectId) {
+	let Some(object) = model.world.objects.get(object_id) else {
 		return
 	};
 
-	ui.label(format!("Object #{object_index} - \"{}\"", object.name));
+	ui.label(format!("{object_id:?} - \"{}\"", object.name));
 
 	ui.horizontal(|ui| {
 		ui.label("Name");
 
 		let mut object_name = Cow::from(&object.name);
 		if ui.text_edit_singleline(&mut object_name).changed() {
-			message_bus.emit(EditorWorldEditCmd::SetObjectName(object_index, object_name.into_owned()));
+			message_bus.emit(EditorWorldEditCmd::SetObjectName(object_id, object_name.into_owned()));
 		}
 	});
 
@@ -264,7 +264,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 			let mut target_world = Cow::from(target_world);
 			if ui.text_edit_singleline(&mut target_world).changed() {
 				let new_target_world = target_world.into_owned();
-				message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+				message_bus.emit(EditorWorldEditCmd::edit_object(object_id, move |_, object| {
 					if let ObjectInfo::Ladder{target_world, ..} = &mut object.info {
 						*target_world = new_target_world;
 					}
@@ -274,7 +274,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 			let mut target_object = Cow::from(target_object);
 			if ui.text_edit_singleline(&mut target_object).changed() {
 				let new_target_object = target_object.into_owned();
-				message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+				message_bus.emit(EditorWorldEditCmd::edit_object(object_id, move |_, object| {
 					if let ObjectInfo::Ladder{target_object, ..} = &mut object.info {
 						*target_object = new_target_object;
 					}
@@ -290,7 +290,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 
 				let mut light_color = color;
 				if ui.color_edit_button_rgb(light_color.as_mut()).changed() {
-					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+					message_bus.emit(EditorWorldEditCmd::edit_object(object_id, move |_, object| {
 						if let Some(LightObject{color, ..}) = object.as_light_mut() {
 							*color = light_color;
 						}
@@ -303,7 +303,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 
 				let mut new_height = height;
 				if ui.add(Slider::new(&mut new_height, 0.0..=5.0).step_by(0.01)).changed() {
-					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+					message_bus.emit(EditorWorldEditCmd::edit_object(object_id, move |_, object| {
 						if let Some(LightObject{height, ..}) = object.as_light_mut() {
 							*height = new_height;
 						}
@@ -316,7 +316,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 
 				let mut new_radius = radius;
 				if ui.add(Slider::new(&mut new_radius, 0.1..=20.0).logarithmic(false)).changed() {
-					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+					message_bus.emit(EditorWorldEditCmd::edit_object(object_id, move |_, object| {
 						if let Some(LightObject{radius, ..}) = object.as_light_mut() {
 							*radius = new_radius;
 						}
@@ -329,7 +329,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 
 				let mut new_power = power;
 				if ui.add(Slider::new(&mut new_power, 0.1..=100.0).step_by(0.01).logarithmic(true)).changed() {
-					message_bus.emit(EditorWorldEditCmd::edit_object(object_index, move |_, object| {
+					message_bus.emit(EditorWorldEditCmd::edit_object(object_id, move |_, object| {
 						if let Some(LightObject{power, ..}) = object.as_light_mut() {
 							*power = new_power;
 						}

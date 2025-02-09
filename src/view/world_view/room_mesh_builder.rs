@@ -21,7 +21,6 @@ pub struct RoomLight {
 }
 
 pub struct RoomMeshBuilder<'w> {
-	world: &'w World,
 	processed_world: &'w ProcessedWorld,
 	vertices: Vec<RoomVertex>,
 	indices: Vec<u32>,
@@ -32,9 +31,8 @@ pub struct RoomMeshBuilder<'w> {
 }
 
 impl<'w> RoomMeshBuilder<'w> {
-	pub fn new(world: &'w World, processed_world: &'w ProcessedWorld) -> Self {
+	pub fn new(processed_world: &'w ProcessedWorld) -> Self {
 		RoomMeshBuilder {
-			world,
 			processed_world,
 			vertices: Vec::new(),
 			indices: Vec::new(),
@@ -122,7 +120,7 @@ impl RoomMeshBuilder<'_> {
 		let base_light = self.lights.len() as u32;
 
 		self.set_texture_index(0);
-		for object in self.processed_world.objects_in_room(room_id, self.world) {
+		for object in self.processed_world.objects_in_room(room_id) {
 			self.build_object(object);
 		}
 
@@ -160,7 +158,7 @@ impl RoomMeshBuilder<'_> {
 
 			while let Some(entry) = room_queue.pop() {
 				// TODO(pat.m): recurse into all rooms touched by light
-				for object in self.processed_world.objects_in_room(entry.room_id, self.world) {
+				for object in self.processed_world.objects_in_room(entry.room_id) {
 					let Some(light) = object.as_light() else { continue };
 
 					// TODO(pat.m): range check

@@ -16,15 +16,17 @@ pub use interactions::*;
 pub use environment::*;
 pub use processed_world::*;
 
+/// Runtime Immutable - loaded from resources, edited by editor
 #[derive(Debug)]
-pub struct Model {
-	// Immutable - loaded from resources, edited by editor
+pub struct SourceModel {
 	pub world: World,
 	// TODO(pat.m): item info
 	// TODO(pat.m): any dialogue stuff
+}
 
+#[derive(Debug)]
+pub struct Model {
 	// Mutable - save game state
-
 	pub player: Player,
 
 	// TODO(pat.m): active effects/stats/equipment

@@ -147,8 +147,7 @@ impl<'c> Viewport<'c> {
 		let mut tracked_location = None;
 
 		if context.state.track_player {
-			let player_src_placement = context.model.processed_world.to_source_placement(context.model.player.placement);
-			tracked_location = Some(player_src_placement.location());
+			tracked_location = Some(context.source_player_placement.location());
 		}
 
 		let viewport_metrics = ViewportMetrics::new(response.rect, &viewport_state);
@@ -165,7 +164,7 @@ impl<'c> Viewport<'c> {
 			tracked_location,
 
 			world: &context.model.world,
-			processed_world: &context.model.processed_world,
+			processed_world: &context.runtime_model.processed_world,
 			message_bus: context.message_bus,
 
 			items: Vec::new(),

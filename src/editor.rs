@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use model::{Model, VertexId, WallId, RoomId};
+use model::{SourceModel, Placement, ObjectId, VertexId, WallId, RoomId};
 
 mod viewport;
 use viewport::{Viewport, ViewportItemFlags};
@@ -27,7 +27,7 @@ pub enum Item {
 	Room(RoomId),
 
 	PlayerSpawn,
-	Object(usize),
+	Object(ObjectId),
 }
 
 impl Item {
@@ -42,7 +42,7 @@ impl Item {
 			}
 			Item::Wall(wall_id) => geometry.walls[wall_id].room,
 			Item::PlayerSpawn => world.player_spawn.room_id,
-			Item::Object(object_index) => world.objects.get(object_index)
+			Item::Object(object_id) => world.objects.get(object_id)
 				.map(|obj| obj.placement.room_id)
 				.unwrap(),
 		}
@@ -97,11 +97,14 @@ impl State {
 
 struct Context<'w> {
 	state: &'w mut InnerState,
-	model: &'w model::Model,
+	model: &'w model::SourceModel,
+	runtime_model: &'w model::Model,
 	message_bus: &'w MessageBus,
+
+	source_player_placement: Placement,
 }
 
-fn validate_model(state: &mut State, model: &mut Model) {
+fn validate_model(state: &mut State, model: &mut SourceModel) {
 	let geometry = &model.world.geometry;
 	let first_room = geometry.first_room();
 
@@ -119,12 +122,12 @@ fn validate_model(state: &mut State, model: &mut Model) {
 }
 
 
-fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
+fn validate_item(model: &SourceModel, maybe_item: &mut Option<Item>) {
 	let geometry = &model.world.geometry;
-	let num_objects = model.world.objects.len();
+	let objects = &model.world.objects;
 
 	match maybe_item {
-		&mut Some(Item::Object(object_index)) if object_index >= num_objects => {
+		&mut Some(Item::Object(object_id)) if !objects.contains_key(object_id) => {
 			*maybe_item = None;
 		}
 
@@ -146,7 +149,7 @@ fn validate_item(model: &Model, maybe_item: &mut Option<Item>) {
 
 
 
-pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::Model, message_bus: &MessageBus) {
+pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::SourceModel, runtime_model: &model::Model, message_bus: &MessageBus) {
 	// TODO(pat.m): modal world load/save flows
 	let modal_active = false;
 
@@ -165,8 +168,6 @@ pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::Model
 		});
 	}
 
-
-
 	if state.inner.focused_room_id.is_none() {
 		let first_room = model.world.geometry.first_room();
 		state.inner.focused_room_id = Some(first_room);
@@ -179,7 +180,10 @@ pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::Model
 	let mut context = Context {
 		state: &mut state.inner,
 		model,
+		runtime_model,
 		message_bus,
+
+		source_player_placement: runtime_model.processed_world.to_source_placement(runtime_model.player.placement),
 	};
 
 	egui::SidePanel::right("Inspector")

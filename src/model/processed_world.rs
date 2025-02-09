@@ -5,6 +5,10 @@ use slotmap::SecondaryMap;
 
 #[derive(Debug)]
 pub struct ProcessedWorld {
+	// Copied from source World for now
+	pub objects: SlotMap<ObjectId, Object>,
+	pub fog: FogParameters,
+
 	wall_infos: SecondaryMap<WallId, WallInfo>,
 	room_infos: SecondaryMap<RoomId, RoomInfo>,
 
@@ -18,6 +22,9 @@ pub struct ProcessedWorld {
 impl ProcessedWorld {
 	pub fn new(world: &World, message_bus: &MessageBus) -> Self {
 		let mut this = Self {
+			objects: SlotMap::with_key(),
+			fog: FogParameters::default(),
+
 			wall_infos: SecondaryMap::new(),
 			room_infos: SecondaryMap::new(),
 
@@ -65,18 +72,18 @@ impl ProcessedWorld {
 			.filter_map(move |&wall_id| self.connection_info(wall_id))
 	}
 
-	pub fn object_indices_for_room(&self, room_id: RoomId) -> impl Iterator<Item=usize> + use<'_> {
-		let object_indices = match self.room_info(room_id) {
-			Some(info) => info.object_indices.as_slice(),
+	pub fn object_ids_for_room(&self, room_id: RoomId) -> impl Iterator<Item=ObjectId> + use<'_> {
+		let object_ids = match self.room_info(room_id) {
+			Some(info) => info.object_ids.as_slice(),
 			None => &[]
 		};
 
-		object_indices.iter().cloned()
+		object_ids.iter().cloned()
 	}
 
-	pub fn objects_in_room<'w, 's>(&'s self, room_id: RoomId, world: &'w World) -> impl Iterator<Item=&'w Object> + use<'s, 'w> {
-		self.object_indices_for_room(room_id)
-			.map(move |idx| &world.objects[idx])
+	pub fn objects_in_room(&self, room_id: RoomId) -> impl Iterator<Item=&'_ Object> + use<'_> {
+		self.object_ids_for_room(room_id)
+			.map(move |idx| &self.objects[idx])
 	}
 
 	pub fn to_source_placement(&self, processed_placement: Placement) -> Placement {
@@ -129,6 +136,18 @@ impl ProcessedWorld {
 		self.geometry = new_geometry;
 		invert_processed_to_source_room_map(&mut self.source_to_processed_rooms, &self.processed_to_source_rooms);
 
+		self.fog = world.fog.clone();
+		self.objects = world.objects.clone();
+
+		// Map objects into the right rooms
+		for object in self.objects.values_mut() {
+			object.placement.room_id = self.processed_to_source_rooms.get(object.placement.room_id)
+				.cloned()
+				.unwrap_or(object.placement.room_id);
+		}
+
+		// TODO(pat.m): objects _could_ be stored in rooms themselves.
+
 		for room_id in self.geometry.rooms.keys() {
 			let mut connecting_walls = Vec::new();
 
@@ -154,13 +173,13 @@ impl ProcessedWorld {
 			}
 
 			// Collect objects
-			let object_indices = world.objects.iter().enumerate()
+			let object_ids = self.objects.iter()
 				.filter(|(_, o)| o.placement.room_id == room_id)
-				.map(|(index, _)| index)
+				.map(|(id, _)| id)
 				.collect();
 
 			self.room_infos.insert(room_id, RoomInfo {
-				object_indices,
+				object_ids,
 				connecting_walls,
 			});
 		}
@@ -263,7 +282,7 @@ impl ConnectionInfo {
 
 #[derive(Default, Debug)]
 pub struct RoomInfo {
-	pub object_indices: Vec<usize>,
+	pub object_ids: Vec<ObjectId>,
 	pub connecting_walls: Vec<WallId>,
 }
 
@@ -414,6 +433,46 @@ fn invert_processed_to_source_room_map(
 	}
 }
 
+
+// TODO(pat.m): would be good to move some of the below into a higher level model that can cache transforms, since
+// transforms between connected rooms will always be the same.
+
+fn calculate_portal_transform(geometry: &WorldGeometry, from: WallId, to: WallId) -> Mat2x3 {
+	let from_wall = &geometry.walls[from];
+	let to_wall = &geometry.walls[to];
+
+	let (from_wall_start, from_wall_end) = geometry.wall_vertices(from);
+	let (to_wall_start, to_wall_end) = geometry.wall_vertices(to);
+
+	let from_wall_length = (from_wall_end - from_wall_start).length();
+	let to_wall_length = (to_wall_end - to_wall_start).length();
+
+	let from_wall_dir = (from_wall_end - from_wall_start) / from_wall_length;
+	let to_wall_dir = (to_wall_end - to_wall_start) / to_wall_length;
+
+
+	let aperture_extent = from_wall_length.min(to_wall_length) / 2.0;
+
+	let from_wall_offset = from_wall.horizontal_offset.clamp(aperture_extent-from_wall_length/2.0, from_wall_length/2.0-aperture_extent);
+	let to_wall_offset = to_wall.horizontal_offset.clamp(aperture_extent-to_wall_length/2.0, to_wall_length/2.0-aperture_extent);
+
+
+	let s = from_wall_dir.wedge(-to_wall_dir);
+	let c = from_wall_dir.dot(-to_wall_dir);
+	let new_x = Vec2::new(c, -s);
+	let new_y = Vec2::new(s, c);
+
+	let from_wall_center = (from_wall_start + from_wall_end) / 2.0 + from_wall_dir * from_wall_offset;
+	let to_wall_center = (to_wall_start + to_wall_end) / 2.0 + to_wall_dir * to_wall_offset;
+	let rotated_to_wall_center = to_wall_center.x * new_x + to_wall_center.y * new_y;
+	let translation = from_wall_center - rotated_to_wall_center;
+
+	Mat2x3::from_columns([
+		new_x,
+		new_y,
+		translation,
+	])
+}
 
 #[test]
 fn split_concave_rooms_noop_for_simple_geometry() {

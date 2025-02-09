@@ -61,7 +61,7 @@ impl HudView {
 		}
 
 
-		if let Some(object) = model.interactions.hovered_object.and_then(|idx| model.world.objects.get(idx)) {
+		if let Some(object) = model.interactions.hovered_object.and_then(|id| model.processed_world.objects.get(id)) {
 			let interact_message = match &object.info {
 				ObjectInfo::Ladder { target_world, .. } => format!("To {target_world}"),
 				_ => format!("Frob '{}'", object.name),
