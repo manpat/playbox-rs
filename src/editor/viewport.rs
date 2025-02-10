@@ -546,16 +546,6 @@ impl Viewport<'_> {
 				}
 
 				Item::Room(room_id) => {
-					if ui.button("Duplicate").clicked() {
-						self.message_bus.emit(EditorWorldEditCmd::AddRoom {
-							room: self.world.geometry.rooms[room_id].clone(),
-							connection: None,
-						});
-						ui.close_menu();
-					}
-
-					ui.separator();
-
 					if ui.button("Disconnect All").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_id));
 						ui.close_menu();

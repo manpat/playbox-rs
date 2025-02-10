@@ -25,12 +25,6 @@ pub enum EditorWorldEditCmd {
 
 	SetFogParams(FogParameters),
 
-
-	AddRoom {
-		room: RoomDef,
-		connection: Option<(WallId, WallId)>,
-	},
-
 	RemoveRoom(RoomId),
 	DisconnectRoom(RoomId),
 
@@ -279,78 +273,35 @@ fn handle_world_edit_cmd(_state: &mut InnerState, transaction: &mut Transaction<
 			transaction.submit();
 		}
 
-		EditorWorldEditCmd::AddRoom { room, connection } => {
-			anyhow::bail!("Not implemented");
-
-			// if let Some((_, target_wall_id)) = connection {
-			// 	transaction.describe(format!("Add Room from {target_wall_id:?}"));
-			// } else {
-			// 	transaction.describe("Add Room");
-			// }
-
-			// transaction.update_world(|_, world| {
-			// 	world.rooms.push(room);
-			// 	Ok(())
-			// })?;
-
-			// if let Some((source_wall_index, target_wall_id)) = connection {
-			// 	transaction.update_connections(|model, connections| {
-			// 		let new_room_index = model.world.rooms.len();
-
-			// 		// Disconnect target wall
-			// 		connections.retain(|&(wall_a, wall_b)| {
-			// 			wall_a != target_wall_id && wall_b != target_wall_id
-			// 		});
-
-			// 		let source_wall_id = WallId {
-			// 			room_index: new_room_index,
-			// 			wall_index: source_wall_index,
-			// 		};
-
-			// 		// Create new connection
-			// 		connections.push((source_wall_id, target_wall_id));
-
-			// 		Ok(())
-			// 	})?;
-			// }
-
-			// transaction.submit();
-		}
-
 		EditorWorldEditCmd::RemoveRoom(room_id) => {
-			anyhow::bail!("Not implemented");
-			// if transaction.model().world.rooms.len() == 1 {
-			// 	anyhow::bail!("Can't delete last room in world")
-			// }
+			if transaction.model().world.geometry.rooms.len() == 1 {
+				anyhow::bail!("Can't delete last room in world")
+			}
 
-			// if transaction.model().player.placement.room_id == room_id {
-			// 	anyhow::bail!("Can't delete room containing player");
-			// }
+			transaction.describe(format!("Remove {room_id:?}"));
+			transaction.update_geometry(|model, geometry| {
+				anyhow::ensure!(room_id.is_valid(geometry));
 
-			// transaction.describe(format!("Remove Room #{room_id}"));
+				let old_geometry = &model.world.geometry;
 
-			// transaction.update_world(|_, world| {
-			// 	// TODO(pat.m): maybe find a way to do this that _doesn't_ involve touching every Location in the model
+				for wall_id in old_geometry.room_walls(room_id) {
+					if let Some(wall) = wall_id.connected_wall(old_geometry)
+						.and_then(|wall_id| wall_id.try_get_mut(geometry))
+					{
+						wall.connected_wall = None;
+					}
 
-			// 	// Clear or adjust selection
-			// 	if let Some(selected_item) = &mut state.selection {
-			// 		// TODO(pat.m): this doesn't really make sense for player spawn
-			// 		let selected_room_id = selected_item.room_id(&world);
+					// TODO(pat.m): assert that vertex is unique
 
-			// 		if selected_room_id == room_id {
-			// 			state.selection = None;
-			// 		}
-			// 	}
+					geometry.vertices.remove(wall_id.vertex(old_geometry));
+					geometry.walls.remove(wall_id);
+				}
 
-			// 	// Actually remove room
-			// 	world.geometry.rooms.remove(room_id);
+				geometry.rooms.remove(room_id);
 
-			// 	todo!("Remove walls and vertices");
-
-			// 	Ok(())
-			// })?;
-
-			// transaction.submit();
+				Ok(())
+			})?;
+			transaction.submit();
 		}
 
 		EditorWorldEditCmd::DisconnectRoom(room_id) => {

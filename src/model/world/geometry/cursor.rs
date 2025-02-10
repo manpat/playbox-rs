@@ -15,6 +15,14 @@ impl RoomId {
 		&mut geometry.rooms[*self]
 	}
 
+	pub fn try_get<'g>(&self, geometry: &'g WorldGeometry) -> Option<&'g RoomDef> {
+		geometry.rooms.get(*self)
+	}
+
+	pub fn try_get_mut<'g>(&self, geometry: &'g mut WorldGeometry) -> Option<&'g mut RoomDef> {
+		geometry.rooms.get_mut(*self)
+	}
+
 	pub fn first_wall(&self, geometry: &WorldGeometry) -> WallId {
 		self.get(geometry).first_wall
 	}
@@ -32,6 +40,14 @@ impl WallId {
 
 	pub fn get_mut<'g>(&self, geometry: &'g mut WorldGeometry) -> &'g mut WallDef {
 		&mut geometry.walls[*self]
+	}
+
+	pub fn try_get<'g>(&self, geometry: &'g WorldGeometry) -> Option<&'g WallDef> {
+		geometry.walls.get(*self)
+	}
+
+	pub fn try_get_mut<'g>(&self, geometry: &'g mut WorldGeometry) -> Option<&'g mut WallDef> {
+		geometry.walls.get_mut(*self)
 	}
 
 	pub fn vertex(&self, geometry: &WorldGeometry) -> VertexId {
@@ -76,6 +92,14 @@ impl VertexId {
 
 	pub fn get_mut<'g>(&self, geometry: &'g mut WorldGeometry) -> &'g mut VertexDef {
 		&mut geometry.vertices[*self]
+	}
+
+	pub fn try_get<'g>(&self, geometry: &'g WorldGeometry) -> Option<&'g VertexDef> {
+		geometry.vertices.get(*self)
+	}
+
+	pub fn try_get_mut<'g>(&self, geometry: &'g mut WorldGeometry) -> Option<&'g mut VertexDef> {
+		geometry.vertices.get_mut(*self)
 	}
 
 	pub fn position(&self, geometry: &WorldGeometry) -> Vec2 {
