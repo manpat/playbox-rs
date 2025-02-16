@@ -96,9 +96,9 @@ impl RoomMeshBuilder<'_> {
 		let up = Vec3::from_y(room.height);
 
 		let forward_vertices = geometry.room_walls(room_id)
-			.map(|id| geometry.vertices[geometry.walls[id].source_vertex].position);
+			.map(|id| id.vertex(geometry).position(geometry));
 		let backward_vertices = geometry.room_walls(room_id).rev()
-			.map(|id| geometry.vertices[geometry.walls[id].source_vertex].position);
+			.map(|id| id.vertex(geometry).position(geometry));
 
 		// ASSUME: rooms are always convex
 		let floor_verts = forward_vertices.clone().map(|v| v.to_x0y());
@@ -198,6 +198,32 @@ impl RoomMeshBuilder<'_> {
 		}
 	}
 
+	pub fn add_vertical_quad(&mut self, start: Vec2, end: Vec2, bottom: f32, top: f32, color: Color, u_offset: f32) {
+		let start_3d = start.to_x0y();
+		let end_3d = end.to_x0y();
+
+		let length = (start - end).length();
+		let bottom_3d = Vec3::from_y(bottom);
+		let top_3d = Vec3::from_y(top);
+
+		let verts = [
+			start_3d + bottom_3d,
+			start_3d + top_3d,
+			end_3d + top_3d,
+			end_3d + bottom_3d,
+		];
+
+		// TODO(pat.m): ??
+		let uvs = [
+			Vec2::new(u_offset, bottom),
+			Vec2::new(u_offset, top),
+			Vec2::new(u_offset + length, top),
+			Vec2::new(u_offset + length, bottom),
+		];
+
+		self.add_convex(verts, uvs, color);
+	}
+
 	pub fn build_wall(&mut self, wall_id: WallId) {
 		let geometry = self.processed_world.geometry();
 
@@ -208,116 +234,28 @@ impl RoomMeshBuilder<'_> {
 		self.set_texture_index(1);
 
 		let (start_vertex, end_vertex) = geometry.wall_vertices(wall_id);
-
-		let length = (start_vertex - end_vertex).length();
-		let start_vertex_3d = start_vertex.to_x0y();
-		let end_vertex_3d = end_vertex.to_x0y();
-
-		let up = Vec3::from_y(room.height);
-
 		let Some(connection_info) = self.processed_world.connection_info(wall_id) else {
-			let verts = [
-				start_vertex_3d,
-				start_vertex_3d + up,
-				end_vertex_3d + up,
-				end_vertex_3d,
-			];
-
-			let uvs = [
-				Vec2::new(0.0, 0.0),
-				Vec2::new(0.0, room.height),
-				Vec2::new(length, room.height),
-				Vec2::new(length, 0.0),
-			];
-
-			self.add_convex(verts, uvs, wall.color);
-
+			self.add_vertical_quad(start_vertex, end_vertex, 0.0, room.height, wall.color, 0.0);
 			return
 		};
 
 		let opposing_room = &geometry.rooms[connection_info.target_room];
 
-		let left_length = (start_vertex - connection_info.aperture_start).length();
-		let right_length = (end_vertex - connection_info.aperture_end).length();
-
-		let right_uv_start = length - right_length;
-
-		let left_vertex_3d = connection_info.aperture_start.to_x0y();
-		let right_vertex_3d = connection_info.aperture_end.to_x0y();
+		let left_uv_start = (start_vertex - connection_info.aperture_start).length();
+		let right_uv_start = (start_vertex - connection_info.aperture_end).length();
 
 		// Add left and right room height quads
-		let verts = [
-			start_vertex_3d,
-			start_vertex_3d + up,
-			left_vertex_3d + up,
-			left_vertex_3d,
-		];
-
-		let uvs = [
-			Vec2::new(0.0, 0.0),
-			Vec2::new(0.0, room.height),
-			Vec2::new(left_length, room.height),
-			Vec2::new(left_length, 0.0),
-		];
-
-		self.add_convex(verts, uvs, wall.color);
-
-		let verts = [
-			right_vertex_3d,
-			right_vertex_3d + up,
-			end_vertex_3d + up,
-			end_vertex_3d,
-		];
-
-		let uvs = [
-			Vec2::new(right_uv_start, 0.0),
-			Vec2::new(right_uv_start, room.height),
-			Vec2::new(length, room.height),
-			Vec2::new(length, 0.0),
-		];
-
-		self.add_convex(verts, uvs, wall.color);
+		self.add_vertical_quad(start_vertex, connection_info.aperture_start, 0.0, room.height, wall.color, 0.0);
+		self.add_vertical_quad(connection_info.aperture_end, end_vertex, 0.0, room.height, wall.color, right_uv_start);
 
 		// Add quads above and below the aperture
 		if connection_info.height_difference > 0.0 {
-			let aperture_bottom = Vec3::from_y(connection_info.height_difference);
-
-			let verts = [
-				left_vertex_3d,
-				left_vertex_3d + aperture_bottom,
-				right_vertex_3d + aperture_bottom,
-				right_vertex_3d,
-			];
-
-			let uvs = [
-				Vec2::new(left_length, 0.0),
-				Vec2::new(left_length, aperture_bottom.y),
-				Vec2::new(right_uv_start, aperture_bottom.y),
-				Vec2::new(right_uv_start, 0.0),
-			];
-
-			self.add_convex(verts, uvs, wall.color);
+			self.add_vertical_quad(connection_info.aperture_start, connection_info.aperture_end, 0.0, connection_info.height_difference, wall.color, left_uv_start);
 		}
 
 		if connection_info.height_difference + opposing_room.height < room.height {
 			let aperture_top = connection_info.height_difference + opposing_room.height;
-			let aperture_top = Vec3::from_y(aperture_top);
-
-			let verts = [
-				left_vertex_3d + aperture_top,
-				left_vertex_3d + up,
-				right_vertex_3d + up,
-				right_vertex_3d + aperture_top,
-			];
-
-			let uvs = [
-				Vec2::new(left_length, aperture_top.y),
-				Vec2::new(left_length, room.height),
-				Vec2::new(right_uv_start, room.height),
-				Vec2::new(right_uv_start, aperture_top.y),
-			];
-
-			self.add_convex(verts, uvs, wall.color);
+			self.add_vertical_quad(connection_info.aperture_start, connection_info.aperture_end, aperture_top, room.height, wall.color, left_uv_start);
 		}
 	}
 
