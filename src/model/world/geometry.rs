@@ -166,6 +166,7 @@ impl WorldGeometry {
 		}
 	}
 
+	// TODO(pat.m): only works for convex rooms.
 	pub fn room_contains_point(&self, room_id: RoomId, point: Vec2) -> bool {
 		for wall in self.room_walls(room_id) {
 			let (start, end) = self.wall_vertices(wall);

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use model::*;
 
+use super::room_renderer::RoomVertex;
 
 pub struct RoomMeshInfo {
 	pub base_vertex: u32,
@@ -86,6 +87,34 @@ impl RoomMeshBuilder<'_> {
 		self.add_convex_textured(vs, std::iter::repeat(Vec2::zero()), color, 0);
 	}
 
+	fn add_vertical_quad(&mut self, start: Vec2, end: Vec2, bottom: f32, top: f32, color: Color, u_offset: f32) {
+		let start_3d = start.to_x0y();
+		let end_3d = end.to_x0y();
+
+		let length = (start - end).length();
+		let bottom_3d = Vec3::from_y(bottom);
+		let top_3d = Vec3::from_y(top);
+
+		let verts = [
+			start_3d + bottom_3d,
+			start_3d + top_3d,
+			end_3d + top_3d,
+			end_3d + bottom_3d,
+		];
+
+		// TODO(pat.m): ??
+		let uvs = [
+			Vec2::new(u_offset, bottom),
+			Vec2::new(u_offset, top),
+			Vec2::new(u_offset + length, top),
+			Vec2::new(u_offset + length, bottom),
+		];
+
+		self.add_convex(verts, uvs, color);
+	}
+}
+
+impl RoomMeshBuilder<'_> {
 	pub fn build_room(&mut self, room_id: RoomId) -> RoomMeshInfo {
 		self.base_vertex = self.vertices.len() as u32;
 		let base_index = self.indices.len() as u32;
@@ -198,32 +227,6 @@ impl RoomMeshBuilder<'_> {
 		}
 	}
 
-	pub fn add_vertical_quad(&mut self, start: Vec2, end: Vec2, bottom: f32, top: f32, color: Color, u_offset: f32) {
-		let start_3d = start.to_x0y();
-		let end_3d = end.to_x0y();
-
-		let length = (start - end).length();
-		let bottom_3d = Vec3::from_y(bottom);
-		let top_3d = Vec3::from_y(top);
-
-		let verts = [
-			start_3d + bottom_3d,
-			start_3d + top_3d,
-			end_3d + top_3d,
-			end_3d + bottom_3d,
-		];
-
-		// TODO(pat.m): ??
-		let uvs = [
-			Vec2::new(u_offset, bottom),
-			Vec2::new(u_offset, top),
-			Vec2::new(u_offset + length, top),
-			Vec2::new(u_offset + length, bottom),
-		];
-
-		self.add_convex(verts, uvs, color);
-	}
-
 	pub fn build_wall(&mut self, wall_id: WallId) {
 		let geometry = self.processed_world.geometry();
 
@@ -317,45 +320,3 @@ impl RoomMeshBuilder<'_> {
 }
 
 
-
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C)]
-pub struct RoomVertex {
-	pub pos: Vec3,
-	pub uv_packed: [i16; 2],
-	pub color_packed: [u16; 4],
-	pub texture_index: u32,
-
-	pub _padding: [u32; 1],
-}
-
-pub const PIXEL_DENSITY: f32 = 128.0;
-
-impl RoomVertex {
-	pub fn new(pos: Vec3, uv: Vec2, color: impl Into<Color>, texture_index: u32) -> RoomVertex {
-		let [u, v] = (uv*8.0 * PIXEL_DENSITY).to_vec2i().into();
-		let [r, g, b, a] = color.into().to_array();
-
-		RoomVertex {
-			pos,
-			uv_packed: [u as i16, v as i16],
-
-			color_packed: [
-				unorm_to_u16(r),
-				unorm_to_u16(g),
-				unorm_to_u16(b),
-				unorm_to_u16(a),
-			],
-
-			texture_index,
-
-			_padding: Default::default(),
-		}
-	}
-}
-
-fn unorm_to_u16(o: f32) -> u16 {
-	let umax_f = u16::MAX as f32;
-	(o * umax_f).clamp(0.0, umax_f) as u16
-}

@@ -1,7 +1,8 @@
 use crate::prelude::*;
 use model::*;
 
-use slotmap::SecondaryMap;
+mod room_renderer;
+use room_renderer::*;
 
 mod room_mesh_builder;
 use room_mesh_builder::*;
@@ -15,14 +16,7 @@ const MAX_VISIBILITY_RECURSION_DEPTH: i32 = 50;
 
 
 pub struct WorldView {
-	room_mesh_infos: SecondaryMap<RoomId, RoomMeshInfo>,
-	vbo: gfx::BufferName,
-	ebo: gfx::BufferName,
-	light_buffer: gfx::BufferName,
-
-	v_shader: gfx::ShaderHandle,
-	f_shader: gfx::ShaderHandle,
-	texture: gfx::ImageHandle,
+	room_renderer: RoomRenderer,
 
 	// Every visible instance of each room
 	visible_rooms: Vec<RoomInstance>,
@@ -33,32 +27,8 @@ pub struct WorldView {
 
 impl WorldView {
 	pub fn new(gfx: &mut gfx::System, processed_world: &ProcessedWorld, message_bus: MessageBus) -> anyhow::Result<Self> {
-		let vbo = gfx.core.create_buffer();
-		let ebo = gfx.core.create_buffer();
-		let light_buffer = gfx.core.create_buffer();
-
-		gfx.core.set_debug_label(vbo, "Room vertex buffer");
-		gfx.core.set_debug_label(ebo, "Room index buffer");
-		gfx.core.set_debug_label(light_buffer, "Room light buffer");
-
-		let room_mesh_infos = build_room_buffers(gfx, processed_world, vbo, ebo, light_buffer);
-
 		Ok(Self {
-			room_mesh_infos,
-			vbo, ebo,
-			light_buffer,
-
-			v_shader: gfx.resource_manager.load_vertex_shader("shaders/room.vs.glsl"),
-			f_shader: gfx.resource_manager.load_fragment_shader("shaders/room.fs.glsl"),
-			texture: gfx.resource_manager.load_image_array("World Textures", &[
-				"images/dumb-brick.png",
-				"images/dumb-brick2.png",
-				"images/dumb-tile.png",
-				// "images/coolcat.png",
-				// "images/coolcat.png",
-				// "images/coolcat.png",
-				// "images/coolcat.png",
-			]),
+			room_renderer: RoomRenderer::new(gfx, processed_world)?,
 			visible_rooms: Vec::new(),
 
 			change_subscription: message_bus.subscribe(),
@@ -75,30 +45,15 @@ impl WorldView {
 		// 	using wall intersection to calculate a frustum to cull by
 
 		if self.message_bus.any(&self.change_subscription) {
-			gfx.core.destroy_buffer(self.vbo);
-			gfx.core.destroy_buffer(self.ebo);
-			gfx.core.destroy_buffer(self.light_buffer);
-
-			self.vbo = gfx.core.create_buffer();
-			self.ebo = gfx.core.create_buffer();
-			self.light_buffer = gfx.core.create_buffer();
-
-			gfx.core.set_debug_label(self.vbo, "Room vertex buffer");
-			gfx.core.set_debug_label(self.ebo, "Room index buffer");
-			gfx.core.set_debug_label(self.light_buffer, "Room light buffer");
-
-			self.room_mesh_infos = build_room_buffers(gfx, processed_world, self.vbo, self.ebo, self.light_buffer);
+			self.room_renderer.rebuild(gfx, processed_world);
 		}
 
 		self.build_visibility_graph(processed_world, viewer_placement);
 
 		// Draw
-		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
+		// let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
 
 		for &RoomInstance{room_id, room_to_world, clip_by, height_offset} in self.visible_rooms.iter() {
-			let room_mesh = &self.room_mesh_infos[room_id];
-			let index_size = std::mem::size_of::<u32>() as u32;
-
 			let [x,z,w] = room_to_world.columns();
 			let transform = Mat3x4::from_columns([
 				x.to_x0y(),
@@ -107,16 +62,7 @@ impl WorldView {
 				w.to_x0y() + Vec3::from_y(height_offset)
 			]);
 
-			#[derive(Copy, Clone)]
-			#[repr(C)]
-			struct RoomUniforms {
-				transform: Mat3x4,
-				plane_0: Vec4,
-				plane_1: Vec4,
-				plane_2: Vec4,
-			}
-
-			let (plane_0, plane_1, plane_2) = match clip_by {
+			let planes = match clip_by {
 				Some(ClipState{left_aperture, right_aperture, local_viewer_position, aperture_plane, ..}) => {
 					let pos_to_left = left_aperture - local_viewer_position;
 					let pos_to_right = right_aperture - local_viewer_position;
@@ -133,29 +79,13 @@ impl WorldView {
 					let [x, y, w] = aperture_plane.into();
 					let plane_2 = Vec4::new(x, 0.0, y, w);
 
-					(plane_0, plane_1, plane_2)
+					[plane_0, plane_1, plane_2]
 				}
 
-				None => (Vec4::from_w(-1.0), Vec4::from_w(-1.0), Vec4::from_w(-1.0)),
+				None => [Vec4::from_w(-1.0), Vec4::from_w(-1.0), Vec4::from_w(-1.0)],
 			};
 
-			group.draw(self.v_shader, self.f_shader)
-				.elements(room_mesh.num_elements)
-				.indexed(self.ebo.with_offset_size(
-					room_mesh.base_index * index_size,
-					room_mesh.num_elements * index_size
-				))
-				.base_vertex(room_mesh.base_vertex)
-				.sampled_image(0, self.texture, gfx::CommonSampler::NearestRepeat)
-				.ssbo(0, self.vbo)
-				.ubo(1, &[RoomUniforms {
-					transform,
-					plane_0,
-					plane_1,
-					plane_2,
-				}])
-				.ssbo(2, &[room_mesh.base_light, room_mesh.num_lights])
-				.ssbo(3, self.light_buffer);
+			self.room_renderer.draw(&mut gfx.frame_encoder, room_id, transform, &planes)
 		}
 	}
 
@@ -307,21 +237,3 @@ struct RoomInstance {
 	clip_by: Option<ClipState>,
 }
 
-
-
-fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
-	vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) -> SecondaryMap<RoomId, RoomMeshInfo>
-{
-	let mut room_builder = RoomMeshBuilder::new(processed_world);
-
-	let mut room_mesh_infos = SecondaryMap::with_capacity(processed_world.geometry().rooms.len());
-
-	for room_id in processed_world.geometry().rooms.keys() {
-		let info = room_builder.build_room(room_id);
-		room_mesh_infos.insert(room_id, info);
-	}
-
-	room_builder.upload(gfx, vbo, ebo, light_buffer);
-
-	room_mesh_infos
-}
