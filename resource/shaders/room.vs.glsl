@@ -13,7 +13,7 @@ layout(binding=0) uniform P {
 };
 
 struct Instance {
-	mat4x3 transform;
+	mat4x4 transform;
 	vec4 plane_0;
 	vec4 plane_1;
 	vec4 plane_2;
@@ -23,23 +23,23 @@ layout(binding=0) readonly buffer V {
 	Vertex s_vertices[];
 };
 
-layout(binding=1) readonly buffer M {
+layout(binding=1, std430) readonly buffer M {
 	Instance s_instances[];
 };
 
 
 out OutVertex {
-	vec4 v_color;
-	vec2 v_uv;
-	vec3 v_local_pos;
-	flat uint v_texture_index;
+	layout(location=0) vec4 v_color;
+	layout(location=1) vec2 v_uv;
+	layout(location=2) vec3 v_local_pos;
+	layout(location=3) flat uint v_texture_index;
 };
 
 void main() {
 	Vertex vertex = s_vertices[gl_VertexID];
 	Instance instance = s_instances[gl_InstanceID];
 
-	vec3 world_pos = instance.transform * vec4(vertex.pos, 1.0);
+	vec3 world_pos = (instance.transform * vec4(vertex.pos, 1.0)).xyz;
 	gl_Position = u_projection_view * vec4(world_pos, 1.0);
 
 	gl_ClipDistance[0] = dot(instance.plane_0.xyz, vertex.pos) - instance.plane_0.w;

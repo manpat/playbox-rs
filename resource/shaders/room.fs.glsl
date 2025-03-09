@@ -1,9 +1,9 @@
 
 in Vertex {
-	vec4 v_color;
-	vec2 v_uv;
-	vec3 v_local_pos;
-	flat uint v_texture_index;
+	layout(location=0) vec4 v_color;
+	layout(location=1) vec2 v_uv;
+	layout(location=2) vec3 v_local_pos;
+	layout(location=3) flat uint v_texture_index;
 };
 
 out vec4 o_color;
