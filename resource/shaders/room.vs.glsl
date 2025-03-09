@@ -7,32 +7,31 @@ struct Vertex {
 	uint _padding;
 };
 
-
-layout(binding=0) uniform P {
-	mat4 u_projection_view;
-};
-
 struct Instance {
-	mat4x4 transform;
+	mat4x3 transform;
 	vec4 plane_0;
 	vec4 plane_1;
 	vec4 plane_2;
+};
+
+layout(binding=0) uniform P {
+	mat4 u_projection_view;
 };
 
 layout(binding=0) readonly buffer V {
 	Vertex s_vertices[];
 };
 
-layout(binding=1, std430) readonly buffer M {
+// HACK: nvidia seems to ignore the default matrix layout for nested structs on my laptop :(
+layout(binding=1, row_major) readonly buffer M {
 	Instance s_instances[];
 };
 
-
 out OutVertex {
-	layout(location=0) vec4 v_color;
-	layout(location=1) vec2 v_uv;
-	layout(location=2) vec3 v_local_pos;
-	layout(location=3) flat uint v_texture_index;
+	vec4 v_color;
+	vec2 v_uv;
+	vec3 v_local_pos;
+	flat uint v_texture_index;
 };
 
 void main() {

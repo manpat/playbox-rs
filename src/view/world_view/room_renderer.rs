@@ -73,7 +73,7 @@ impl RoomRenderer {
 			.or_default();
 
 		instance_list.push(RoomUniforms {
-			transform: transform.to_mat4(),
+			transform,
 			planes: planes.clone()
 		});
 	}
@@ -112,11 +112,10 @@ impl RoomRenderer {
 
 
 
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 struct RoomUniforms {
-	transform: Mat4,
+	transform: Mat3x4,
 	planes: [Vec4; 3],
 }
 
