@@ -6,6 +6,7 @@ use super::room_mesh_builder::*;
 
 pub struct RoomRenderer {
 	room_mesh_infos: slotmap::SecondaryMap<RoomId, RoomMeshInfo>,
+	instances: slotmap::SecondaryMap<RoomId, SmallVec<[RoomUniforms; 4]>>,
 
 	vbo: gfx::BufferName,
 	ebo: gfx::BufferName,
@@ -31,6 +32,8 @@ impl RoomRenderer {
 
 		Ok(RoomRenderer {
 			room_mesh_infos,
+			instances: Default::default(),
+
 			vbo, ebo,
 			light_buffer,
 
@@ -64,40 +67,58 @@ impl RoomRenderer {
 		self.room_mesh_infos = build_room_buffers(gfx, processed_world, self.vbo, self.ebo, self.light_buffer);
 	}
 
-	pub fn draw(&self, encoder: &mut gfx::FrameEncoder, room_id: RoomId, transform: Mat3x4, planes: &[Vec4; 3]) {
-		let mesh_info = &self.room_mesh_infos[room_id];
+	pub fn add_instance(&mut self, room_id: RoomId, transform: Mat3x4, planes: &[Vec4; 3]) {
+		let instance_list = self.instances.entry(room_id)
+			.unwrap()
+			.or_default();
+
+		instance_list.push(RoomUniforms {
+			transform,
+			planes: planes.clone()
+		});
+	}
+
+	pub fn reset(&mut self) {
+		self.instances.clear();
+	}
+
+	pub fn draw(&self, encoder: &mut gfx::FrameEncoder) {
 		let index_size = std::mem::size_of::<u32>() as u32;
 
 		let mut group = encoder.command_group(gfx::FrameStage::Main);
 
-		#[derive(Copy, Clone)]
-		#[repr(C)]
-		struct RoomUniforms {
-			transform: Mat3x4,
-			planes: [Vec4; 3],
-		}
+		for (room_id, instance_list) in self.instances.iter() {
+			let mesh_info = &self.room_mesh_infos[room_id];
 
-		group.draw(self.v_shader, self.f_shader)
-			.elements(mesh_info.num_elements)
-			.indexed(self.ebo.with_offset_size(
-				mesh_info.base_index * index_size,
-				mesh_info.num_elements * index_size
-			))
-			.base_vertex(mesh_info.base_vertex)
-			.sampled_image(0, self.texture, gfx::CommonSampler::NearestRepeat)
-			.ssbo(0, self.vbo)
-			.ubo(1, &[RoomUniforms {
-				transform,
-				planes: planes.clone(),
-			}])
-			.ssbo(2, &[mesh_info.base_light, mesh_info.num_lights])
-			.ssbo(3, self.light_buffer);
+			let instance_data_upload = group.upload(instance_list);
+
+			group.draw(self.v_shader, self.f_shader)
+				.elements(mesh_info.num_elements)
+				.instances(instance_list.len() as u32)
+				.indexed(self.ebo.with_offset_size(
+					mesh_info.base_index * index_size,
+					mesh_info.num_elements * index_size
+				))
+				.base_vertex(mesh_info.base_vertex)
+				.sampled_image(0, self.texture, gfx::CommonSampler::NearestRepeat)
+				.ssbo(0, self.vbo)
+				.ssbo(1, instance_data_upload)
+				.ssbo(2, &[mesh_info.base_light, mesh_info.num_lights])
+				.ssbo(3, self.light_buffer);
+		}
 	}
 }
 
 
 
 
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+struct RoomUniforms {
+	transform: Mat3x4,
+	planes: [Vec4; 3],
+}
 
 
 

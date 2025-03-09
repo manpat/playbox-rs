@@ -12,15 +12,19 @@ layout(binding=0) uniform P {
 	mat4 u_projection_view;
 };
 
-layout(binding=1) uniform M {
-	mat4x3 u_model;
-	vec4 u_plane_0;
-	vec4 u_plane_1;
-	vec4 u_plane_2;
+struct Instance {
+	mat4x3 transform;
+	vec4 plane_0;
+	vec4 plane_1;
+	vec4 plane_2;
 };
 
 layout(binding=0) readonly buffer V {
 	Vertex s_vertices[];
+};
+
+layout(binding=1) readonly buffer M {
+	Instance s_instances[];
 };
 
 
@@ -33,13 +37,14 @@ out OutVertex {
 
 void main() {
 	Vertex vertex = s_vertices[gl_VertexID];
+	Instance instance = s_instances[gl_InstanceID];
 
-	vec3 world_pos = u_model * vec4(vertex.pos, 1.0);
+	vec3 world_pos = instance.transform * vec4(vertex.pos, 1.0);
 	gl_Position = u_projection_view * vec4(world_pos, 1.0);
 
-	gl_ClipDistance[0] = dot(u_plane_0.xyz, vertex.pos) - u_plane_0.w;
-	gl_ClipDistance[1] = dot(u_plane_1.xyz, vertex.pos) - u_plane_1.w;
-	gl_ClipDistance[2] = dot(u_plane_2.xyz, vertex.pos) - u_plane_2.w;
+	gl_ClipDistance[0] = dot(instance.plane_0.xyz, vertex.pos) - instance.plane_0.w;
+	gl_ClipDistance[1] = dot(instance.plane_1.xyz, vertex.pos) - instance.plane_1.w;
+	gl_ClipDistance[2] = dot(instance.plane_2.xyz, vertex.pos) - instance.plane_2.w;
 	gl_ClipDistance[3] = 1.0;
 
 	v_local_pos = vertex.pos;

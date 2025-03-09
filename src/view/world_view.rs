@@ -44,6 +44,8 @@ impl WorldView {
 		// 	calculate transform between connected walls, and build that room,
 		// 	using wall intersection to calculate a frustum to cull by
 
+		self.room_renderer.reset();
+
 		if self.message_bus.any(&self.change_subscription) {
 			self.room_renderer.rebuild(gfx, processed_world);
 		}
@@ -51,8 +53,6 @@ impl WorldView {
 		self.build_visibility_graph(processed_world, viewer_placement);
 
 		// Draw
-		// let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
-
 		for &RoomInstance{room_id, room_to_world, clip_by, height_offset} in self.visible_rooms.iter() {
 			let [x,z,w] = room_to_world.columns();
 			let transform = Mat3x4::from_columns([
@@ -85,8 +85,10 @@ impl WorldView {
 				None => [Vec4::from_w(-1.0), Vec4::from_w(-1.0), Vec4::from_w(-1.0)],
 			};
 
-			self.room_renderer.draw(&mut gfx.frame_encoder, room_id, transform, &planes)
+			self.room_renderer.add_instance(room_id, transform, &planes)
 		}
+
+		self.room_renderer.draw(&mut gfx.frame_encoder);
 	}
 
 	#[instrument(skip_all, name="world_view build_visibility_graph")]
