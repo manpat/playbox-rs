@@ -247,6 +247,7 @@ fn draw_object_inspector(ui: &mut egui::Ui, Context{model, message_bus, ..}: &mu
 	};
 
 	ui.label(format!("{object_id:?} - \"{}\"", object.name));
+	ui.label(format!("{:?}", object.placement));
 
 	ui.horizontal(|ui| {
 		ui.label("Name");

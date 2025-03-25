@@ -199,6 +199,7 @@ pub struct WallInfo {
 
 #[derive(Debug)]
 pub struct ConnectionInfo {
+	pub source_wall: WallId,
 	pub target_wall: WallId,
 	pub target_room: RoomId,
 
@@ -260,6 +261,7 @@ impl ConnectionInfo {
 		};
 
 		ConnectionInfo {
+			source_wall: source_id,
 			target_wall: target_id,
 			target_room: target_wall.room,
 			target_to_source,

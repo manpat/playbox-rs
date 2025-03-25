@@ -663,10 +663,22 @@ impl Viewport<'_> {
 						true => 4.0,
 					};
 
+					let center = (start + end) / 2.0;
+
 					let start = self.viewport_metrics.world_to_widget_position(start);
 					let end = self.viewport_metrics.world_to_widget_position(end);
 
 					self.painter.line_segment([start, end], (stroke_thickness, color));
+
+					if let Some(Item::Wall(wall_id)) = item {
+						self.painter.text(
+							self.viewport_metrics.world_to_widget_position(center),
+							egui::Align2::CENTER_CENTER,
+							format!("{wall_id:?}"),
+							egui::FontId::proportional(12.0),
+							egui::Color32::GRAY
+						);
+					}
 				}
 
 				ViewportItemShape::PlayerIndicator(transform) => {

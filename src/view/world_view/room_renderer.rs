@@ -124,16 +124,110 @@ struct RoomUniforms {
 fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 	vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) -> slotmap::SecondaryMap<RoomId, RoomMeshInfo>
 {
+	use slotmap::SecondaryMap;
+
 	let mut room_builder = RoomMeshBuilder::new(processed_world);
 
-	let mut room_mesh_infos = slotmap::SecondaryMap::with_capacity(processed_world.geometry().rooms.len());
+	let mut room_mesh_infos = SecondaryMap::with_capacity(processed_world.geometry().rooms.len());
 
 	for room_id in processed_world.geometry().rooms.keys() {
 		let info = room_builder.build_room(room_id);
 		room_mesh_infos.insert(room_id, info);
 	}
 
-	room_builder.upload(gfx, vbo, ebo, light_buffer);
+	struct QueueEntry {
+		room_id: RoomId,
+		from_wall: WallId,
+		transform: Mat3x4,
+		depth: u32,
+	}
+
+	fn to_transform(target_to_source: Mat2x3, height_difference: f32) -> Mat3x4 {
+		let [x,z,w] = target_to_source.columns();
+		Mat3x4::from_columns([
+			x.to_x0y(),
+			Vec3::from_y(1.0),
+			z.to_x0y(),
+			w.to_x0y() + Vec3::from_y(height_difference)
+		])
+	}
+
+	let mut room_lights: SecondaryMap<_, Vec<RoomLight>> = SecondaryMap::with_capacity(processed_world.geometry().rooms.len());
+	let mut room_queue = SmallVec::<[QueueEntry; 16]>::new();
+
+	// Figure out which rooms touched by each light.
+	for object in processed_world.objects.values() {
+		let Some(light) = object.as_light() else { continue };
+
+		room_queue.clear();
+		room_queue.push(QueueEntry {
+			room_id: object.placement.room_id,
+			from_wall: WallId::default(), // this should always be invalid.
+			transform: Mat3x4::identity(),
+			depth: 3,
+		});
+
+		while let Some(room_entry) = room_queue.pop() {
+			let local_pos = room_entry.transform * object.placement.position.to_xny(light.height);
+
+			// Push light
+			{
+				let light_list = room_lights.entry(room_entry.room_id)
+					.unwrap().or_default();
+
+				light_list.push(RoomLight {
+					local_pos,
+					radius: light.radius,
+					color: light.color.into(),
+					power: light.power,
+				});
+			}
+
+			log::info!("[build] visited {:?}", room_entry.room_id);
+
+			// Bail if we've hit recursion limit
+			let Some(next_depth) = room_entry.depth.checked_sub(1) else { continue };
+
+
+			// Figure out which walls touch light
+			for connection in processed_world.connections_for_room(room_entry.room_id) {
+				log::info!("[build] ... check {:?} ({:?} -> {:?})", connection.target_room, connection.source_wall, connection.target_wall);
+
+				if connection.target_wall == room_entry.from_wall {
+					// This is the wall we recursed through, skip.
+					continue;
+				}
+
+				log::info!("[build] ... recurse");
+
+				room_queue.push(QueueEntry {
+					room_id: connection.target_room,
+					from_wall: connection.source_wall,
+					transform: room_entry.transform * to_transform(connection.target_to_source, connection.height_difference),
+					depth: next_depth,
+				});
+			}
+		}
+
+		break;
+	}
+
+	// Collect lights for each room into a buffer for upload
+	let mut built_light_buffer = Vec::new();
+	for (room_id, mesh_info) in room_mesh_infos.iter_mut() {
+		let Some(light_list) = room_lights.get(room_id) else { continue };
+
+		mesh_info.base_light = built_light_buffer.len() as u32;
+		mesh_info.num_lights = light_list.len() as u32;
+
+		built_light_buffer.extend_from_slice(light_list);
+	}
+
+	gfx.core.upload_immutable_buffer_immediate(light_buffer, &built_light_buffer);
+
+	room_builder.upload(gfx, vbo, ebo);
+
+	gfx.core.debug_marker("Uploaded Room Data");
 
 	room_mesh_infos
 }

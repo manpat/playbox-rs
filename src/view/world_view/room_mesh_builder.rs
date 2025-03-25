@@ -13,7 +13,7 @@ pub struct RoomMeshInfo {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct RoomLight {
 	pub local_pos: Vec3,
 	pub radius: f32,
@@ -27,8 +27,6 @@ pub struct RoomMeshBuilder<'w> {
 	indices: Vec<u32>,
 	base_vertex: u32,
 	current_texture_index: u32,
-
-	lights: Vec<RoomLight>,
 }
 
 impl<'w> RoomMeshBuilder<'w> {
@@ -39,8 +37,6 @@ impl<'w> RoomMeshBuilder<'w> {
 			indices: Vec::new(),
 			base_vertex: 0,
 			current_texture_index: 0,
-
-			lights: Vec::new(),
 		}
 	}
 
@@ -48,11 +44,9 @@ impl<'w> RoomMeshBuilder<'w> {
 		self.current_texture_index = texture_index;
 	}
 
-	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName, light_buffer: gfx::BufferName) {
+	pub fn upload(&self, gfx: &gfx::System, vbo: gfx::BufferName, ebo: gfx::BufferName) {
 		gfx.core.upload_immutable_buffer_immediate(vbo, &self.vertices);
 		gfx.core.upload_immutable_buffer_immediate(ebo, &self.indices);
-		gfx.core.upload_immutable_buffer_immediate(light_buffer, &self.lights);
-		gfx.core.debug_marker("Uploaded Room Data");
 	}
 }
 
@@ -146,75 +140,11 @@ impl RoomMeshBuilder<'_> {
 		}
 
 		// Objects
-		let base_light = self.lights.len() as u32;
-
 		self.set_texture_index(0);
 		for object in self.processed_world.objects_in_room(room_id) {
 			self.build_object(object);
 		}
 
-		// Collect lights in neighboring rooms
-		{
-			// Maybe instead of trying to do this per room, it would be better to do some kinda scatter-gather type thing.
-			// figure out which rooms are visible from each light, and _then_ invert that to get a list of lights visible from each room.
-			// Maybe WorldView::build_visibility_graph can be generalised?
-
-			struct QueueEntry {
-				room_id: RoomId,
-				from_wall: WallId,
-				transform: Mat3x4,
-				depth: u32,
-			}
-
-			fn to_transform(target_to_source: Mat2x3, height_difference: f32) -> Mat3x4 {
-				let [x,z,w] = target_to_source.columns();
-				Mat3x4::from_columns([
-					x.to_x0y(),
-					Vec3::from_y(1.0),
-					z.to_x0y(),
-					w.to_x0y() + Vec3::from_y(height_difference)
-				])
-			}
-
-			let mut room_queue = SmallVec::<[QueueEntry; 16]>::new();
-			room_queue.extend(self.processed_world.connections_for_room(room_id)
-				.map(|connection| QueueEntry {
-					room_id: connection.target_room,
-					from_wall: connection.target_wall.connected_wall(self.processed_world.geometry()).unwrap(),
-					transform: to_transform(connection.target_to_source, connection.height_difference),
-					depth: 1,
-				}));
-
-			while let Some(entry) = room_queue.pop() {
-				// TODO(pat.m): recurse into all rooms touched by light
-				for object in self.processed_world.objects_in_room(entry.room_id) {
-					let Some(light) = object.as_light() else { continue };
-
-					// TODO(pat.m): range check
-					// TODO(pat.m): cull!
-
-					self.lights.push(RoomLight {
-						local_pos: entry.transform * object.placement.position.to_xny(light.height),
-						radius: light.radius,
-						color: light.color.into(),
-						power: light.power,
-					});
-				}
-
-				room_queue.extend(self.processed_world.connections_for_room(entry.room_id)
-					.filter(|connection| connection.target_wall != entry.from_wall)
-					.filter_map(|connection| Some(QueueEntry {
-						room_id: connection.target_room,
-						from_wall: connection.target_wall.connected_wall(self.processed_world.geometry()).unwrap(),
-						transform: entry.transform * to_transform(connection.target_to_source, connection.height_difference),
-						depth: entry.depth.checked_sub(1)?,
-					})));
-			}
-		}
-
-		// TODO(pat.m): check neighboring rooms for nearby lights
-
-		let num_lights = self.lights.len() as u32 - base_light;
 		let num_elements = self.indices.len() as u32 - base_index;
 
 		RoomMeshInfo {
@@ -222,8 +152,8 @@ impl RoomMeshBuilder<'_> {
 			base_index,
 			num_elements,
 
-			base_light,
-			num_lights,
+			base_light: 0,
+			num_lights: 0,
 		}
 	}
 
@@ -303,15 +233,6 @@ impl RoomMeshBuilder<'_> {
 				];
 
 				self.add_convex_untextured(verts, Color::grey(0.02));
-			}
-
-			&ObjectInfo::Light(LightObject{color, height, radius, power}) => {
-				self.lights.push(RoomLight {
-					local_pos: object.placement.position.to_xny(height),
-					radius,
-					color: color.into(),
-					power,
-				});
 			}
 
 			_ => {}
