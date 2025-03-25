@@ -54,7 +54,7 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 		_ => todo!()
 	};
 
-	let neighbouring_room_margin = 0.3;
+	let neighbouring_room_margin = 0.1;
 
 	let mut neighbouring_rooms = Vec::new();
 
@@ -72,21 +72,25 @@ fn draw_focused_room_viewport(ui: &mut egui::Ui, context: &mut Context) -> egui:
 	let world = &context.model.world;
 	let source_player_placement = context.source_player_placement;
 
+	let mut settings_flags = ViewportItemFlags::empty();
+	if context.state.show_debug_labels {
+		settings_flags |= ViewportItemFlags::SHOW_DEBUG_LABELS;
+	}
+
 	let mut viewport = Viewport::new(ui, context);
-	viewport.add_room(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE);
+	viewport.add_room(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS | ViewportItemFlags::RECENTERABLE | settings_flags);
 	viewport.add_room_connections(focused_room_id, Mat2x3::identity(), ViewportItemFlags::BASIC_INTERACTIONS);
 
 	for (room_id, transform) in neighbouring_rooms {
-		viewport.add_room(room_id, transform, ViewportItemFlags::BASIC_INTERACTIONS);
-		viewport.add_room_connections(room_id, transform, ViewportItemFlags::empty());
+		viewport.add_room(room_id, transform, ViewportItemFlags::BASIC_INTERACTIONS | settings_flags);
 	}
 
 	for (object_id, object) in world.objects.iter() {
-		viewport.add_object(object.placement, Item::Object(object_id), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS);
+		viewport.add_object(object.placement, Item::Object(object_id), OBJECT_COLOR, ViewportItemFlags::BASIC_INTERACTIONS | settings_flags);
 	}
 
-	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, ViewportItemFlags::empty());
-	viewport.add_player_indicator(source_player_placement, None, Color::grey(0.8), ViewportItemFlags::empty());
+	viewport.add_player_indicator(world.player_spawn, Item::PlayerSpawn, PLAYER_SPAWN_COLOR, settings_flags);
+	viewport.add_player_indicator(source_player_placement, None, Color::grey(0.8), settings_flags);
 
 	viewport.build()
 }

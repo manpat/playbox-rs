@@ -66,8 +66,13 @@ struct InnerState {
 	selection: Option<Item>,
 
 	focused_room_id: Option<RoomId>,
+
+	// Viewport settings
 	track_player: bool,
 
+	show_debug_labels: bool,
+
+	// Panel states
 	show_undo_stack: bool,
 }
 
@@ -79,7 +84,8 @@ impl State {
 				selection: None,
 
 				focused_room_id: None,
-				track_player: true,
+				track_player: false,
+				show_debug_labels: true,
 
 				show_undo_stack: false,
 			},
@@ -208,7 +214,7 @@ pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::Sourc
 		.show(ui_ctx, |ui| do_world_editor(ui, &mut context));
 }
 
-pub fn do_undo_stack_widget(ui: &mut egui::Ui, undo_stack: &UndoStack, message_bus: &MessageBus) {
+fn do_undo_stack_widget(ui: &mut egui::Ui, undo_stack: &UndoStack, message_bus: &MessageBus) {
 	ui.horizontal(|ui| {
 		if ui.button("Undo").clicked() {
 			message_bus.emit(UndoCmd::Undo);
@@ -249,5 +255,8 @@ pub fn do_undo_stack_widget(ui: &mut egui::Ui, undo_stack: &UndoStack, message_b
 
 pub fn do_editor_menu(ui: &mut egui::Ui, state: &mut State) {
 	ui.checkbox(&mut state.inner.track_player, "Track Player");
+	ui.checkbox(&mut state.inner.show_debug_labels, "Show Debug Labels");
+
+	ui.separator();
 	ui.checkbox(&mut state.inner.show_undo_stack, "Show Undo Stack");
 }

@@ -2,19 +2,21 @@ use crate::prelude::*;
 use model::{World, ProcessedWorld, WallId, RoomId, Placement, Location};
 use super::{Item, InnerState, Context, EditorWorldEditCmd};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 enum ViewportItemShape {
 	Vertex(Vec2),
 	Line(Vec2, Vec2),
 
 	PlayerIndicator(Mat2x3),
 	ObjectIndicator(Mat2x3),
+
+	Text(String, Vec2),
 }
 
 impl ViewportItemShape {
 	fn distance_to(&self, target_pos: Vec2) -> f32 {
 		match self {
-			&ViewportItemShape::Vertex(v) => (target_pos - v).length(),
+			&ViewportItemShape::Vertex(v) | &ViewportItemShape::Text(_, v) => (target_pos - v).length(),
 
 			&ViewportItemShape::Line(start, end) => {
 				let wall_diff = end - start;
@@ -69,7 +71,6 @@ bitflags::bitflags! {
 		const DRAGGABLE = 1 << 0;
 		const CLICKABLE = 1 << 1;
 		const HAS_CONTEXT_MENU = 1 << 2;
-
 		const BASIC_INTERACTIONS = 0b111;
 
 		// Can rooms themselves be dragged?
@@ -80,6 +81,7 @@ bitflags::bitflags! {
 
 		const ALL_INTERACTIONS = 0b11111;
 
+		const SHOW_DEBUG_LABELS = 1 << 10;
 	}
 }
 
@@ -183,6 +185,7 @@ impl<'c> Viewport<'c> {
 		}
 
 		let wall_interaction_flags = interaction_flags | ViewportItemFlags::CONNECTABLE;
+		let show_debug_labels = flags.contains(ViewportItemFlags::SHOW_DEBUG_LABELS);
 
 		// Add vertices
 		for vertex_id in source_geometry.room_vertices(room_id) {
@@ -201,6 +204,8 @@ impl<'c> Viewport<'c> {
 		for processed_room_id in self.processed_world.to_processed_rooms(room_id) {
 			for wall_id in processed_geometry.room_walls(processed_room_id) {
 				let (start, end) = processed_geometry.wall_vertices(wall_id);
+				let direction = (end - start).normalize();
+				let label_pos = (start + end) / 2.0 + direction * 0.05 + direction.perp() * 0.1;
 
 				// Check if this wall exists in the source data (and so can be modified),
 				// or was generated.
@@ -212,14 +217,36 @@ impl<'c> Viewport<'c> {
 						room_to_world,
 						flags: wall_interaction_flags,
 					});
+
+					if show_debug_labels {
+						self.items.push(ViewportItem {
+							shape: ViewportItemShape::Text(format!("{wall_id:?}"), room_to_world * label_pos),
+							item: Some(Item::Wall(wall_id)),
+							color: wall_id.get(source_geometry).color,
+							room_to_world,
+							flags: wall_interaction_flags,
+						});
+					}
 				} else {
+					let processed_color = Color::rgba(0.2, 0.1, 0.1, 0.5);
+
 					self.items.push(ViewportItem {
 						shape: ViewportItemShape::Line(room_to_world * start, room_to_world * end),
 						item: None,
-						color: Color::rgba(0.2, 0.1, 0.1, 0.5),
+						color: processed_color,
 						room_to_world,
 						flags: ViewportItemFlags::empty(),
 					});
+
+					if show_debug_labels {
+						self.items.push(ViewportItem {
+							shape: ViewportItemShape::Text(format!("{wall_id:?}"), room_to_world * label_pos),
+							item: None,
+							color: processed_color.with_alpha(0.8),
+							room_to_world,
+							flags: ViewportItemFlags::empty(),
+						});
+					}
 				}
 			}
 		}
@@ -254,7 +281,7 @@ impl<'c> Viewport<'c> {
 				continue
 			};
 
-			let visual_separation = wall_info.normal * 0.1;
+			let visual_separation = wall_info.normal * 0.05;
 			let aperture_start = connection_info.aperture_start + visual_separation;
 			let aperture_end = connection_info.aperture_end + visual_separation;
 
@@ -370,16 +397,16 @@ impl Viewport<'_> {
 
 		let mut min_distance = 0.3;
 
-		for &ViewportItem {shape, item, room_to_world, flags, ..} in self.items.iter() {
+		for ViewportItem {shape, item, room_to_world, flags, ..} in self.items.iter() {
 			if !flags.intersects(ViewportItemFlags::BASIC_INTERACTIONS) {
 				continue
 			}
 
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
-				self.editor_state.hovered = item;
-				self.viewport_state.hovered_item_transform = room_to_world;
-				self.viewport_state.hovered_item_flags = flags;
+				self.editor_state.hovered = *item;
+				self.viewport_state.hovered_item_transform = *room_to_world;
+				self.viewport_state.hovered_item_flags = *flags;
 				self.viewport_state.hovered_item_hover_pos = room_to_world.inverse() * hover_pos_world;
 				min_distance = distance;
 			}
@@ -622,13 +649,13 @@ impl Viewport<'_> {
 	}
 
 	fn draw_items(&self) {
-		for &ViewportItem{item, shape, color, ..} in self.items.iter() {
-			let item_hovered = self.editor_state.hovered == item && item.is_some();
-			let item_selected = self.editor_state.selection == item && item.is_some();
+		for ViewportItem{item, shape, color, ..} in self.items.iter() {
+			let item_hovered = self.editor_state.hovered == *item && item.is_some();
+			let item_selected = self.editor_state.selection == *item && item.is_some();
 			let color = color.to_egui_rgba();
 
 			match shape {
-				ViewportItemShape::Vertex(vertex) => {
+				&ViewportItemShape::Vertex(vertex) => {
 					if let Some(Item::Room(room_id)) = item {
 						let vertex_px = self.viewport_metrics.world_to_widget_position(vertex);
 
@@ -657,31 +684,31 @@ impl Viewport<'_> {
 					}
 				}
 
-				ViewportItemShape::Line(start, end) => {
+				&ViewportItemShape::Line(start, end) => {
 					let stroke_thickness = match item_hovered || item_selected {
 						false => 1.0,
 						true => 4.0,
 					};
 
-					let center = (start + end) / 2.0;
-
 					let start = self.viewport_metrics.world_to_widget_position(start);
 					let end = self.viewport_metrics.world_to_widget_position(end);
 
 					self.painter.line_segment([start, end], (stroke_thickness, color));
-
-					if let Some(Item::Wall(wall_id)) = item {
-						self.painter.text(
-							self.viewport_metrics.world_to_widget_position(center),
-							egui::Align2::CENTER_CENTER,
-							format!("{wall_id:?}"),
-							egui::FontId::proportional(12.0),
-							egui::Color32::GRAY
-						);
-					}
 				}
 
-				ViewportItemShape::PlayerIndicator(transform) => {
+				ViewportItemShape::Text(text, position) => {
+					let position_px = self.viewport_metrics.world_to_widget_position(*position);
+
+					self.painter.text(
+						position_px,
+						egui::Align2::CENTER_CENTER,
+						text,
+						egui::FontId::proportional(12.0),
+						color.into()
+					);
+				}
+
+				&ViewportItemShape::PlayerIndicator(transform) => {
 					let forward = -transform.column_y();
 					let origin = transform.column_z();
 
@@ -694,7 +721,7 @@ impl Viewport<'_> {
 					self.painter.line_segment([center_widget, point], (1.0, color));
 				}
 
-				ViewportItemShape::ObjectIndicator(transform) => {
+				&ViewportItemShape::ObjectIndicator(transform) => {
 					let right = transform.column_x();
 					let forward = -transform.column_y();
 					let origin = transform.column_z();
