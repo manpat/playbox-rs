@@ -374,6 +374,10 @@ impl GameScene {
 
 				ui.close_menu();
 			}
+
+			ui.separator();
+
+			editor::do_editor_menu(ui, &mut self.editor_state);
 		});
 	}
 

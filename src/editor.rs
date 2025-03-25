@@ -67,6 +67,8 @@ struct InnerState {
 
 	focused_room_id: Option<RoomId>,
 	track_player: bool,
+
+	show_undo_stack: bool,
 }
 
 impl State {
@@ -78,6 +80,8 @@ impl State {
 
 				focused_room_id: None,
 				track_player: true,
+
+				show_undo_stack: false,
 			},
 
 			undo_stack: UndoStack::new(message_bus.clone()),
@@ -173,9 +177,11 @@ pub fn do_editor(ui_ctx: &egui::Context, state: &mut State, model: &model::Sourc
 		state.inner.focused_room_id = Some(first_room);
 	}
 
-	egui::Window::new("Undo Stack")
-		.enabled(!modal_active)
-		.show(ui_ctx, |ui| do_undo_stack_widget(ui, &state.undo_stack, message_bus));
+	if state.inner.show_undo_stack {
+		egui::Window::new("Undo Stack")
+			.enabled(!modal_active)
+			.show(ui_ctx, |ui| do_undo_stack_widget(ui, &state.undo_stack, message_bus));
+	}
 
 	let mut context = Context {
 		state: &mut state.inner,
@@ -239,4 +245,9 @@ pub fn do_undo_stack_widget(ui: &mut egui::Ui, undo_stack: &UndoStack, message_b
 	ui.collapsing("Debug", |ui| {
 		ui.label(format!("{:#?}", undo_stack));
 	});
+}
+
+pub fn do_editor_menu(ui: &mut egui::Ui, state: &mut State) {
+	ui.checkbox(&mut state.inner.track_player, "Track Player");
+	ui.checkbox(&mut state.inner.show_undo_stack, "Show Undo Stack");
 }
