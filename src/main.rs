@@ -90,7 +90,9 @@ impl App {
 
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
 		let ui_shared = ui::UiShared::new(&mut ctx.gfx)?;
-		let console = console::Console::new();
+		let mut console = console::Console::new();
+
+		console.register_command("quit", |ctx, _| ctx.bus.emit(MenuCmd::QuitToDesktop));
 
 		let mut shared = AppShared {
 			console,
@@ -138,10 +140,6 @@ impl App {
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
 		self.shared.console.update(ctx);
-
-		if self.shared.console.command("quit").is_some() {
-			ctx.bus.emit(MenuCmd::QuitToDesktop);
-		}
 
 		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
 			&& self.game_scene.is_none()

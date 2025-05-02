@@ -1,11 +1,15 @@
 use crate::prelude::*;
 
 
+type CmdFn = Box<dyn Fn(&mut toybox::Context, &str)>;
+
 pub struct Console {
 	visible: bool,
 
 	text_buffer: String,
 	ready_cmd_str: Option<(String, String)>,
+
+	registered_commands: HashMap<String, CmdFn>,
 }
 
 impl Console {
@@ -15,6 +19,8 @@ impl Console {
 
 			text_buffer: String::new(),
 			ready_cmd_str: None,
+
+			registered_commands: HashMap::new(),
 		}
 	}
 
@@ -53,6 +59,32 @@ impl Console {
 					}
 				}
 			});
+
+		if let Some((verb, args)) = self.ready_cmd_str.as_ref()
+			&& let Some(cmd_fn) = self.registered_commands.get(verb)
+		{
+			log::info!("Running command '{verb}'");
+			cmd_fn(ctx, &args);
+			self.ready_cmd_str = None;
+		}
+	}
+
+	pub fn register_command(&mut self, verb: impl Into<String>, cmd_fn: impl Fn(&mut toybox::Context, &str) + 'static) {
+		use std::collections::hash_map::Entry;
+
+		let cmd_fn = Box::new(cmd_fn);
+
+		match self.registered_commands.entry(verb.into()) {
+			Entry::Occupied(mut entry) => {
+				log::info!("Replacing already registered console command {}", entry.key());
+				let _ = entry.insert(cmd_fn);
+			}
+
+			Entry::Vacant(entry) => {
+				log::info!("Registered console command '{}'", entry.key());
+				entry.insert(cmd_fn);
+			}
+		}
 	}
 
 	pub fn command(&mut self, verb: &str) -> Option<String> {
@@ -86,3 +118,6 @@ fn show_command_line(ui: &mut egui::Ui, text_buffer: &mut String) -> Option<Stri
 		None
 	}
 }
+
+
+
