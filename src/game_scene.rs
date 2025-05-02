@@ -382,14 +382,6 @@ impl GameScene {
 	}
 
 	fn handle_console(&mut self, ctx: &mut Context) -> anyhow::Result<()> {
-		if let Some(world_name) = ctx.console.command("load") {
-			if world_name.is_empty() {
-				anyhow::bail!("'load' requires world name argument");
-			}
-
-			ctx.bus.emit(MenuCmd::Play(world_name));
-		}
-
 		if let Some(world_name) = ctx.console.command("save") {
 			if world_name.is_empty() {
 				anyhow::bail!("'save' requires world name argument");

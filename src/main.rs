@@ -92,7 +92,7 @@ impl App {
 		let ui_shared = ui::UiShared::new(&mut ctx.gfx)?;
 		let mut console = console::Console::new();
 
-		console.register_command("quit", |ctx, _| ctx.bus.emit(MenuCmd::QuitToDesktop));
+		register_commands(&mut console);
 
 		let mut shared = AppShared {
 			console,
@@ -253,3 +253,16 @@ impl<'tb> Context<'tb> {
 	}
 }
 
+
+
+fn register_commands(console: &mut Console) {
+	console.register_command("quit", |ctx, _| ctx.bus.emit(MenuCmd::QuitToDesktop));
+	console.register_command("load", |ctx, world_name| {
+		if world_name.is_empty() {
+			log::error!("'load' requires world name argument");
+			return;
+		}
+
+		ctx.bus.emit(MenuCmd::Play(world_name.into()));
+	});
+}
