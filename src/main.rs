@@ -190,6 +190,20 @@ impl toybox::App for App {
 					self.active_scene = ActiveScene::Game;
 				}
 
+				MenuCmd::PlayGeneratedWorld => {
+					let world = model::world::generate();
+					let ctx = &mut Context::new(ctx, &mut self.shared);
+
+					// Reuse scene if we can, to avoid reloading common stuff
+					if let Some(game_scene) = &mut self.game_scene {
+						game_scene.switch_world(ctx, world)
+					} else {
+						self.game_scene = Some(GameScene::new(ctx, world).expect("Failed to initialise GameScene"));
+					}
+
+					self.active_scene = ActiveScene::Game;
+				}
+
 				MenuCmd::Resume => {
 					if self.game_scene.is_some() {
 						self.active_scene = ActiveScene::Game;
@@ -265,4 +279,6 @@ fn register_commands(console: &mut Console) {
 
 		ctx.bus.emit(MenuCmd::Play(world_name.into()));
 	});
+
+	console.register_command("gen", |ctx, _| ctx.bus.emit(MenuCmd::PlayGeneratedWorld));
 }

@@ -55,3 +55,115 @@ impl World {
 		}
 	}
 }
+
+
+
+pub fn generate() -> World {
+	let geometry = generate_geometry();
+
+	World {
+		name: "generated".into(),
+		objects: SlotMap::with_key(),
+		fog: FogParameters {
+			color: Color::grey(0.1),
+			start: 0.0,
+			distance: 30.0,
+			emission: 1.0,
+			transparency: 0.5,
+		},
+
+		player_spawn: Placement {
+			room_id: geometry.first_room(),
+			position: Vec2::zero(),
+			yaw: 0.0,
+		},
+
+		geometry,
+	}
+}
+
+
+fn generate_geometry() -> WorldGeometry {
+	let mut geometry = WorldGeometry::new();
+
+	let mut rooms = Vec::new();
+	let mut verts = Vec::new();
+
+	for _ in 0..200 {
+		generate_room_verts(&mut verts);
+
+		let room = geometry.insert_room_from_positions(&verts);
+		rooms.push(room);
+
+		let room = room.get_mut(&mut geometry);
+
+		room.floor_color = Color::grey(rand::random_range(0.5..=1.0));
+		room.ceiling_color = room.floor_color;
+
+		if rand::random_bool(1.0 / 8.0) {
+			room.height = rand::random_range(3.0 ..= 6.0);
+		} else {
+			room.height = rand::random_range(0.65 ..= 2.0);
+		}
+	}
+
+	let mut walls = Vec::new();
+	for room in rooms.iter() {
+		let first_wall = room.first_wall(&geometry);
+
+		let mut wall = first_wall;
+		let mut cumulative_length = 0.0;
+
+		'main: loop {
+			let wall_length = geometry.wall_length(wall);
+			cumulative_length += wall_length;
+
+			if wall_length > 0.3 && cumulative_length > 1.0 {
+				walls.push(wall);
+				cumulative_length = 0.0;
+			}
+
+			wall.move_next(&geometry);
+			if wall.next_wall(&geometry) == first_wall {
+				break 'main
+			}
+		}
+	}
+
+	walls.shuffle(&mut rand::rng());
+
+	for pair in walls.chunks_exact(2) {
+		let &[a, b] = pair else { break };
+
+		geometry.connect_wall(a, b).unwrap();
+
+		let a = a.get_mut(&mut geometry);
+		a.vertical_offset = rand::random_range(-0.1 ..= 0.1);
+		a.horizontal_offset = rand::random_range(-0.5 ..= 0.5);
+
+		let b = b.get_mut(&mut geometry);
+		b.vertical_offset = rand::random_range(-0.1 ..= 0.1);
+		b.horizontal_offset = rand::random_range(-0.5 ..= 0.5);
+	}
+
+	geometry
+}
+
+
+fn generate_room_verts(verts: &mut Vec<Vec2>) {
+	use std::f32::consts::*;
+
+	verts.clear();
+
+	let mut angle = 0.0f32;
+
+	let max_radius = rand::random_range(1.0 ..= 2.2);
+	let radius = rand::random_range(0.5 ..= max_radius);
+
+	while angle < TAU {
+		let perturbment = rand::random_range(0.9 ..= 1.1);
+
+		verts.push(Vec2::from_angle(-angle) * radius * perturbment);
+		angle += rand::random_range(0.03 ..= 0.35) * TAU;
+	}
+}

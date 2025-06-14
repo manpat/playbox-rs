@@ -70,6 +70,7 @@ impl MainMenuScene {
 
 pub enum MenuCmd {
 	Play(String),
+	PlayGeneratedWorld,
 	Resume,
 	Settings,
 	QuitToMain,
