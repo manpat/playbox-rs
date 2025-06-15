@@ -69,23 +69,30 @@ void main() {
 
 	vec3 lighting = vec3(0.0);
 
+	const float feathering = 0.01;
+
 	// Collect lighting
 	for (uint light_idx = u_first_light; light_idx < u_first_light + u_num_lights; light_idx++) {
 		Light light = s_lights[light_idx];
 
+		float distance = length(light.local_pos - v_local_pos);
 		float d0 = dot(light.plane_0, vec4(v_local_pos, -1.0));
 		float d1 = dot(light.plane_1, vec4(v_local_pos, -1.0));
 
-		const float feathering = 0.01;
+		float attenuated_feather = distance * distance * feathering;
 
-		float occlusion = min(smoothstep(-feathering, feathering, d0), smoothstep(-feathering, feathering, d1));
+		float occlusion = min(
+			smoothstep(-attenuated_feather, attenuated_feather, d0),
+			smoothstep(-attenuated_feather, attenuated_feather, d1));
 
-		float value = max(1.0 - length(light.local_pos - v_local_pos) / light.radius, 0.0) * occlusion;
+		float value = max(1.0 - distance / light.radius, 0.0);
 
 		value *= light.power;
 
 		value = ceil(value*4.0)/4.0;
 		value *= value;
+
+		value *= occlusion;
 
 		lighting += diffuse * light.color * value;
 	}

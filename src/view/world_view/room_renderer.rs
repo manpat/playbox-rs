@@ -167,7 +167,7 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 			room_id: object.placement.room_id,
 			from_wall: WallId::default(), // this should always be invalid.
 			transform: Mat3x4::identity(),
-			depth: 5,
+			depth: 10,
 
 			plane_0: Plane2::NEGATIVE_INFINITY,
 			plane_1: Plane2::NEGATIVE_INFINITY,
@@ -176,7 +176,7 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 		while let Some(room_entry) = room_queue.pop() {
 			let local_pos = room_entry.transform * object.placement.position.to_xny(light.height);
 
-			// Push light
+			// Add light to room
 			{
 				let light_list = room_lights.entry(room_entry.room_id)
 					.unwrap().or_default();
@@ -192,34 +192,58 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 				});
 			}
 
-			log::info!("[build] visited {:?}", room_entry.room_id);
-
 			// Bail if we've hit recursion limit
 			let Some(next_depth) = room_entry.depth.checked_sub(1) else { continue };
 
 
 			// Figure out which walls touch light
 			for connection in processed_world.connections_for_room(room_entry.room_id) {
-				log::info!("[build] ... check {:?} ({:?} -> {:?})", connection.target_room, connection.source_wall, connection.target_wall);
-
 				if connection.target_wall == room_entry.from_wall {
 					// This is the wall we recursed through, skip.
 					continue;
 				}
 
-				let start_vertex = connection.source_to_target * connection.aperture_start;
-				let end_vertex = connection.source_to_target * connection.aperture_end;
-				let local_pos2 = local_pos.to_xz();
+				let mut start_vertex = connection.source_to_target * connection.aperture_start;
+				let mut end_vertex = connection.source_to_target * connection.aperture_end;
+				let local_pos2 = connection.source_to_target * local_pos.to_xz();
 
 				// If the aperture we're considering isn't CCW from our position then cull it and the room it connects to.
 				if (end_vertex - local_pos2).wedge(start_vertex - local_pos2) < 0.0 {
 					continue;
 				}
 
+				if room_entry.plane_0.distance_to(start_vertex) < 0.0 {
+					let plane = room_entry.plane_0;
+					let diff = end_vertex - start_vertex;
+
+					let length = diff.length();
+					let direction = diff.normalize();
+
+					let t = -(plane.normal.dot(start_vertex) - plane.distance) / plane.normal.dot(direction);
+					if t < 0.0 || t > length {
+						continue;
+					}
+
+					start_vertex = start_vertex + direction * t;
+				}
+
+				if room_entry.plane_1.distance_to(end_vertex) < 0.0 {
+					let plane = room_entry.plane_1;
+					let diff = start_vertex - end_vertex;
+
+					let length = diff.length();
+					let direction = diff.normalize();
+
+					let t = -(plane.normal.dot(end_vertex) - plane.distance) / plane.normal.dot(direction);
+					if t < 0.0 || t > length {
+						continue;
+					}
+
+					end_vertex = end_vertex + direction * t;
+				}
+
 				let plane_0 = Plane2::from_points(start_vertex, local_pos2);
 				let plane_1 = Plane2::from_points(local_pos2, end_vertex);
-
-				log::info!("[build] ... recurse");
 
 				room_queue.push(QueueEntry {
 					room_id: connection.target_room,
