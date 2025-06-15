@@ -21,6 +21,7 @@ pub struct GameScene {
 
 	world_view: view::WorldView,
 	hud_view: view::HudView,
+	debug_painter: ui::UiPainter,
 
 	source_model: model::SourceModel,
 	model: model::Model,
@@ -94,6 +95,7 @@ impl GameScene {
 			// sprites: Sprites::new(&mut ctx.gfx)?,
 			world_view: view::WorldView::new(&mut ctx.gfx, &processed_world, ctx.bus.clone())?,
 			hud_view: view::HudView::new(&mut ctx.gfx, ctx.bus.clone())?,
+			debug_painter: ui::UiPainter::new(&mut ctx.gfx, gfx::FrameStage::Ui(10)),
 
 			model: model::Model {
 				player: model::Player {
@@ -182,9 +184,9 @@ impl GameScene {
 	}
 
 	pub fn draw(&mut self, ctx: &mut Context<'_>) {
-		let Context{gfx, ui_shared, ..} = ctx;
+		let Context{gfx, ui_shared, delta_time, ..} = ctx;
 
-		self.time += 1.0/60.0;
+		self.time += *delta_time;
 
 		let player = &self.model.player;
 
@@ -219,6 +221,20 @@ impl GameScene {
 
 		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
 		self.hud_view.draw(gfx, ui_shared, &self.model);
+
+		{
+			let screen_size = gfx.backbuffer_size().to_vec2();
+			let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
+
+			let mut painter = self.debug_painter.with_shared(ui_shared);
+
+			let fps = 1.0 / *delta_time;
+
+			let top_left = screen_bounds.shrink(16.0).min_max_corner();
+			painter.text(top_left - Vec2::from_y(16.0), 16, format!("dt: {:.2}ms ({fps:.0}fps)", *delta_time * 1000.0), Color::white());
+
+			self.debug_painter.submit(gfx, ui_shared, screen_bounds);
+		}
 
 		// self.toy_renderer.draw(gfx);
 		// self.sprites.draw(gfx);

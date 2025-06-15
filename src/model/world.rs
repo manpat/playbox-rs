@@ -90,20 +90,22 @@ fn generate_geometry() -> WorldGeometry {
 	let mut verts = Vec::new();
 
 	for _ in 0..200 {
-		generate_room_verts(&mut verts);
+		let big_room = rand::random_bool(3.0 / 50.0);
+
+		generate_room_verts(&mut verts, big_room);
 
 		let room = geometry.insert_room_from_positions(&verts);
 		rooms.push(room);
 
 		let room = room.get_mut(&mut geometry);
 
-		room.floor_color = Color::grey(rand::random_range(0.5..=1.0));
+		room.floor_color = Color::grey(rand::random_range(0.4..=1.0));
 		room.ceiling_color = room.floor_color;
 
-		if rand::random_bool(1.0 / 8.0) {
+		if big_room || rand::random_bool(1.0 / 20.0) {
 			room.height = rand::random_range(3.0 ..= 6.0);
 		} else {
-			room.height = rand::random_range(0.65 ..= 2.0);
+			room.height = rand::random_range(0.65 ..= 1.5);
 		}
 	}
 
@@ -118,7 +120,7 @@ fn generate_geometry() -> WorldGeometry {
 			let wall_length = geometry.wall_length(wall);
 			cumulative_length += wall_length;
 
-			if wall_length > 0.3 && cumulative_length > 1.0 {
+			if wall_length > 0.4 && cumulative_length > 1.0 {
 				walls.push(wall);
 				cumulative_length = 0.0;
 			}
@@ -137,33 +139,52 @@ fn generate_geometry() -> WorldGeometry {
 
 		geometry.connect_wall(a, b).unwrap();
 
+		let a_len = geometry.wall_length(a);
+		let b_len = geometry.wall_length(b);
+
+		let min_len = a_len.min(b_len);
+		let a_offset_extent = (a_len - min_len) / 2.0;
+		let b_offset_extent = (b_len - min_len) / 2.0;
+
 		let a = a.get_mut(&mut geometry);
 		a.vertical_offset = rand::random_range(-0.1 ..= 0.1);
-		a.horizontal_offset = rand::random_range(-0.5 ..= 0.5);
+		a.horizontal_offset = rand::random_range(-a_offset_extent ..= a_offset_extent);
 
 		let b = b.get_mut(&mut geometry);
 		b.vertical_offset = rand::random_range(-0.1 ..= 0.1);
-		b.horizontal_offset = rand::random_range(-0.5 ..= 0.5);
+		b.horizontal_offset = rand::random_range(-b_offset_extent ..= b_offset_extent);
 	}
 
 	geometry
 }
 
 
-fn generate_room_verts(verts: &mut Vec<Vec2>) {
+fn generate_room_verts(verts: &mut Vec<Vec2>, big_room: bool) {
 	use std::f32::consts::*;
 
 	verts.clear();
 
 	let mut angle = 0.0f32;
 
-	let max_radius = rand::random_range(1.0 ..= 2.2);
-	let radius = rand::random_range(0.5 ..= max_radius);
+	let radius_range = match big_room {
+		false => 0.5 ..= 1.5,
+		true => 2.0 ..= 4.0,
+	};
+	let length_range = match big_room {
+		false => 0.2 ..= 1.0,
+		true => 0.5 ..= 10.0,
+	};
+
+	let radius = rand::random_range(radius_range);
 
 	while angle < TAU {
-		let perturbment = rand::random_range(0.9 ..= 1.1);
+		let perturbment = rand::random_range(0.9 ..= 1.3);
 
 		verts.push(Vec2::from_angle(-angle) * radius * perturbment);
-		angle += rand::random_range(0.03 ..= 0.35) * TAU;
+
+		let length = rand::random_range(length_range.clone());
+		let angle_delta = (length / radius).clamp(0.0, TAU * 0.3);
+
+		angle += angle_delta;
 	}
 }

@@ -46,6 +46,8 @@ pub mod prelude {
 	pub use smallvec::SmallVec;
 }
 
+use std::time::{Instant, Duration};
+
 use prelude::*;
 
 fn main() -> anyhow::Result<()> {
@@ -73,6 +75,7 @@ struct App {
 	menu_cmd_subscription: Subscription<MenuCmd>,
 
 	shared: AppShared,
+	frame_start: Instant,
 }
 
 
@@ -81,6 +84,7 @@ struct AppShared {
 	ui_shared: ui::UiShared,
 
 	audio: MyAudioSystem,
+	delta_time: f32,
 }
 
 
@@ -98,6 +102,7 @@ impl App {
 			console,
 			ui_shared,
 			audio,
+			delta_time: 1.0/60.0,
 		};
 
 		let ctx = &mut Context::new(ctx, &mut shared);
@@ -120,6 +125,7 @@ impl App {
 			menu_cmd_subscription,
 
 			shared,
+			frame_start: Instant::now(),
 		})
 	}
 
@@ -139,6 +145,12 @@ impl App {
 
 impl toybox::App for App {
 	fn present(&mut self, ctx: &mut toybox::Context) {
+		let now = Instant::now();
+		let delta = now.duration_since(self.frame_start);
+		self.frame_start = now;
+
+		self.shared.delta_time = delta.as_secs_f32();
+
 		self.shared.console.update(ctx);
 
 		if let ActiveScene::Game | ActiveScene::PauseMenu = self.active_scene
@@ -254,16 +266,18 @@ pub struct Context<'tb> {
 	pub console: &'tb mut Console,
 	pub ui_shared: &'tb mut ui::UiShared,
 
+	pub delta_time: f32,
 	pub show_editor: bool,
 }
 
 impl<'tb> Context<'tb> {
 	fn new(tb: &'tb mut toybox::Context, shared: &'tb mut AppShared) -> Self {
 		let toybox::Context { gfx, input, egui, cfg, vfs, bus, show_debug_menu, .. } = tb;
-		let AppShared { audio, console, ui_shared } = shared;
+		let AppShared { audio, console, ui_shared, delta_time } = shared;
 		let show_editor = *show_debug_menu;
+		let delta_time = *delta_time;
 
-		Self {gfx, input, egui, cfg, vfs, bus, audio, ui_shared, console, show_editor}
+		Self {gfx, input, egui, cfg, vfs, bus, audio, ui_shared, console, delta_time, show_editor}
 	}
 }
 

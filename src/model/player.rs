@@ -87,7 +87,7 @@ impl Player {
 			// https://github.com/id-Software/Quake-III-Arena/blob/dbe4ddb10315479fc00086f08e25d968b4b43c49/code/client/cl_input.c#L293
 			// https://github.com/id-Software/Quake-III-Arena/blob/dbe4ddb10315479fc00086f08e25d968b4b43c49/code/client/cl_main.c#L2300
 			let pitch_yaw_speed = 140.0f32.to_radians();
-			let dt = 1.0/60.0;
+			let dt = ctx.delta_time;
 
 			let key_yaw = yaw_key_delta * pitch_yaw_speed * dt;
 			let key_pitch = pitch_key_delta * pitch_yaw_speed * dt;
@@ -101,7 +101,7 @@ impl Player {
 
 
 
-		let base_speed = 1.0/60.0;
+		let base_speed = ctx.delta_time;
 		let speed = match (ctx.input.button_down(input::keys::Shift), ctx.input.button_down(input::keys::Alt)) {
 			(true, false) => 2.0 * base_speed,
 			(false, true) => 0.25 * base_speed,
