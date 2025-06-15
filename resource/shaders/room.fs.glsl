@@ -27,6 +27,9 @@ struct Light {
 	float radius;
 	vec3 color;
 	float power;
+
+	vec4 plane_0;
+	vec4 plane_1;
 };
 
 layout(binding=2) readonly buffer RoomInfo {
@@ -70,7 +73,14 @@ void main() {
 	for (uint light_idx = u_first_light; light_idx < u_first_light + u_num_lights; light_idx++) {
 		Light light = s_lights[light_idx];
 
-		float value = max(1.0 - length(light.local_pos - v_local_pos) / light.radius, 0.0);
+		float d0 = dot(light.plane_0, vec4(v_local_pos, -1.0));
+		float d1 = dot(light.plane_1, vec4(v_local_pos, -1.0));
+
+		const float feathering = 0.01;
+
+		float occlusion = min(smoothstep(-feathering, feathering, d0), smoothstep(-feathering, feathering, d1));
+
+		float value = max(1.0 - length(light.local_pos - v_local_pos) / light.radius, 0.0) * occlusion;
 
 		value *= light.power;
 
