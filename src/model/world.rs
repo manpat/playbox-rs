@@ -89,7 +89,7 @@ fn generate_geometry() -> WorldGeometry {
 	let mut rooms = Vec::new();
 	let mut verts = Vec::new();
 
-	for _ in 0..200 {
+	for _ in 0..10 {
 		let big_room = rand::random_bool(3.0 / 50.0);
 
 		generate_room_verts(&mut verts, big_room);

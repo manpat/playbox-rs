@@ -141,9 +141,12 @@ impl ProcessedWorld {
 
 		// Map objects into the right rooms
 		for object in self.objects.values_mut() {
-			object.placement.room_id = self.processed_to_source_rooms.get(object.placement.room_id)
-				.cloned()
-				.unwrap_or(object.placement.room_id);
+			for room_id in self.source_to_processed_rooms.get(object.placement.room_id).unwrap() {
+				if self.geometry.room_contains_point(*room_id, object.placement.position) {
+					object.placement.room_id = *room_id;
+					break
+				}
+			}
 		}
 
 		// TODO(pat.m): objects _could_ be stored in rooms themselves.
@@ -332,15 +335,15 @@ fn split_concave_rooms(geometry: &mut WorldGeometry, processed_to_source_rooms: 
 		if let Some(next) = loop_guard.checked_sub(1) {
 			loop_guard = next;
 		} else {
-			println!("Stuck in a loop");
-			println!("{geometry:#?}");
+			log::error!("Stuck in a loop");
+			log::error!("{geometry:#?}");
 
 			let walls: Vec<_> = geometry.walls.keys().collect();
 			for &wall in walls.iter() {
 				let start_vert = wall.vertex(&geometry);
 				let end_vert = wall.next_vertex(&geometry);
 				let next_concave = find_concave_wall(&geometry, wall);
-				println!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
+				log::error!("{wall:?}: {start_vert:?} -> {end_vert:?}; next concave: {next_concave:?}");
 			}
 
 			anyhow::bail!("Stuck in a loop");
