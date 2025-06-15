@@ -141,8 +141,8 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 		transform: Mat3x4,
 		depth: u32,
 
-		plane_0: Vec4,
-		plane_1: Vec4,
+		plane_0: Plane2,
+		plane_1: Plane2,
 	}
 
 	fn to_transform(target_to_source: Mat2x3, height_difference: f32) -> Mat3x4 {
@@ -169,8 +169,8 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 			transform: Mat3x4::identity(),
 			depth: 5,
 
-			plane_0: Vec4::from_w(-1.0),
-			plane_1: Vec4::from_w(-1.0),
+			plane_0: Plane2::NEGATIVE_INFINITY,
+			plane_1: Plane2::NEGATIVE_INFINITY,
 		});
 
 		while let Some(room_entry) = room_queue.pop() {
@@ -187,8 +187,8 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 					color: light.color.into(),
 					power: light.power,
 
-					plane_0: room_entry.plane_0,
-					plane_1: room_entry.plane_1,
+					plane_0: room_entry.plane_0.to_x0y(),
+					plane_1: room_entry.plane_1.to_x0y(),
 				});
 			}
 
@@ -212,23 +212,12 @@ fn build_room_buffers(gfx: &mut gfx::System, processed_world: &ProcessedWorld,
 				let local_pos2 = local_pos.to_xz();
 
 				// If the aperture we're considering isn't CCW from our position then cull it and the room it connects to.
-				// if (end_vertex - local_pos2).wedge(start_vertex - local_pos2) < 0.0 {
-				// 	continue;
-				// }
+				if (end_vertex - local_pos2).wedge(start_vertex - local_pos2) < 0.0 {
+					continue;
+				}
 
-				let pos_to_left = start_vertex - local_pos2;
-				let pos_to_right = end_vertex - local_pos2;
-
-				let normal_a = pos_to_right.perp().normalize();
-				let dist_a = local_pos2.dot(normal_a);
-
-				let normal_b = -pos_to_left.perp().normalize();
-				let dist_b = local_pos2.dot(normal_b);
-
-				let plane_0 = normal_a.to_x0y().extend(dist_a);
-				let plane_1 = normal_b.to_x0y().extend(dist_b);
-
-
+				let plane_0 = Plane2::from_points(start_vertex, local_pos2);
+				let plane_1 = Plane2::from_points(local_pos2, end_vertex);
 
 				log::info!("[build] ... recurse");
 

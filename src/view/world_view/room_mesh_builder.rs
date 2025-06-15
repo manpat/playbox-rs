@@ -20,8 +20,8 @@ pub struct RoomLight {
 	pub color: Vec3,
 	pub power: f32,
 
-	pub plane_0: Vec4,
-	pub plane_1: Vec4,
+	pub plane_0: Plane3,
+	pub plane_1: Plane3,
 }
 
 pub struct RoomMeshBuilder<'w> {
