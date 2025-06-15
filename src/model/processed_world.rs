@@ -141,10 +141,12 @@ impl ProcessedWorld {
 
 		// Map objects into the right rooms
 		for object in self.objects.values_mut() {
-			for room_id in self.source_to_processed_rooms.get(object.placement.room_id).unwrap() {
-				if self.geometry.room_contains_point(*room_id, object.placement.position) {
-					object.placement.room_id = *room_id;
-					break
+			if let Some(potential_rooms) = self.source_to_processed_rooms.get(object.placement.room_id) {
+				for room_id in potential_rooms {
+					if self.geometry.room_contains_point(*room_id, object.placement.position) {
+						object.placement.room_id = *room_id;
+						break
+					}
 				}
 			}
 		}
