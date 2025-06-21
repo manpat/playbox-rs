@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 pub mod aabb2_ext;
 
 pub mod audio;
@@ -51,7 +49,10 @@ use std::time::{Instant, Duration};
 use prelude::*;
 
 fn main() -> anyhow::Result<()> {
-	std::env::set_var("RUST_BACKTRACE", "1");
+	unsafe {
+		std::env::set_var("RUST_BACKTRACE", "1");
+	}
+
 	toybox::run("playbox", App::new)
 }
 
