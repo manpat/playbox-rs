@@ -3,6 +3,7 @@ use crate::prelude::*;
 pub struct GameScene {
 	fog_shader: gfx::ShaderHandle,
 	hdr_to_ldr_shader: gfx::ShaderHandle,
+	repair_color_shader: gfx::ShaderHandle,
 
 	downsample_shader: gfx::ShaderHandle,
 	upsample_shader: gfx::ShaderHandle,
@@ -78,6 +79,7 @@ impl GameScene {
 		Ok(GameScene {
 			fog_shader: resource_manager.load_compute_shader("shaders/fog.cs.glsl"),
 			hdr_to_ldr_shader: resource_manager.load_compute_shader("shaders/hdr_to_ldr.cs.glsl"),
+			repair_color_shader: resource_manager.load_compute_shader("shaders/repair.cs.glsl"),
 
 			downsample_shader: resource_manager.load_compute_shader("shaders/downsample.cs.glsl"),
 			upsample_shader: resource_manager.load_compute_shader("shaders/upsample.cs.glsl"),
@@ -272,6 +274,11 @@ impl GameScene {
 			}])
 			.groups_from_image_size(self.hdr_color_rt);
 
+		// Repair color
+		group.compute(self.repair_color_shader)
+			.image_rw(0, self.hdr_color_rt)
+			.sampled_image(1, self.depth_rt, gfx::CommonSampler::Nearest)
+			.groups_from_image_size(self.hdr_color_rt);
 
 		// Apply bloom
 		{
