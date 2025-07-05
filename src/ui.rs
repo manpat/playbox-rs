@@ -215,6 +215,16 @@ pub enum Axis {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
+pub enum Alignment {
+	Unspecified,
+	Begin,
+	Center,
+	// TODO(pat.m): baseline
+	End,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u8)]
 pub enum LayoutType {
 	Stack,
 	LeftToRight,
@@ -311,11 +321,22 @@ impl WidgetConstraints {
 	}
 }
 
+#[derive(Default, Clone)]
+pub struct WidgetLayoutConfig {
+	pub layout_type: LayoutType,
+
+	pub main_alignment: Alignment,
+	pub cross_alignment: Alignment,
+
+	pub main_child_alignment: Alignment,
+	pub cross_child_alignment: Alignment,
+}
+
 pub struct Widget {
 	pub parent: WidgetId,
 
 	pub constraints: WidgetConstraints,
-	pub layout_type: LayoutType,
+	pub layout: WidgetLayoutConfig,
 
 	pub layout_key: Option<layout::LayoutKey>,
 
