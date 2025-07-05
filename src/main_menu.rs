@@ -16,9 +16,32 @@ impl MainMenuScene {
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
-		// ctx.gfx.frame_encoder.backbuffer_color(Color::rgb(0.05, 0.01, 0.01));
+		ctx.gfx.frame_encoder.backbuffer_color(Color::rgb(0.05, 0.01, 0.01));
 
-		// ctx.input.set_capture_mouse(false);
+		ctx.input.set_capture_mouse(false);
+
+		ui::build(ctx.gfx, ctx.ui_system, |ui| {
+			let widget = ui.start_widget();
+			// widget.constraints.set_fixed_size(Vec2::splat(100.0));
+			widget.constraints.set_margins(10.0);
+			widget.constraints.set_paddings(10.0);
+
+			if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
+				painter.rect(rect, Color::red());
+			}
+
+			{
+				let widget = ui.do_widget();
+				widget.constraints.horizontal.set_fixed_size(500.0);
+
+				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
+					painter.rect(rect, Color::blue());
+				}
+			}
+
+
+			ui.end_widget();
+		});
 
 		// let scale_factor = 0.5;
 

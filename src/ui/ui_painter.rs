@@ -67,6 +67,7 @@ impl UiPainter<'_> {
 
 impl UiPainter<'_> {
 	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
+		self.set_paint_mode(UiPaintMode::ShapeUntextured);
 		self.buffer.draw_quad(geom, Aabb2::zero(), color);
 	}
 }

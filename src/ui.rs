@@ -2,6 +2,7 @@ mod ui_painter;
 // mod ui_builder;
 mod ui_layout;
 mod glyph_cache;
+mod layout;
 
 pub use ui_painter::*;
 // pub use ui_builder::*;
@@ -63,13 +64,13 @@ struct WidgetStackEntry {
 
 pub struct UiContext<'ctx> {
 	system: &'ctx mut UiSystem,
-	pass: UiPass<'ctx>,
+	pub pass: UiPass<'ctx>,
 
 	tree: WidgetTree,
 	widget_stack: Vec<WidgetStackEntry>,
 }
 
-pub fn build_ui(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl FnMut(&mut UiContext)) {
+pub fn build(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl FnMut(&mut UiContext)) {
 	let screen_size = gfx.backbuffer_size().to_vec2() * system.global_scale;
 
 	let mut ctx = UiContext {
@@ -92,7 +93,7 @@ pub fn build_ui(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl Fn
 		do_ui(&mut ctx);
 	}
 
-	// layout_widget_tree(ctx.tree);
+	layout::layout_widget_tree(&mut ctx.tree);
 
 	// Render pass
 	{
@@ -125,7 +126,12 @@ pub fn build_ui(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl Fn
 
 
 impl<'ctx> UiContext<'ctx> {
-	pub fn start_widget(&mut self, id: impl Into<WidgetId>) -> &mut Widget {
+	pub fn start_widget(&mut self) -> &mut Widget {
+		let id = self.auto_id();
+		self.start_widget_with_id(id)
+	}
+
+	pub fn start_widget_with_id(&mut self, id: impl Into<WidgetId>) -> &mut Widget {
 		let id = id.into();
 
 		let prev = self.widget_stack.last_mut().unwrap();
@@ -144,7 +150,12 @@ impl<'ctx> UiContext<'ctx> {
 		self.widget_stack.pop();
 	}
 
-	pub fn do_widget(&mut self, id: impl Into<WidgetId>) -> &mut Widget {
+	pub fn do_widget(&mut self) -> &mut Widget {
+		let id = self.auto_id();
+		self.do_widget_with_id(id)
+	}
+
+	pub fn do_widget_with_id(&mut self, id: impl Into<WidgetId>) -> &mut Widget {
 		let id = id.into();
 
 		let prev = self.widget_stack.last_mut().unwrap();
@@ -170,8 +181,7 @@ impl<'ctx> UiContext<'ctx> {
 
 impl<'ctx> UiContext<'ctx> {
 	pub fn text(&mut self, text: impl AsRef<str>) {
-		let id = self.auto_id();
-		let widget = self.do_widget(id);
+		let widget = self.do_widget();
 
 		let text = text.as_ref();
 		let font_size = 16;
@@ -185,8 +195,6 @@ impl<'ctx> UiContext<'ctx> {
 			UiPass::Render(_) => {
 				// self.system.painter.text(font_size, text);
 			}
-
-			_ => {}
 		}
 	}
 
@@ -200,14 +208,14 @@ impl<'ctx> UiContext<'ctx> {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
-enum Axis {
+pub enum Axis {
 	Horizontal = 0,
 	Vertical = 1,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
-enum LayoutType {
+pub enum LayoutType {
 	Stack,
 	LeftToRight,
 	RightToLeft,
@@ -215,7 +223,8 @@ enum LayoutType {
 	BottomToTop,
 }
 
-struct WidgetAxisConstraints {
+#[derive(Clone)]
+pub struct WidgetAxisConstraints {
 	pub min: f32,
 	pub preferred: f32,
 	pub max: f32,
@@ -249,29 +258,66 @@ impl WidgetAxisConstraints {
 		self.preferred = fixed;
 		self.max = fixed;
 	}
+
+	pub fn set_margins(&mut self, size: f32) {
+		self.margin_start = size;
+		self.margin_end = size;
+	}
+
+	pub fn set_paddings(&mut self, size: f32) {
+		self.padding_start = size;
+		self.padding_end = size;
+	}
 }
 
-#[derive(Default)]
-struct WidgetConstraints([WidgetAxisConstraints; 2]);
+#[derive(Default, Clone)]
+pub struct WidgetConstraints {
+	pub horizontal: WidgetAxisConstraints,
+	pub vertical: WidgetAxisConstraints,
+}
 
 impl WidgetConstraints {
 	pub fn axis(&self, axis: Axis) -> &WidgetAxisConstraints {
-		&self.0[axis as usize]
+		match axis {
+			Axis::Horizontal => &self.horizontal,
+			Axis::Vertical => &self.vertical,
+		}
 	}
 
 	pub fn axis_mut(&mut self, axis: Axis) -> &mut WidgetAxisConstraints {
-		&mut self.0[axis as usize]
+		match axis {
+			Axis::Horizontal => &mut self.horizontal,
+			Axis::Vertical => &mut self.vertical,
+		}
 	}
 
 	pub fn set_fixed_size(&mut self, size: Vec2) {
-		self.axis_mut(Axis::Horizontal).set_fixed_size(size.x);
-		self.axis_mut(Axis::Vertical).set_fixed_size(size.y);
+		self.horizontal.set_fixed_size(size.x);
+		self.vertical.set_fixed_size(size.y);
+	}
+
+	pub fn set_margins(&mut self, margin: f32) {
+		self.horizontal.set_margins(margin);
+		self.vertical.set_margins(margin);
+	}
+
+	pub fn set_paddings(&mut self, padding: f32) {
+		self.horizontal.set_paddings(padding);
+		self.vertical.set_paddings(padding);
+	}
+
+	pub fn preferred_size(&self) -> Vec2 {
+		Vec2::new(self.horizontal.preferred, self.vertical.preferred)
 	}
 }
 
-struct Widget {
-	pub constraints: WidgetConstraints,
+pub struct Widget {
 	pub parent: WidgetId,
+
+	pub constraints: WidgetConstraints,
+	pub layout_type: LayoutType,
+
+	pub layout_key: Option<layout::LayoutKey>,
 
 	// Includes padding.
 	pub rect: Option<Aabb2>,
@@ -280,8 +326,12 @@ struct Widget {
 impl Default for Widget {
 	fn default() -> Widget {
 		Widget {
-			constraints: default(),
 			parent: WidgetId::ROOT,
+
+			constraints: default(),
+			layout_type: LayoutType::Stack,
+
+			layout_key: None,
 
 			rect: None,
 		}
@@ -298,18 +348,23 @@ impl WidgetId {
 
 #[derive(Default)]
 struct WidgetTree {
-	widgets: HashMap<WidgetId, Widget>,
-	children: HashMap<WidgetId, SmallVec<[WidgetId; 4]>>,
+	pub widgets: HashMap<WidgetId, Widget>,
+	pub children: HashMap<WidgetId, SmallVec<[WidgetId; 4]>>,
+
+	pub submission_order: Vec<WidgetId>,
 }
 
 impl WidgetTree {
 	pub fn clear(&mut self) {
 		self.widgets.clear();
 		self.children.clear();
+		self.submission_order.clear();
 	}
 
 	pub fn make_root(&mut self) -> &mut Widget {
 		use std::collections::hash_map::Entry;
+
+		self.submission_order.push(WidgetId::ROOT);
 
 		match self.widgets.entry(WidgetId::ROOT) {
 			Entry::Occupied(_) => panic!("Root already exists!"),
@@ -330,6 +385,8 @@ impl WidgetTree {
 		use std::collections::hash_map::Entry;
 
 		assert!(id != WidgetId::ROOT);
+
+		self.submission_order.push(id);
 
 		self.children.entry(parent)
 			.or_default()
