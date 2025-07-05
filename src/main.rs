@@ -6,7 +6,6 @@ pub mod sprites;
 pub mod toy_draw;
 pub mod game_scene;
 pub mod main_menu;
-pub mod glyph_cache;
 
 pub mod view;
 pub mod model;
@@ -33,15 +32,18 @@ pub mod prelude {
 	pub use crate::console::Console;
 	pub use crate::editor;
 
-	pub use crate::glyph_cache::GlyphCache;
-
 	pub use crate::Context;
 
 	pub use std::collections::HashMap;
 	pub use std::borrow::Cow;
+	pub use std::hash::{DefaultHasher, Hash, Hasher};
 
 	pub use slotmap::SlotMap;
 	pub use smallvec::SmallVec;
+
+	pub fn default<T: Default>() -> T {
+		T::default()
+	}
 }
 
 use std::time::{Instant, Duration};
@@ -82,7 +84,7 @@ struct App {
 
 struct AppShared {
 	console: console::Console,
-	ui_shared: ui::UiShared,
+	ui_system: ui::UiSystem,
 
 	audio: MyAudioSystem,
 	delta_time: f32,
@@ -94,14 +96,14 @@ impl App {
 		let menu_cmd_subscription = ctx.bus.subscribe();
 
 		let audio = MyAudioSystem::start(&mut ctx.audio)?;
-		let ui_shared = ui::UiShared::new(&mut ctx.gfx)?;
+		let ui_system = ui::UiSystem::new(&mut ctx.gfx)?;
 		let mut console = console::Console::new();
 
 		register_commands(&mut console);
 
 		let mut shared = AppShared {
 			console,
-			ui_shared,
+			ui_system,
 			audio,
 			delta_time: 1.0/60.0,
 		};
@@ -238,7 +240,7 @@ impl toybox::App for App {
 			}
 		}
 
-		self.shared.ui_shared.glyph_atlas.get_mut().update_atlas(&mut ctx.gfx);
+		self.shared.ui_system.update(&mut ctx.gfx);
 	}
 
 	fn customise_debug_menu(&mut self, ctx: &mut toybox::Context, ui: &mut egui::Ui) {
@@ -265,7 +267,7 @@ pub struct Context<'tb> {
 
 	pub audio: &'tb MyAudioSystem,
 	pub console: &'tb mut Console,
-	pub ui_shared: &'tb mut ui::UiShared,
+	pub ui_system: &'tb mut ui::UiSystem,
 
 	pub delta_time: f32,
 	pub show_editor: bool,
@@ -274,11 +276,11 @@ pub struct Context<'tb> {
 impl<'tb> Context<'tb> {
 	fn new(tb: &'tb mut toybox::Context, shared: &'tb mut AppShared) -> Self {
 		let toybox::Context { gfx, input, egui, cfg, vfs, bus, show_debug_menu, .. } = tb;
-		let AppShared { audio, console, ui_shared, delta_time } = shared;
+		let AppShared { audio, console, ui_system, delta_time } = shared;
 		let show_editor = *show_debug_menu;
 		let delta_time = *delta_time;
 
-		Self {gfx, input, egui, cfg, vfs, bus, audio, ui_shared, console, delta_time, show_editor}
+		Self {gfx, input, egui, cfg, vfs, bus, audio, ui_system, console, delta_time, show_editor}
 	}
 }
 
