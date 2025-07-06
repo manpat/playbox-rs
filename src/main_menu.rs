@@ -25,6 +25,7 @@ impl MainMenuScene {
 			widget.layout.set_margins(10.0);
 			widget.layout.set_paddings(10.0);
 
+			widget.layout.layout_type = ui::LayoutType::LeftToRight;
 			widget.layout.horizontal.child_alignment = ui::Alignment::Start;
 			widget.layout.vertical.child_alignment = ui::Alignment::Center;
 
@@ -34,8 +35,8 @@ impl MainMenuScene {
 
 			{
 				let widget = ui.do_widget();
-				widget.layout.horizontal.set_fixed_size(500.0);
-				widget.layout.vertical.set_fixed_size(500.0);
+				widget.layout.horizontal.set_fixed_size(50.0);
+				widget.layout.vertical.set_fixed_size(100.0);
 
 				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
 					painter.rect(rect, Color::blue());
@@ -44,7 +45,8 @@ impl MainMenuScene {
 
 			{
 				let widget = ui.do_widget();
-				widget.layout.horizontal.set_fixed_size(300.0);
+				widget.layout.horizontal.min = 50.0;
+				widget.layout.horizontal.max = 300.0;
 				widget.layout.horizontal.alignment = Some(ui::Alignment::End);
 				widget.layout.vertical.alignment = Some(ui::Alignment::Start);
 
@@ -55,6 +57,8 @@ impl MainMenuScene {
 
 			{
 				let widget = ui.do_widget();
+				widget.layout.horizontal.min = 20.0;
+				widget.layout.horizontal.max = 300.0;
 				widget.layout.vertical.set_fixed_size(100.0);
 				widget.layout.vertical.alignment = Some(ui::Alignment::Start);
 

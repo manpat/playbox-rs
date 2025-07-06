@@ -177,21 +177,21 @@ impl<'ctx> UiContext<'ctx> {
 
 impl<'ctx> UiContext<'ctx> {
 	pub fn text(&mut self, text: impl AsRef<str>) {
-		let widget = self.do_widget();
+		// let widget = self.do_widget();
 
-		let text = text.as_ref();
-		let font_size = 16;
+		// let text = text.as_ref();
+		// let font_size = 16;
 
-		match self.pass {
-			UiPass::Layout => {
-				// let text_rect = self.system.painter.text_rect(font_size, text);
-				// widget.constraints.set_fixed_size(text_rect.size());
-			}
+		// match self.pass {
+		// 	UiPass::Layout => {
+		// 		// let text_rect = self.system.painter.text_rect(font_size, text);
+		// 		// widget.constraints.set_fixed_size(text_rect.size());
+		// 	}
 
-			UiPass::Render(_) => {
-				// self.system.painter.text(font_size, text);
-			}
-		}
+		// 	UiPass::Render(_) => {
+		// 		// self.system.painter.text(font_size, text);
+		// 	}
+		// }
 	}
 
 	pub fn button(&mut self, text: impl AsRef<str>) {
@@ -203,10 +203,9 @@ impl<'ctx> UiContext<'ctx> {
 
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
 pub enum Axis {
-	Horizontal = 0,
-	Vertical = 1,
+	Horizontal,
+	Vertical,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -232,7 +231,7 @@ pub enum LayoutType {
 #[derive(Clone)]
 pub struct WidgetAxisLayout {
 	pub min: f32,
-	pub preferred: f32,
+	pub preferred: f32, // TODO(pat.m): do I actually need this?
 	pub max: f32,
 
 	pub padding_start: f32,
@@ -240,6 +239,8 @@ pub struct WidgetAxisLayout {
 
 	pub margin_start: f32,
 	pub margin_end: f32,
+
+	pub spacing: f32,
 
 	pub child_alignment: Alignment,
 	pub alignment: Option<Alignment>,
@@ -257,6 +258,8 @@ impl Default for WidgetAxisLayout {
 
 			margin_start: 0.0,
 			margin_end: 0.0,
+
+			spacing: 4.0,
 
 			child_alignment: Alignment::Center,
 			alignment: None,
@@ -304,6 +307,10 @@ impl WidgetLayout {
 		}
 	}
 
+	pub fn each<T>(&mut self, f: impl Fn(&WidgetAxisLayout) -> T) -> [T; 2] {
+		[f(&self.horizontal), f(&self.vertical)]
+	}
+
 	pub fn set_fixed_size(&mut self, size: Vec2) {
 		self.horizontal.set_fixed_size(size.x);
 		self.vertical.set_fixed_size(size.y);
@@ -319,9 +326,9 @@ impl WidgetLayout {
 		self.vertical.set_paddings(padding);
 	}
 
-	pub fn preferred_size(&self) -> Vec2 {
-		Vec2::new(self.horizontal.preferred, self.vertical.preferred)
-	}
+	// pub fn preferred_size(&self) -> Vec2 {
+	// 	Vec2::new(self.horizontal.preferred, self.vertical.preferred)
+	// }
 }
 
 
