@@ -21,61 +21,110 @@ impl MainMenuScene {
 		ctx.input.set_capture_mouse(false);
 
 		ui::build(ctx.gfx, ctx.ui_system, |ui| {
-			let widget = ui.start_widget();
+			let mut widget = ui.begin_widget();
 			widget.layout.set_margins(10.0);
 			widget.layout.set_paddings(10.0);
 
 			widget.layout.layout_type = ui::LayoutType::LeftToRight;
-			widget.layout.horizontal.child_alignment = ui::Alignment::Start;
+			widget.layout.horizontal.child_alignment = ui::Alignment::Begin;
 			widget.layout.vertical.child_alignment = ui::Alignment::Center;
 
-			if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, widget.pass) {
-				painter.rect(rect, Color::red());
-			}
+			widget.draw_rect(Color::red());
 
 			{
-				let widget = ui.do_widget();
+				let mut widget = ui.do_widget();
 				widget.layout.horizontal.set_fixed_size(50.0);
 				widget.layout.vertical.set_fixed_size(100.0);
 
-				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, widget.pass) {
-					painter.rect(rect, Color::blue());
-				}
+				widget.draw_rect(Color::blue());
 			}
 
 			{
-				let widget = ui.start_widget();
+				let mut widget = ui.begin_widget();
 				widget.layout.horizontal.min = 50.0;
 				widget.layout.horizontal.max = 300.0;
 				widget.layout.horizontal.alignment = Some(ui::Alignment::End);
-				widget.layout.vertical.alignment = Some(ui::Alignment::Start);
+				widget.layout.vertical.alignment = Some(ui::Alignment::Begin);
+				widget.layout.vertical.child_alignment = ui::Alignment::End;
 
 				widget.layout.layout_type = ui::LayoutType::TopToBottom;
 
-				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, widget.pass) {
-					painter.rect(rect, Color::green());
-				}
+				widget.draw_rect(Color::green());
 
 				{
-					let widget = ui.do_widget();
-					widget.layout.set_fixed_size([20.0, 20.0].into());
+					let mut widget = ui.do_widget();
+					widget.layout.set_fixed_size([50.0, 50.0].into());
+					widget.draw_rect(Color::white());
+
+					let mut widget = ui.do_widget();
+					widget.layout.vertical.set_fixed_size(50.0);
+					widget.draw_rect(Color::white());
+
+					let mut widget = ui.do_widget();
+					widget.layout.horizontal.alignment = Some(ui::Alignment::Begin);
+					widget.layout.horizontal.set_fixed_size(50.0);
+					widget.layout.vertical.set_fixed_size(50.0);
+					widget.draw_rect(Color::white());
+
+					let mut widget = ui.do_widget();
+					widget.layout.vertical.min = 20.0;
+					widget.layout.vertical.max = 200.0;
+					widget.draw_rect(Color::white());
+
+					let mut widget = ui.do_widget();
+					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
+					widget.layout.horizontal.set_fixed_size(50.0);
+					widget.layout.vertical.set_fixed_size(50.0);
+					widget.draw_rect(Color::white());
 				}
 
 
 				ui.end_widget();
 			}
-
 			{
-				let widget = ui.do_widget();
-				widget.layout.horizontal.min = 20.0;
-				widget.layout.horizontal.max = 300.0;
-				widget.layout.vertical.set_fixed_size(100.0);
-				widget.layout.vertical.alignment = Some(ui::Alignment::Start);
+				let mut widget = ui.begin_widget();
+				widget.layout.layout_type = ui::LayoutType::Stack;
+				widget.draw_rect(Color::grey_a(0.0, 0.5));
 
-				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, widget.pass) {
-					painter.rect(rect, Color::magenta().with_alpha(0.5).to_premultiplied());
+				{
+					let mut widget = ui.do_widget();
+					widget.layout.horizontal.min = 20.0;
+					widget.layout.horizontal.max = 300.0;
+					widget.layout.vertical.set_fixed_size(100.0);
+
+					widget.layout.horizontal.alignment = Some(ui::Alignment::Begin);
+					widget.layout.vertical.alignment = Some(ui::Alignment::Begin);
+
+					widget.draw_rect(Color::magenta());
 				}
+
+				{
+					let mut widget = ui.do_widget();
+					widget.layout.set_fixed_size(Vec2::splat(50.0));
+					widget.layout.horizontal.alignment = Some(ui::Alignment::Begin);
+					widget.layout.vertical.alignment = Some(ui::Alignment::End);
+					widget.draw_rect(Color::magenta());
+				}
+
+				{
+					let mut widget = ui.do_widget();
+					widget.layout.set_fixed_size(Vec2::splat(50.0));
+					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
+					widget.layout.vertical.alignment = Some(ui::Alignment::Begin);
+					widget.draw_rect(Color::cyan());
+				}
+
+				{
+					let mut widget = ui.do_widget();
+					widget.layout.set_fixed_size(Vec2::splat(50.0));
+					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
+					widget.layout.vertical.alignment = Some(ui::Alignment::End);
+					widget.draw_rect(Color::cyan());
+				}
+
+				ui.end_widget();
 			}
+
 
 
 			ui.end_widget();

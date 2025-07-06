@@ -127,14 +127,30 @@ pub struct WidgetRef<'sys, 'ctx> where 'sys: 'ctx {
 	pub pass: &'ctx mut UiPass<'sys>,
 }
 
-
-impl<'sys> UiContext<'sys> {
-	pub fn start_widget<'ctx>(&'ctx mut self) -> WidgetRef<'sys, 'ctx> {
-		let id = self.auto_id();
-		self.start_widget_with_id(id)
+impl WidgetRef<'_, '_> {
+	pub fn with_painter(&mut self, f: impl FnOnce(&mut UiPainter, Aabb2)) {
+		if let UiPass::Render(painter) = self.pass 
+			&& let Some(rect) = self.rect
+		{
+			f(painter, rect);
+		}
 	}
 
-	pub fn start_widget_with_id<'ctx>(&'ctx mut self, id: impl Into<WidgetId>) -> WidgetRef<'sys, 'ctx> {
+	pub fn draw_rect(&mut self, color: impl Into<Color>) {
+		self.with_painter(|painter, rect| {
+			painter.rect(rect, color.into());
+		});
+	}
+}
+
+
+impl<'sys> UiContext<'sys> {
+	pub fn begin_widget<'ctx>(&'ctx mut self) -> WidgetRef<'sys, 'ctx> {
+		let id = self.auto_id();
+		self.begin_widget_with_id(id)
+	}
+
+	pub fn begin_widget_with_id<'ctx>(&'ctx mut self, id: impl Into<WidgetId>) -> WidgetRef<'sys, 'ctx> {
 		let id = id.into();
 
 		let prev = self.widget_stack.last_mut().unwrap();
@@ -232,7 +248,7 @@ pub enum Axis {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Alignment {
-	Start,
+	Begin,
 	Center,
 	// TODO(pat.m): baseline
 	End,

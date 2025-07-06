@@ -103,8 +103,8 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 				layout_axis_overlapping(leaf_nodes, layout_children, Axis::Horizontal, container)
 			}
 
-			LayoutType::LeftToRight => { layout_axis_linear(leaf_nodes, layout_children, Axis::Horizontal, container) }
-			LayoutType::RightToLeft => { layout_axis_linear(leaf_nodes, layout_children, Axis::Horizontal, container) }
+			LayoutType::LeftToRight => { layout_axis_linear(leaf_nodes, layout_children, Axis::Horizontal, container, false) }
+			LayoutType::RightToLeft => { layout_axis_linear(leaf_nodes, layout_children, Axis::Horizontal, container, true) }
 		}
 
 		// Layout vertically
@@ -113,8 +113,8 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 				layout_axis_overlapping(leaf_nodes, layout_children, Axis::Vertical, container);
 			}
 
-			LayoutType::TopToBottom => { layout_axis_linear(leaf_nodes, layout_children, Axis::Vertical, container) }
-			LayoutType::BottomToTop => { layout_axis_linear(leaf_nodes, layout_children, Axis::Vertical, container) }
+			LayoutType::TopToBottom => { layout_axis_linear(leaf_nodes, layout_children, Axis::Vertical, container, true) }
+			LayoutType::BottomToTop => { layout_axis_linear(leaf_nodes, layout_children, Axis::Vertical, container, false) }
 		}
 	}
 
@@ -212,7 +212,7 @@ fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey
 		*child_size = (available_content_size - margin_total).clamp(min_length, max_length);
 
 		match alignment {
-			Alignment::Start => {
+			Alignment::Begin => {
 				*child_position = available_content_start + child_config.margin_start;
 			}
 			Alignment::Center => {
@@ -225,7 +225,7 @@ fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey
 	}
 }
 
-fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], axis: Axis, container: &ResolvedLayout) {
+fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], axis: Axis, container: &ResolvedLayout, reverse: bool) {
 	let container_config = container.config.axis(axis);
 	let container_size = length(&container.size, axis);
 	let container_padding = container_config.padding_start + container_config.padding_end;
@@ -284,15 +284,38 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 	let container_position = length(&container.position, axis);
 	let mut content_position = container_position + container_config.padding_start;
 
-	// TODO(pat.m): justify left/right
-	for &key in children {
-		let config = &widgets[key].config.axis(axis);
-		let size = length(&widgets[key].size, axis);
+	match container_config.child_alignment {
+		Alignment::Begin => {}
 
-		content_position += config.margin_start;
-		*length_mut(&mut widgets[key].position, axis) = content_position;
+		Alignment::Center => {
+			content_position += remaining_space / 2.0;
+		}
 
-		content_position += size + config.margin_end + container_config.spacing;
+		Alignment::End => {
+			content_position += remaining_space;
+		}
+	}
+
+	if reverse {
+		for &key in children.iter().rev() {
+			let config = &widgets[key].config.axis(axis);
+			let size = length(&widgets[key].size, axis);
+
+			content_position += config.margin_start;
+			*length_mut(&mut widgets[key].position, axis) = content_position;
+
+			content_position += size + config.margin_end + container_config.spacing;
+		}
+	} else {
+		for &key in children {
+			let config = &widgets[key].config.axis(axis);
+			let size = length(&widgets[key].size, axis);
+
+			content_position += config.margin_start;
+			*length_mut(&mut widgets[key].position, axis) = content_position;
+
+			content_position += size + config.margin_end + container_config.spacing;
+		}
 	}
 }
 
