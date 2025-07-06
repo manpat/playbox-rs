@@ -47,10 +47,10 @@ impl UiSystem {
 	}
 }
 
-pub enum UiPass<'ctx> {
+pub enum UiPass<'sys> {
 	// Input,
 	Layout,
-	Render(UiPainter<'ctx>),
+	Render(UiPainter<'sys>),
 }
 
 struct WidgetStackEntry {
@@ -58,9 +58,9 @@ struct WidgetStackEntry {
 	num_children: u32,
 }
 
-pub struct UiContext<'ctx> {
-	system: &'ctx mut UiSystem,
-	pub pass: UiPass<'ctx>,
+pub struct UiContext<'sys> {
+	system: &'sys mut UiSystem,
+	pub pass: UiPass<'sys>,
 
 	tree: WidgetTree,
 	widget_stack: Vec<WidgetStackEntry>,
@@ -120,14 +120,21 @@ pub fn build(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl FnMut
 }
 
 
+pub struct WidgetRef<'sys, 'ctx> where 'sys: 'ctx {
+	pub layout: &'ctx mut WidgetLayout,
+	pub rect: Option<Aabb2>,
 
-impl<'ctx> UiContext<'ctx> {
-	pub fn start_widget(&mut self) -> &mut Widget {
+	pub pass: &'ctx mut UiPass<'sys>,
+}
+
+
+impl<'sys> UiContext<'sys> {
+	pub fn start_widget<'ctx>(&'ctx mut self) -> WidgetRef<'sys, 'ctx> {
 		let id = self.auto_id();
 		self.start_widget_with_id(id)
 	}
 
-	pub fn start_widget_with_id(&mut self, id: impl Into<WidgetId>) -> &mut Widget {
+	pub fn start_widget_with_id<'ctx>(&'ctx mut self, id: impl Into<WidgetId>) -> WidgetRef<'sys, 'ctx> {
 		let id = id.into();
 
 		let prev = self.widget_stack.last_mut().unwrap();
@@ -136,9 +143,16 @@ impl<'ctx> UiContext<'ctx> {
 
 		self.widget_stack.push(WidgetStackEntry{ id, num_children: 0 });
 
-		match self.pass {
+		let widget = match self.pass {
 			UiPass::Layout => self.tree.insert(id, parent),
 			UiPass::Render(_) => self.tree.get_mut(id),
+		};
+
+		WidgetRef {
+			layout: &mut widget.layout,
+			rect: widget.rect,
+
+			pass: &mut self.pass,
 		}
 	}
 
@@ -146,21 +160,28 @@ impl<'ctx> UiContext<'ctx> {
 		self.widget_stack.pop();
 	}
 
-	pub fn do_widget(&mut self) -> &mut Widget {
+	pub fn do_widget<'ctx>(&'ctx mut self) -> WidgetRef<'sys, 'ctx> {
 		let id = self.auto_id();
 		self.do_widget_with_id(id)
 	}
 
-	pub fn do_widget_with_id(&mut self, id: impl Into<WidgetId>) -> &mut Widget {
+	pub fn do_widget_with_id<'ctx>(&'ctx mut self, id: impl Into<WidgetId>) -> WidgetRef<'sys, 'ctx> {
 		let id = id.into();
 
 		let prev = self.widget_stack.last_mut().unwrap();
 		let parent = prev.id;
 		prev.num_children += 1;
 
-		match self.pass {
+		let widget = match self.pass {
 			UiPass::Layout => self.tree.insert(id, parent),
 			UiPass::Render(_) => self.tree.get_mut(id),
+		};
+
+		WidgetRef {
+			layout: &mut widget.layout,
+			rect: widget.rect,
+
+			pass: &mut self.pass,
 		}
 	}
 
@@ -175,7 +196,7 @@ impl<'ctx> UiContext<'ctx> {
 	}
 }
 
-impl<'ctx> UiContext<'ctx> {
+impl<'sys> UiContext<'sys> {
 	pub fn text(&mut self, text: impl AsRef<str>) {
 		// let widget = self.do_widget();
 
