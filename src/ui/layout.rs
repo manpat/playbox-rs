@@ -248,9 +248,9 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 		*length_mut(&mut widgets[key].size, axis) = config.min;
 	}
 
-	// TODO(pat.m): if layout has overflow, then available_space can be infinite
-	let mut available_space2 = (available_space - total_min_size).max(0.0);
-	while available_space2 > 0.0 && num_children_wanting_expand > 0 {
+	// TODO(pat.m): if layout has overflow, then remaining_space can be infinite
+	let mut remaining_space = (available_space - total_min_size).max(0.0);
+	while remaining_space > 0.0 && num_children_wanting_expand > 0 {
 		for &key in children {
 			let config = &widgets[key].config.axis(axis);
 			let size = length_mut(&mut widgets[key].size, axis);
@@ -261,20 +261,20 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 				continue;
 			}
 
-			let available_expansion_space = (available_space2 / num_children_wanting_expand as f32).max(0.0);
+			let available_expansion_space = (remaining_space / num_children_wanting_expand as f32).max(0.0);
 			let claimed_expansion = available_expansion_space.min(allowed_expansion);
 
 			*size += claimed_expansion;
-			available_space2 -= claimed_expansion;
+			remaining_space -= claimed_expansion;
 
 			if available_expansion_space >= allowed_expansion {
 				// We've reached our max, so we don't need to expand any more.
 				num_children_wanting_expand -= 1;
 			}
 
-			// We have to check for denorms since we're subtracting increasingly smaller amounts from available_space.
-			if available_space2.is_subnormal() || available_space2 <= 0.0 {
-				available_space2 = 0.0;
+			// We have to check for denorms since we're subtracting increasingly smaller amounts from remaining_space.
+			if remaining_space.is_subnormal() || remaining_space <= 0.0 {
+				remaining_space = 0.0;
 				break;
 			}
 		}
