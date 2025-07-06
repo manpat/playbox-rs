@@ -3,9 +3,8 @@ use super::*;
 
 pub type LayoutKey = usize;
 
-struct WidgetLayout {
-	layout_type: LayoutType,
-	constraints: WidgetConstraints,
+struct ResolvedLayout {
+	config: WidgetLayout,
 
 	size: Vec2,
 	position: Vec2,
@@ -13,7 +12,7 @@ struct WidgetLayout {
 
 #[derive(Default)]
 pub struct LayoutTree {
-	widgets: Vec<WidgetLayout>,
+	widgets: Vec<ResolvedLayout>,
 	children: Vec<SmallVec<[LayoutKey; 4]>>,
 }
 
@@ -31,9 +30,8 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 
 		{
 			let widget = widget_tree.widgets.get_mut(&widget_id).unwrap();
-			layout_tree.widgets.push(WidgetLayout {
-				constraints: widget.constraints.clone(),
-				layout_type: widget.layout_type,
+			layout_tree.widgets.push(ResolvedLayout {
+				config: widget.layout.clone(),
 
 				size: Vec2::zero(),
 				position: Vec2::zero(),
@@ -64,15 +62,15 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 		}
 
 		let (leaf_nodes, post) = layout_tree.widgets.split_at_mut(layout_key);
-		let widget = &mut post[0];
+		let container = &mut post[0];
 
-		match widget.layout_type {
+		match container.config.layout_type {
 			LayoutType::Stack => {
 				let horizontal_measurement = measure_axis_overlapping(leaf_nodes, layout_children, Axis::Horizontal);
 				let vertical_measurement = measure_axis_overlapping(leaf_nodes, layout_children, Axis::Vertical);
 
-				adjust_constraints(widget.constraints.axis_mut(Axis::Horizontal), &horizontal_measurement);
-				adjust_constraints(widget.constraints.axis_mut(Axis::Vertical), &vertical_measurement);
+				adjust_container_constraints(container.config.axis_mut(Axis::Horizontal), &horizontal_measurement);
+				adjust_container_constraints(container.config.axis_mut(Axis::Vertical), &vertical_measurement);
 			}
 
 			LayoutType::LeftToRight => unimplemented!(),
@@ -84,8 +82,8 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 
 	// Root should already be at the appropriate size.
 	{
-		let mut root = layout_tree.widgets.last_mut().unwrap();
-		root.size = root.constraints.preferred_size();
+		let root = layout_tree.widgets.last_mut().unwrap();
+		root.size = root.config.preferred_size();
 		root.position = Vec2::zero();
 	}
 
@@ -99,16 +97,24 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 		let (leaf_nodes, post) = layout_tree.widgets.split_at_mut(layout_key);
 		let container = &post[0];
 
-		match container.layout_type {
-			LayoutType::Stack => {
-				layout_axis_overlapping(leaf_nodes, layout_children, Axis::Horizontal, container);
+		// Layout horizontally
+		match container.config.layout_type {
+			LayoutType::Stack | LayoutType::TopToBottom | LayoutType::BottomToTop => {
+				layout_axis_overlapping(leaf_nodes, layout_children, Axis::Horizontal, container)
+			}
+
+			LayoutType::LeftToRight => { /*layout_axis_linear()*/ }
+			LayoutType::RightToLeft => { /*layout_axis_linear()*/ }
+		}
+
+		// Layout vertically
+		match container.config.layout_type {
+			LayoutType::Stack | LayoutType::LeftToRight | LayoutType::RightToLeft => {
 				layout_axis_overlapping(leaf_nodes, layout_children, Axis::Vertical, container);
 			}
 
-			LayoutType::LeftToRight => unimplemented!(),
-			LayoutType::RightToLeft => unimplemented!(),
-			LayoutType::TopToBottom => unimplemented!(),
-			LayoutType::BottomToTop => unimplemented!(),
+			LayoutType::TopToBottom => { /*layout_axis_linear()*/ }
+			LayoutType::BottomToTop => { /*layout_axis_linear()*/ }
 		}
 	}
 
@@ -121,31 +127,30 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	}
 }
 
-struct AxisMeasurement {
+struct ContainerMeasurement {
 	min_length: f32,
 	preferred_length: f32,
 }
 
-fn measure_axis_overlapping(widgets: &[WidgetLayout], children: &[LayoutKey], axis: Axis) -> AxisMeasurement {
+fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis) -> ContainerMeasurement {
 	let mut min_length = 0.0f32;
 	let mut preferred_length = 0.0f32;
 
 	for &key in children {
-		let constraints = widgets[key].constraints.axis(axis);
+		let config = widgets[key].config.axis(axis);
+		let margin_total = config.margin_start + config.margin_end;
 
-		let margin_total = constraints.margin_start + constraints.margin_end;
-
-		min_length = min_length.max(constraints.min + margin_total);
-		preferred_length = preferred_length.max(constraints.preferred + margin_total);
+		min_length = min_length.max(config.min + margin_total);
+		preferred_length = preferred_length.max(config.preferred + margin_total);
 	}
 
-	AxisMeasurement {
+	ContainerMeasurement {
 		min_length,
 		preferred_length,
 	}
 }
 
-fn adjust_constraints(constraints: &mut WidgetAxisConstraints, measurement: &AxisMeasurement) {
+fn adjust_container_constraints(constraints: &mut WidgetAxisLayout, measurement: &ContainerMeasurement) {
 	let initial_min = constraints.min;
 	let initial_preferred = constraints.preferred;
 	let padding_total = constraints.padding_start + constraints.padding_end;
@@ -156,34 +161,48 @@ fn adjust_constraints(constraints: &mut WidgetAxisConstraints, measurement: &Axi
 		.clamp(constraints.min, constraints.max);
 }
 
-fn layout_axis_overlapping(widgets: &mut [WidgetLayout], children: &[LayoutKey], axis: Axis, container: &WidgetLayout) {
-	let container_constraints = container.constraints.axis(axis);
+fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey], axis: Axis, container: &ResolvedLayout) {
+	let container_config = container.config.axis(axis);
 	let container_size = length(&container.size, axis);
 	let container_position = length(&container.position, axis);
-	let container_padding = container_constraints.padding_start + container_constraints.padding_end;
+	let container_padding = container_config.padding_start + container_config.padding_end;
 
 	let available_content_size = (container_size - container_padding).max(0.0);
-	let available_content_start = container_position + container_constraints.padding_start;
+	let available_content_start = container_position + container_config.padding_start;
 
 	for &key in children {
-		let layout = &mut widgets[key];
+		let child = &mut widgets[key];
 
-		let constraints = layout.constraints.axis(axis);
-		let margin_total = constraints.margin_start + constraints.margin_end;
+		let child_config = child.config.axis(axis);
+		let margin_total = child_config.margin_start + child_config.margin_end;
 
-		let min_length = constraints.min;
-		let max_length = constraints.max;
+		let min_length = child_config.min;
+		let max_length = child_config.max;
 
-		let layout_position = length_mut(&mut layout.position, axis);
-		let layout_size = length_mut(&mut layout.size, axis);
+		let alignment = child_config.alignment.unwrap_or(container_config.child_alignment);
 
-		*layout_size = (available_content_size - margin_total).clamp(min_length, max_length);
+		let child_position = length_mut(&mut child.position, axis);
+		let child_size = length_mut(&mut child.size, axis);
 
-		// TODO(pat.m): alignment
+		*child_size = (available_content_size - margin_total).clamp(min_length, max_length);
 
-		*layout_position = available_content_start + (available_content_size - *layout_size) / 2.0;
+		match alignment {
+			Alignment::Start => {
+				*child_position = available_content_start + child_config.margin_start;
+			}
+			Alignment::Center => {
+				*child_position = available_content_start + (available_content_size - *child_size) / 2.0;
+			}
+			Alignment::End => {
+				*child_position = available_content_start + available_content_size - *child_size - child_config.margin_end;
+			}
+		}
 	}
 }
+
+// fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], axis: Axis, container: &ResolvedLayout) {
+
+// }
 
 
 fn length_mut(v: &mut Vec2, axis: Axis) -> &mut f32 {

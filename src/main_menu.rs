@@ -22,9 +22,11 @@ impl MainMenuScene {
 
 		ui::build(ctx.gfx, ctx.ui_system, |ui| {
 			let widget = ui.start_widget();
-			// widget.constraints.set_fixed_size(Vec2::splat(100.0));
-			widget.constraints.set_margins(10.0);
-			widget.constraints.set_paddings(10.0);
+			widget.layout.set_margins(10.0);
+			widget.layout.set_paddings(10.0);
+
+			widget.layout.horizontal.child_alignment = ui::Alignment::Start;
+			widget.layout.vertical.child_alignment = ui::Alignment::Center;
 
 			if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
 				painter.rect(rect, Color::red());
@@ -32,10 +34,32 @@ impl MainMenuScene {
 
 			{
 				let widget = ui.do_widget();
-				widget.constraints.horizontal.set_fixed_size(500.0);
+				widget.layout.horizontal.set_fixed_size(500.0);
+				widget.layout.vertical.set_fixed_size(500.0);
 
 				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
 					painter.rect(rect, Color::blue());
+				}
+			}
+
+			{
+				let widget = ui.do_widget();
+				widget.layout.horizontal.set_fixed_size(300.0);
+				widget.layout.horizontal.alignment = Some(ui::Alignment::End);
+				widget.layout.vertical.alignment = Some(ui::Alignment::Start);
+
+				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
+					painter.rect(rect, Color::green());
+				}
+			}
+
+			{
+				let widget = ui.do_widget();
+				widget.layout.vertical.set_fixed_size(100.0);
+				widget.layout.vertical.alignment = Some(ui::Alignment::Start);
+
+				if let (Some(rect), ui::UiPass::Render(painter)) = (widget.rect, &mut ui.pass) {
+					painter.rect(rect, Color::magenta().with_alpha(0.5).to_premultiplied());
 				}
 			}
 

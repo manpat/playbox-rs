@@ -1,12 +1,8 @@
 mod ui_painter;
-// mod ui_builder;
-mod ui_layout;
 mod glyph_cache;
 mod layout;
 
 pub use ui_painter::*;
-// pub use ui_builder::*;
-pub use ui_layout::*;
 
 use crate::prelude::*;
 use glyph_cache::GlyphCache;
@@ -82,7 +78,7 @@ pub fn build(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl FnMut
 	};
 
 	let root_widget = ctx.tree.make_root();
-	root_widget.constraints.set_fixed_size(screen_size);
+	root_widget.layout.set_fixed_size(screen_size);
 
 	// Layout pass
 	{
@@ -216,16 +212,16 @@ pub enum Axis {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Alignment {
-	Unspecified,
-	Begin,
+	Start,
 	Center,
 	// TODO(pat.m): baseline
 	End,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum LayoutType {
+	#[default]
 	Stack,
 	LeftToRight,
 	RightToLeft,
@@ -234,7 +230,7 @@ pub enum LayoutType {
 }
 
 #[derive(Clone)]
-pub struct WidgetAxisConstraints {
+pub struct WidgetAxisLayout {
 	pub min: f32,
 	pub preferred: f32,
 	pub max: f32,
@@ -244,11 +240,14 @@ pub struct WidgetAxisConstraints {
 
 	pub margin_start: f32,
 	pub margin_end: f32,
+
+	pub child_alignment: Alignment,
+	pub alignment: Option<Alignment>,
 }
 
-impl Default for WidgetAxisConstraints {
+impl Default for WidgetAxisLayout {
 	fn default() -> Self {
-		WidgetAxisConstraints {
+		WidgetAxisLayout {
 			min: 0.0,
 			preferred: 1.0,
 			max: f32::INFINITY,
@@ -258,11 +257,14 @@ impl Default for WidgetAxisConstraints {
 
 			margin_start: 0.0,
 			margin_end: 0.0,
+
+			child_alignment: Alignment::Center,
+			alignment: None,
 		}
 	}
 }
 
-impl WidgetAxisConstraints {
+impl WidgetAxisLayout {
 	pub fn set_fixed_size(&mut self, fixed: f32) {
 		self.min = fixed;
 		self.preferred = fixed;
@@ -281,20 +283,21 @@ impl WidgetAxisConstraints {
 }
 
 #[derive(Default, Clone)]
-pub struct WidgetConstraints {
-	pub horizontal: WidgetAxisConstraints,
-	pub vertical: WidgetAxisConstraints,
+pub struct WidgetLayout {
+	pub layout_type: LayoutType,
+	pub horizontal: WidgetAxisLayout,
+	pub vertical: WidgetAxisLayout,
 }
 
-impl WidgetConstraints {
-	pub fn axis(&self, axis: Axis) -> &WidgetAxisConstraints {
+impl WidgetLayout {
+	pub fn axis(&self, axis: Axis) -> &WidgetAxisLayout {
 		match axis {
 			Axis::Horizontal => &self.horizontal,
 			Axis::Vertical => &self.vertical,
 		}
 	}
 
-	pub fn axis_mut(&mut self, axis: Axis) -> &mut WidgetAxisConstraints {
+	pub fn axis_mut(&mut self, axis: Axis) -> &mut WidgetAxisLayout {
 		match axis {
 			Axis::Horizontal => &mut self.horizontal,
 			Axis::Vertical => &mut self.vertical,
@@ -321,22 +324,11 @@ impl WidgetConstraints {
 	}
 }
 
-#[derive(Default, Clone)]
-pub struct WidgetLayoutConfig {
-	pub layout_type: LayoutType,
-
-	pub main_alignment: Alignment,
-	pub cross_alignment: Alignment,
-
-	pub main_child_alignment: Alignment,
-	pub cross_child_alignment: Alignment,
-}
 
 pub struct Widget {
 	pub parent: WidgetId,
 
-	pub constraints: WidgetConstraints,
-	pub layout: WidgetLayoutConfig,
+	pub layout: WidgetLayout,
 
 	pub layout_key: Option<layout::LayoutKey>,
 
@@ -349,8 +341,7 @@ impl Default for Widget {
 		Widget {
 			parent: WidgetId::ROOT,
 
-			constraints: default(),
-			layout_type: LayoutType::Stack,
+			layout: default(),
 
 			layout_key: None,
 
