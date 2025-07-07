@@ -1,11 +1,16 @@
 mod ui_painter;
 mod glyph_cache;
 mod layout;
+mod widget_tree;
 
 pub use ui_painter::*;
+pub use widget_tree::WidgetId;
 
 use crate::prelude::*;
+
 use glyph_cache::GlyphCache;
+use widget_tree::WidgetTree;
+
 use std::cell::RefCell;
 
 // const FONT_DATA: &[u8] = include_bytes!("../resource/fonts/Tuffy.otf");
@@ -128,7 +133,13 @@ pub struct WidgetRef<'sys, 'ctx> where 'sys: 'ctx {
 }
 
 impl WidgetRef<'_, '_> {
-	pub fn with_painter(&mut self, f: impl FnOnce(&mut UiPainter, Aabb2)) {
+	pub fn with_painter(&mut self, f: impl FnOnce(&mut UiPainter)) {
+		if let UiPass::Render(painter) = self.pass {
+			f(painter);
+		}
+	}
+
+	pub fn with_painter_and_rect(&mut self, f: impl FnOnce(&mut UiPainter, Aabb2)) {
 		if let UiPass::Render(painter) = self.pass 
 			&& let Some(rect) = self.rect
 		{
@@ -137,7 +148,7 @@ impl WidgetRef<'_, '_> {
 	}
 
 	pub fn draw_rect(&mut self, color: impl Into<Color>) {
-		self.with_painter(|painter, rect| {
+		self.with_painter_and_rect(|painter, rect| {
 			painter.rect(rect, color.into());
 		});
 	}
@@ -214,21 +225,27 @@ impl<'sys> UiContext<'sys> {
 
 impl<'sys> UiContext<'sys> {
 	pub fn text(&mut self, text: impl AsRef<str>) {
-		// let widget = self.do_widget();
+		let mut text_layout = SmallVec::<[(Aabb2, Aabb2); 16]>::new();
+		let text = text.as_ref();
+		let font_size = 16;
 
-		// let text = text.as_ref();
-		// let font_size = 16;
+		{
+			let mut glyph_cache = self.system.glyph_cache.borrow_mut();
+			glyph_cache.layout(&self.system.font, font_size, text, |glyph_geom, glyph_uvs| {
+				text_layout.push((glyph_geom, glyph_uvs));
+			});
+		}
 
-		// match self.pass {
-		// 	UiPass::Layout => {
-		// 		// let text_rect = self.system.painter.text_rect(font_size, text);
-		// 		// widget.constraints.set_fixed_size(text_rect.size());
-		// 	}
+		let mut widget = self.do_widget();
+		let text_rect = text_layout.iter().fold(Aabb2::zero(), |acc, &(rect, _)| acc.include_rect(rect));
+		widget.layout.set_fixed_size(text_rect.size());
 
-		// 	UiPass::Render(_) => {
-		// 		// self.system.painter.text(font_size, text);
-		// 	}
-		// }
+		widget.with_painter_and_rect(|painter, rect| {
+			painter.set_paint_mode(UiPaintMode::Text);
+			for (geom, uvs) in text_layout {
+				painter.buffer.draw_quad(geom.translate(rect.min), uvs, Color::black());
+			}
+		});
 	}
 
 	pub fn button(&mut self, text: impl AsRef<str>) {
@@ -368,94 +385,3 @@ impl WidgetLayout {
 	// }
 }
 
-
-pub struct Widget {
-	pub parent: WidgetId,
-
-	pub layout: WidgetLayout,
-
-	pub layout_key: Option<layout::LayoutKey>,
-
-	// Includes padding.
-	pub rect: Option<Aabb2>,
-}
-
-impl Default for Widget {
-	fn default() -> Widget {
-		Widget {
-			parent: WidgetId::ROOT,
-
-			layout: default(),
-
-			layout_key: None,
-
-			rect: None,
-		}
-	}
-}
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub struct WidgetId(u64);
-
-impl WidgetId {
-	pub const ROOT: WidgetId = WidgetId(0);
-}
-
-
-#[derive(Default)]
-struct WidgetTree {
-	pub widgets: HashMap<WidgetId, Widget>,
-	pub children: HashMap<WidgetId, SmallVec<[WidgetId; 4]>>,
-
-	pub submission_order: Vec<WidgetId>,
-}
-
-impl WidgetTree {
-	pub fn clear(&mut self) {
-		self.widgets.clear();
-		self.children.clear();
-		self.submission_order.clear();
-	}
-
-	pub fn make_root(&mut self) -> &mut Widget {
-		use std::collections::hash_map::Entry;
-
-		self.submission_order.push(WidgetId::ROOT);
-
-		match self.widgets.entry(WidgetId::ROOT) {
-			Entry::Occupied(_) => panic!("Root already exists!"),
-			Entry::Vacant(entry) => {
-				entry.insert(Widget {
-					parent: WidgetId::ROOT,
-					.. default()
-				})
-			}
-		}
-	}
-
-	pub fn get_mut(&mut self, id: WidgetId) -> &mut Widget {
-		self.widgets.get_mut(&id).expect("Requesting widget not submitted in layout pass")
-	}
-
-	pub fn insert(&mut self, id: WidgetId, parent: WidgetId) -> &mut Widget {
-		use std::collections::hash_map::Entry;
-
-		assert!(id != WidgetId::ROOT);
-
-		self.submission_order.push(id);
-
-		self.children.entry(parent)
-			.or_default()
-			.push(id);
-
-		match self.widgets.entry(id) {
-			Entry::Occupied(_) => panic!("Conflicting id! {id:?}"),
-			Entry::Vacant(entry) => {
-				entry.insert(Widget {
-					parent,
-					.. default()
-				})
-			}
-		}
-	}
-}

@@ -48,6 +48,8 @@ impl UiPainter<'_> {
 					.depth_test(false);
 			}
 		}
+
+		self.buffer.clear();
 	}
 
 	pub fn finish(mut self) {
@@ -70,33 +72,13 @@ impl UiPainter<'_> {
 		self.set_paint_mode(UiPaintMode::ShapeUntextured);
 		self.buffer.draw_quad(geom, Aabb2::zero(), color);
 	}
+
+	pub fn text_quad(&mut self, geom: Aabb2, uvs: Aabb2, color: impl Into<Color>) {
+		self.set_paint_mode(UiPaintMode::Text);
+		self.buffer.draw_quad(geom, uvs, color);
+	}
 }
 
-
-
-// pub struct UiPainterWithShared<'p, 's> {
-// 	pub painter: &'p mut UiPainter,
-// 	pub shared: &'s UiShared,
-// }
-
-// impl<'p, 's> UiPainterWithShared<'p, 's> {
-// 	pub fn text(&mut self, origin: Vec2, font_size: u32, s: impl AsRef<str>, color: impl Into<Color>) {
-// 		let origin = origin.floor();
-// 		let color = color.into();
-
-// 		self.shared.glyph_atlas.borrow_mut().layout(&self.shared.font, font_size, s, |geom_rect, uv_rect| {
-// 			self.painter.text_layer.draw_quad(geom_rect.translate(origin), uv_rect, color);
-// 		});
-// 	}
-
-// 	pub fn text_rect(&mut self, font_size: u32, s: impl AsRef<str>) -> Aabb2 {
-// 		let mut full = Aabb2::zero();
-// 		self.shared.glyph_atlas.borrow_mut().layout(&self.shared.font, font_size, s, |geom_rect, _| {
-// 			full = full.include_rect(geom_rect);
-// 		});
-// 		full
-// 	}
-// }
 
 
 pub struct UiPaintBuffer {

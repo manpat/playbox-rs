@@ -4,15 +4,11 @@ use crate::prelude::*;
 pub const MAIN_MENU_FRAME_STAGE: gfx::FrameStage = gfx::FrameStage::Ui(10);
 
 
-pub struct MainMenuScene {
-	// painter: ui::UiPainter,
-}
+pub struct MainMenuScene {}
 
 impl MainMenuScene {
 	pub fn new(ctx: &mut Context<'_>) -> anyhow::Result<MainMenuScene> {
-		Ok(MainMenuScene{
-			// painter: ui::UiPainter::new(&mut ctx.gfx, MAIN_MENU_FRAME_STAGE),
-		})
+		Ok(MainMenuScene{})
 	}
 
 	pub fn update(&mut self, ctx: &mut Context<'_>) {
@@ -76,6 +72,10 @@ impl MainMenuScene {
 					widget.layout.horizontal.set_fixed_size(50.0);
 					widget.layout.vertical.set_fixed_size(50.0);
 					widget.draw_rect(Color::white());
+
+					ui.text("Hello");
+					ui.text("World");
+					ui.text("Foobar");
 				}
 
 
@@ -107,11 +107,15 @@ impl MainMenuScene {
 				}
 
 				{
-					let mut widget = ui.do_widget();
+					let mut widget = ui.begin_widget();
 					widget.layout.set_fixed_size(Vec2::splat(50.0));
 					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
 					widget.layout.vertical.alignment = Some(ui::Alignment::Begin);
 					widget.draw_rect(Color::cyan());
+
+					ui.text("Yay");
+
+					ui.end_widget();
 				}
 
 				{

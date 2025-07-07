@@ -11,7 +11,7 @@ struct ResolvedLayout {
 }
 
 #[derive(Default)]
-pub struct LayoutTree {
+struct LayoutTree {
 	widgets: Vec<ResolvedLayout>,
 	children: Vec<SmallVec<[LayoutKey; 4]>>,
 }
