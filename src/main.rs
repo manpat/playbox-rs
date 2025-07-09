@@ -38,6 +38,7 @@ pub mod prelude {
 	pub use std::borrow::Cow;
 	pub use std::hash::{DefaultHasher, Hash, Hasher};
 
+	pub use bitflags::bitflags;
 	pub use slotmap::SlotMap;
 	pub use smallvec::SmallVec;
 

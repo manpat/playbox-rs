@@ -5,6 +5,7 @@ pub type LayoutKey = usize;
 
 struct ResolvedLayout {
 	config: WidgetLayout,
+	source_id: WidgetId,
 
 	size: Vec2,
 	position: Vec2,
@@ -14,6 +15,8 @@ struct ResolvedLayout {
 struct LayoutTree {
 	widgets: Vec<ResolvedLayout>,
 	children: Vec<SmallVec<[LayoutKey; 4]>>,
+
+	widget_to_layout: HashMap<WidgetId, LayoutKey>,
 }
 
 
@@ -22,6 +25,8 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	let mut layout_tree = LayoutTree {
 		widgets: Vec::with_capacity(widget_tree.widgets.len()),
 		children: vec![const{ SmallVec::new_const() }; widget_tree.widgets.len()],
+
+		widget_to_layout: HashMap::default(),
 	};
 
 	// Fill layout tree initial state - in reverse submission order
@@ -29,15 +34,16 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 		let layout_key = layout_tree.widgets.len();
 
 		{
-			let widget = widget_tree.widgets.get_mut(&widget_id).unwrap();
+			let widget = widget_tree.widgets.get(&widget_id).unwrap();
 			layout_tree.widgets.push(ResolvedLayout {
 				config: widget.layout.clone(),
+				source_id: widget_id,
 
 				size: Vec2::zero(),
 				position: Vec2::zero(),
 			});
 
-			widget.layout_key = Some(layout_key);
+			layout_tree.widget_to_layout.insert(widget_id, layout_key);
 		}
 
 		let Some(children) = widget_tree.children.get(&widget_id)
@@ -48,8 +54,8 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 		}
 
 		let layout_children = &mut layout_tree.children[layout_key];
-		for child_id in children {
-			let child_layout_key = widget_tree.widgets[child_id].layout_key.unwrap();
+		for child_widget_id in children {
+			let child_layout_key = layout_tree.widget_to_layout[child_widget_id];
 			layout_children.push(child_layout_key);
 		}
 	}
@@ -119,11 +125,9 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	}
 
 	// Write back into widget tree
-	for widget in widget_tree.widgets.values_mut() {
-		let layout_key = widget.layout_key.unwrap();
-		let layout = &layout_tree.widgets[layout_key];
-
-		widget.rect = Some(Aabb2::from_min_size(layout.position, layout.size));
+	for resolved_layout in layout_tree.widgets.iter() {
+		let widget = widget_tree.get_mut(resolved_layout.source_id);
+		widget.rect = Some(Aabb2::from_min_size(resolved_layout.position, resolved_layout.size));
 	}
 }
 

@@ -16,7 +16,7 @@ impl MainMenuScene {
 
 		ctx.input.set_capture_mouse(false);
 
-		ui::build(ctx.gfx, ctx.ui_system, |ui| {
+		ui::build(ctx, |ui| {
 			let mut widget = ui.begin_widget();
 			widget.layout.set_margins(10.0);
 			widget.layout.set_paddings(10.0);

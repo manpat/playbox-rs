@@ -1,9 +1,11 @@
 mod ui_painter;
 mod glyph_cache;
 mod layout;
+mod layout_types;
 mod widget_tree;
 
 pub use ui_painter::*;
+pub use layout_types::*;
 pub use widget_tree::WidgetId;
 
 use crate::prelude::*;
@@ -64,37 +66,39 @@ struct WidgetStackEntry {
 }
 
 pub struct UiContext<'sys> {
-	system: &'sys mut UiSystem,
+	system: &'sys UiSystem,
 	pub pass: UiPass<'sys>,
 
 	tree: WidgetTree,
 	widget_stack: Vec<WidgetStackEntry>,
 }
 
-pub fn build(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl FnMut(&mut UiContext)) {
-	let screen_size = gfx.backbuffer_size().to_vec2() * system.global_scale;
+pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(&mut UiContext)) {
+	let Context{ gfx, ui_system, .. } = ctx;
 
-	let mut ctx = UiContext {
-		system,
+	let screen_size = gfx.backbuffer_size().to_vec2() * ui_system.global_scale;
+
+	let mut ui_ctx = UiContext {
+		system: ui_system,
 		pass: UiPass::Layout,
 
 		tree: WidgetTree::default(),
 		widget_stack: Vec::with_capacity(16),
 	};
 
-	let root_widget = ctx.tree.make_root();
+	let root_widget = ui_ctx.tree.make_root();
 	root_widget.layout.set_fixed_size(screen_size);
 
 	// Layout pass
 	{
-		ctx.pass = UiPass::Layout;
-		ctx.widget_stack.clear();
-		ctx.widget_stack.push(WidgetStackEntry{ id: WidgetId::ROOT, num_children: 0 });
+		ui_ctx.pass = UiPass::Layout;
+		ui_ctx.widget_stack.clear();
+		ui_ctx.widget_stack.push(WidgetStackEntry{ id: WidgetId::ROOT, num_children: 0 });
 
-		do_ui(&mut ctx);
+		do_ui(&mut ui_ctx);
 	}
 
-	layout::layout_widget_tree(&mut ctx.tree);
+	layout::layout_widget_tree(&mut ui_ctx.tree);
 
 	// Render pass
 	{
@@ -107,20 +111,20 @@ pub fn build(gfx: &mut gfx::System, system: &mut UiSystem, mut do_ui: impl FnMut
 			buffer: UiPaintBuffer::new(),
 			encoder,
 
-			f_text_shader: ctx.system.f_text_shader,
-			font_atlas_image: ctx.system.glyph_cache.borrow().font_atlas,
+			f_text_shader: ui_ctx.system.f_text_shader,
+			font_atlas_image: ui_ctx.system.glyph_cache.borrow().font_atlas,
 
 			paint_mode: UiPaintMode::ShapeUntextured,
 		};
 
-		ctx.pass = UiPass::Render(painter);
-		ctx.widget_stack.clear();
-		ctx.widget_stack.push(WidgetStackEntry{ id: WidgetId::ROOT, num_children: 0 });
+		ui_ctx.pass = UiPass::Render(painter);
+		ui_ctx.widget_stack.clear();
+		ui_ctx.widget_stack.push(WidgetStackEntry{ id: WidgetId::ROOT, num_children: 0 });
 
-		do_ui(&mut ctx);
+		do_ui(&mut ui_ctx);
 	}
 
-	let UiPass::Render(painter) = ctx.pass else { panic!() };
+	let UiPass::Render(painter) = ui_ctx.pass else { panic!() };
 	painter.finish();
 }
 
@@ -253,135 +257,4 @@ impl<'sys> UiContext<'sys> {
 	}
 }
 
-
-
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Axis {
-	Horizontal,
-	Vertical,
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
-pub enum Alignment {
-	Begin,
-	Center,
-	// TODO(pat.m): baseline
-	End,
-}
-
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
-pub enum LayoutType {
-	#[default]
-	Stack,
-	LeftToRight,
-	RightToLeft,
-	TopToBottom,
-	BottomToTop,
-}
-
-#[derive(Clone)]
-pub struct WidgetAxisLayout {
-	pub min: f32,
-	pub preferred: f32, // TODO(pat.m): do I actually need this?
-	pub max: f32,
-
-	pub padding_start: f32,
-	pub padding_end: f32,
-
-	pub margin_start: f32,
-	pub margin_end: f32,
-
-	pub spacing: f32,
-
-	pub child_alignment: Alignment,
-	pub alignment: Option<Alignment>,
-}
-
-impl Default for WidgetAxisLayout {
-	fn default() -> Self {
-		WidgetAxisLayout {
-			min: 0.0,
-			preferred: 1.0,
-			max: f32::INFINITY,
-
-			padding_start: 0.0,
-			padding_end: 0.0,
-
-			margin_start: 0.0,
-			margin_end: 0.0,
-
-			spacing: 4.0,
-
-			child_alignment: Alignment::Center,
-			alignment: None,
-		}
-	}
-}
-
-impl WidgetAxisLayout {
-	pub fn set_fixed_size(&mut self, fixed: f32) {
-		self.min = fixed;
-		self.preferred = fixed;
-		self.max = fixed;
-	}
-
-	pub fn set_margins(&mut self, size: f32) {
-		self.margin_start = size;
-		self.margin_end = size;
-	}
-
-	pub fn set_paddings(&mut self, size: f32) {
-		self.padding_start = size;
-		self.padding_end = size;
-	}
-}
-
-#[derive(Default, Clone)]
-pub struct WidgetLayout {
-	pub layout_type: LayoutType,
-	pub horizontal: WidgetAxisLayout,
-	pub vertical: WidgetAxisLayout,
-}
-
-impl WidgetLayout {
-	pub fn axis(&self, axis: Axis) -> &WidgetAxisLayout {
-		match axis {
-			Axis::Horizontal => &self.horizontal,
-			Axis::Vertical => &self.vertical,
-		}
-	}
-
-	pub fn axis_mut(&mut self, axis: Axis) -> &mut WidgetAxisLayout {
-		match axis {
-			Axis::Horizontal => &mut self.horizontal,
-			Axis::Vertical => &mut self.vertical,
-		}
-	}
-
-	pub fn each<T>(&mut self, f: impl Fn(&WidgetAxisLayout) -> T) -> [T; 2] {
-		[f(&self.horizontal), f(&self.vertical)]
-	}
-
-	pub fn set_fixed_size(&mut self, size: Vec2) {
-		self.horizontal.set_fixed_size(size.x);
-		self.vertical.set_fixed_size(size.y);
-	}
-
-	pub fn set_margins(&mut self, margin: f32) {
-		self.horizontal.set_margins(margin);
-		self.vertical.set_margins(margin);
-	}
-
-	pub fn set_paddings(&mut self, padding: f32) {
-		self.horizontal.set_paddings(padding);
-		self.vertical.set_paddings(padding);
-	}
-
-	// pub fn preferred_size(&self) -> Vec2 {
-	// 	Vec2::new(self.horizontal.preferred, self.vertical.preferred)
-	// }
-}
 

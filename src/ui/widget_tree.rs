@@ -6,8 +6,6 @@ pub struct Widget {
 
 	pub layout: WidgetLayout,
 
-	pub layout_key: Option<layout::LayoutKey>,
-
 	// Includes padding.
 	pub rect: Option<Aabb2>,
 }
@@ -18,8 +16,6 @@ impl Default for Widget {
 			parent: WidgetId::ROOT,
 
 			layout: default(),
-
-			layout_key: None,
 
 			rect: None,
 		}
