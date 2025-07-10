@@ -32,11 +32,8 @@ pub struct WidgetAxisLayout {
 	pub preferred: f32, // TODO(pat.m): do I actually need this?
 	pub max: f32,
 
-	pub padding_start: f32,
-	pub padding_end: f32,
-
-	pub margin_start: f32,
-	pub margin_end: f32,
+	pub padding: AxisLengths,
+	pub margin: AxisLengths,
 
 	pub spacing: f32,
 
@@ -58,12 +55,8 @@ impl Default for WidgetAxisLayout {
 			preferred: 1.0,
 			max: f32::INFINITY,
 
-			padding_start: 0.0,
-			padding_end: 0.0,
-
-			margin_start: 0.0,
-			margin_end: 0.0,
-
+			padding: default(),
+			margin: default(),
 			spacing: 4.0,
 
 			child_alignment: Alignment::Center,
@@ -79,14 +72,12 @@ impl WidgetAxisLayout {
 		self.max = fixed;
 	}
 
-	pub fn set_margins(&mut self, size: f32) {
-		self.margin_start = size;
-		self.margin_end = size;
+	pub fn set_margin(&mut self, lengths: impl Into<AxisLengths>) {
+		self.margin = lengths.into();
 	}
 
-	pub fn set_paddings(&mut self, size: f32) {
-		self.padding_start = size;
-		self.padding_end = size;
+	pub fn set_padding(&mut self, lengths: impl Into<AxisLengths>) {
+		self.padding = lengths.into();
 	}
 }
 
@@ -121,14 +112,77 @@ impl WidgetLayout {
 		self.vertical.set_fixed_size(size.y);
 	}
 
-	pub fn set_margins(&mut self, margin: f32) {
-		self.horizontal.set_margins(margin);
-		self.vertical.set_margins(margin);
+	pub fn set_margin(&mut self, margin: impl Into<BoxLengths>) {
+		let margin = margin.into();
+		self.horizontal.set_margin(margin.horizontal);
+		self.vertical.set_margin(margin.vertical);
 	}
 
-	pub fn set_paddings(&mut self, padding: f32) {
-		self.horizontal.set_paddings(padding);
-		self.vertical.set_paddings(padding);
+	pub fn set_padding(&mut self, padding: impl Into<BoxLengths>) {
+		let padding = padding.into();
+		self.horizontal.set_padding(padding.horizontal);
+		self.vertical.set_padding(padding.vertical);
 	}
 }
 
+
+
+#[derive(Copy, Clone, Debug)]
+pub struct AxisLengths {
+	pub start: f32,
+	pub end: f32,
+}
+
+impl AxisLengths {
+	pub fn total(&self) -> f32 {
+		self.start + self.end
+	}
+}
+
+impl Default for AxisLengths {
+	fn default() -> AxisLengths {
+		AxisLengths { start: 0.0, end: 0.0 }
+	}
+}
+
+impl From<f32> for AxisLengths {
+	fn from(o: f32) -> AxisLengths {
+		AxisLengths {
+			start: o,
+			end: o,
+		}
+	}
+}
+
+impl From<(f32, f32)> for AxisLengths {
+	fn from((start, end): (f32, f32)) -> AxisLengths {
+		AxisLengths { start, end }
+	}
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct BoxLengths {
+	pub horizontal: AxisLengths,
+	pub vertical: AxisLengths,
+}
+
+impl From<f32> for BoxLengths {
+	fn from(o: f32) -> BoxLengths {
+		BoxLengths {
+			horizontal: AxisLengths::from(o),
+			vertical: AxisLengths::from(o),
+		}
+	}
+}
+
+impl From<(f32, f32)> for BoxLengths {
+	fn from((horizontal, vertical): (f32, f32)) -> BoxLengths {
+		BoxLengths { horizontal: horizontal.into(), vertical: vertical.into() }
+	}
+}
+
+impl From<(AxisLengths, AxisLengths)> for BoxLengths {
+	fn from((horizontal, vertical): (AxisLengths, AxisLengths)) -> BoxLengths {
+		BoxLengths { horizontal, vertical }
+	}
+}

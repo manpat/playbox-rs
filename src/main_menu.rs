@@ -19,15 +19,15 @@ impl MainMenuScene {
 		ui::build(ctx, |ui| {
 			let widget = ui.begin_widget();
 			widget.layout.layout_type = ui::LayoutType::LeftToRight;
-			widget.layout.set_margins(10.0);
-			widget.layout.set_paddings(10.0);
+			widget.layout.set_margin(10.0);
+			widget.layout.set_padding(10.0);
 			widget.layout.horizontal.child_alignment = ui::Alignment::Begin;
 			widget.layout.vertical.child_alignment = ui::Alignment::Center;
 
 			{
 				let widget = ui.begin_widget();
 				widget.layout.layout_type = ui::LayoutType::TopToBottom;
-				widget.layout.set_paddings(10.0);
+				widget.layout.set_padding(10.0);
 				widget.draw_rect(Color::grey_a(0.0, 0.3));
 
 				if ui.button("Play") {

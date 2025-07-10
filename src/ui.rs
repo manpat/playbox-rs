@@ -296,7 +296,7 @@ impl UiContext {
 	pub fn button(&self, text: impl AsRef<str>) -> bool {
 		let button = self.begin_widget();
 		button.draw_rect(Color::magenta());
-		button.layout.set_paddings(4.0);
+		button.layout.set_padding(4.0);
 		button.layout.vertical.set_fixed_size(16.0 + 8.0);
 
 		self.text(text);

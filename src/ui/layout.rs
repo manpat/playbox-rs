@@ -142,7 +142,7 @@ fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], 
 
 	for &key in children {
 		let config = widgets[key].config.axis(axis);
-		let margin_total = config.margin_start + config.margin_end;
+		let margin_total = config.margin.total();
 
 		min_length = min_length.max(config.min + margin_total);
 		preferred_length = preferred_length.max(config.preferred + margin_total);
@@ -160,7 +160,7 @@ fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis:
 
 	for &key in children {
 		let config = widgets[key].config.axis(axis);
-		let margin_total = config.margin_start + config.margin_end;
+		let margin_total = config.margin.total();
 
 		// TODO(pat.m): collapse margins
 		min_length += config.min + margin_total;
@@ -182,7 +182,7 @@ fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis:
 fn adjust_container_constraints(constraints: &mut WidgetAxisLayout, measurement: &ContainerMeasurement) {
 	let initial_min = constraints.min;
 	let initial_preferred = constraints.preferred;
-	let padding_total = constraints.padding_start + constraints.padding_end;
+	let padding_total = constraints.padding.total();
 
 	constraints.min = initial_min.max(measurement.min_length + padding_total).min(constraints.max);
 
@@ -194,16 +194,16 @@ fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey
 	let container_config = container.config.axis(axis);
 	let container_size = length(&container.size, axis);
 	let container_position = length(&container.position, axis);
-	let container_padding = container_config.padding_start + container_config.padding_end;
+	let container_padding = container_config.padding.total();
 
 	let available_content_size = (container_size - container_padding).max(0.0);
-	let available_content_start = container_position + container_config.padding_start;
+	let available_content_start = container_position + container_config.padding.start;
 
 	for &key in children {
 		let child = &mut widgets[key];
 
 		let child_config = child.config.axis(axis);
-		let margin_total = child_config.margin_start + child_config.margin_end;
+		let margin_total = child_config.margin.total();
 
 		let min_length = child_config.min;
 		let max_length = child_config.max;
@@ -217,13 +217,13 @@ fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey
 
 		match alignment {
 			Alignment::Begin => {
-				*child_position = available_content_start + child_config.margin_start;
+				*child_position = available_content_start + child_config.margin.start;
 			}
 			Alignment::Center => {
 				*child_position = available_content_start + (available_content_size - *child_size) / 2.0;
 			}
 			Alignment::End => {
-				*child_position = available_content_start + available_content_size - *child_size - child_config.margin_end;
+				*child_position = available_content_start + available_content_size - *child_size - child_config.margin.end;
 			}
 		}
 	}
@@ -232,7 +232,7 @@ fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey
 fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], axis: Axis, container: &ResolvedLayout, reverse: bool) {
 	let container_config = container.config.axis(axis);
 	let container_size = length(&container.size, axis);
-	let container_padding = container_config.padding_start + container_config.padding_end;
+	let container_padding = container_config.padding.total();
 
 	let available_space = (container_size - container_padding).max(0.0);
 	let spacing_contribution = children.len().saturating_sub(1) as f32 * container_config.spacing;
@@ -243,7 +243,7 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 	for &key in children {
 		let config = &widgets[key].config.axis(axis);
 
-		total_min_size += config.margin_start + config.margin_end + config.min;
+		total_min_size += config.margin.total() + config.min;
 
 		if config.max > config.min {
 			num_children_wanting_expand += 1;
@@ -287,7 +287,7 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 
 	// Position
 	let container_position = length(&container.position, axis);
-	let mut content_position = container_position + container_config.padding_start;
+	let mut content_position = container_position + container_config.padding.start;
 
 	match container_config.child_alignment {
 		Alignment::Begin => {}
@@ -306,20 +306,20 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 			let config = &widgets[key].config.axis(axis);
 			let size = length(&widgets[key].size, axis);
 
-			content_position += config.margin_start;
+			content_position += config.margin.start;
 			*length_mut(&mut widgets[key].position, axis) = content_position;
 
-			content_position += size + config.margin_end + container_config.spacing;
+			content_position += size + config.margin.end + container_config.spacing;
 		}
 	} else {
 		for &key in children {
 			let config = &widgets[key].config.axis(axis);
 			let size = length(&widgets[key].size, axis);
 
-			content_position += config.margin_start;
+			content_position += config.margin.start;
 			*length_mut(&mut widgets[key].position, axis) = content_position;
 
-			content_position += size + config.margin_end + container_config.spacing;
+			content_position += size + config.margin.end + container_config.spacing;
 		}
 	}
 }
