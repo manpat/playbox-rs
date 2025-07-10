@@ -1,25 +1,15 @@
 use crate::prelude::*;
 use crate::ui::*;
 
+use std::mem::MaybeUninit;
+
 pub struct Widget {
 	pub parent: WidgetId,
 
-	pub layout: WidgetLayout,
+	pub layout: *mut WidgetLayout,
 
 	// Includes padding.
 	pub rect: Option<Aabb2>,
-}
-
-impl Default for Widget {
-	fn default() -> Widget {
-		Widget {
-			parent: WidgetId::ROOT,
-
-			layout: default(),
-
-			rect: None,
-		}
-	}
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -30,23 +20,55 @@ impl WidgetId {
 }
 
 
-#[derive(Default)]
 pub struct WidgetTree {
 	pub widgets: HashMap<WidgetId, Widget>,
 	pub children: HashMap<WidgetId, SmallVec<[WidgetId; 4]>>,
+
+	// TODO(pat.m): some kind of dynamic structure/arena
+	pub layout_storage: Box<[MaybeUninit<WidgetLayout>]>,
+	pub next_layout_index: usize,
 
 	pub submission_order: Vec<WidgetId>,
 }
 
 impl WidgetTree {
+	pub fn new() -> WidgetTree {
+		WidgetTree {
+			widgets: default(),
+			children: default(),
+			submission_order: default(),
+
+			// 10k widgets oughta be enough for anybody...
+			layout_storage: Box::new_uninit_slice(10000),
+			next_layout_index: 0,
+		}
+	}
+
+	fn alloc_layout(&mut self) -> *mut WidgetLayout {
+		let index = self.next_layout_index;
+		assert!(index < self.layout_storage.len());
+
+		self.next_layout_index += 1;
+
+		unsafe {
+			let ptr = self.layout_storage[index].as_mut_ptr();
+			ptr.write(default());
+			ptr
+		}
+	}
+
 	pub fn clear(&mut self) {
 		self.widgets.clear();
 		self.children.clear();
 		self.submission_order.clear();
+
+		self.next_layout_index = 0;
 	}
 
 	pub fn make_root(&mut self) -> &mut Widget {
 		use std::collections::hash_map::Entry;
+
+		let layout = self.alloc_layout();
 
 		self.submission_order.push(WidgetId::ROOT);
 
@@ -55,7 +77,8 @@ impl WidgetTree {
 			Entry::Vacant(entry) => {
 				entry.insert(Widget {
 					parent: WidgetId::ROOT,
-					.. default()
+					rect: None,
+					layout,
 				})
 			}
 		}
@@ -70,8 +93,8 @@ impl WidgetTree {
 
 		assert!(id != WidgetId::ROOT);
 
+		let layout = self.alloc_layout();
 		self.submission_order.push(id);
-
 		self.children.entry(parent)
 			.or_default()
 			.push(id);
@@ -81,7 +104,8 @@ impl WidgetTree {
 			Entry::Vacant(entry) => {
 				entry.insert(Widget {
 					parent,
-					.. default()
+					rect: None,
+					layout,
 				})
 			}
 		}

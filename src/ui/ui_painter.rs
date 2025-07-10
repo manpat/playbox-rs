@@ -11,9 +11,9 @@ pub enum UiPaintMode {
 	Text,
 }
 
-pub struct UiPainter<'gfx> {
+pub struct UiPainter {
 	pub buffer: UiPaintBuffer,
-	pub encoder: gfx::CommandGroupEncoder<'gfx>,
+	// pub encoder: gfx::CommandGroupEncoder<'gfx>,
 
 	pub f_text_shader: gfx::ShaderHandle,
 	pub font_atlas_image: gfx::ImageHandle,
@@ -21,7 +21,7 @@ pub struct UiPainter<'gfx> {
 	pub paint_mode: UiPaintMode,
 }
 
-impl UiPainter<'_> {
+impl UiPainter {
 	fn submit(&mut self) {
 		if self.buffer.is_empty() {
 			return;
@@ -29,23 +29,23 @@ impl UiPainter<'_> {
 
 		match self.paint_mode {
 			UiPaintMode::ShapeUntextured => {
-				self.encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
-					.elements(self.buffer.indices.len() as u32)
-					.indexed(&self.buffer.indices)
-					.ssbo(0, &self.buffer.vertices)
-					.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
-					.blend_mode(gfx::BlendMode::ALPHA)
-					.depth_test(false);
+				// self.encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
+				// 	.elements(self.buffer.indices.len() as u32)
+				// 	.indexed(&self.buffer.indices)
+				// 	.ssbo(0, &self.buffer.vertices)
+				// 	.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
+				// 	.blend_mode(gfx::BlendMode::ALPHA)
+				// 	.depth_test(false);
 			}
 
 			UiPaintMode::Text => {
-				self.encoder.draw(gfx::CommonShader::StandardVertex, self.f_text_shader)
-					.elements(self.buffer.indices.len() as u32)
-					.indexed(&self.buffer.indices)
-					.ssbo(0, &self.buffer.vertices)
-					.sampled_image(0, self.font_atlas_image, gfx::CommonSampler::Nearest)
-					.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
-					.depth_test(false);
+				// self.encoder.draw(gfx::CommonShader::StandardVertex, self.f_text_shader)
+				// 	.elements(self.buffer.indices.len() as u32)
+				// 	.indexed(&self.buffer.indices)
+				// 	.ssbo(0, &self.buffer.vertices)
+				// 	.sampled_image(0, self.font_atlas_image, gfx::CommonSampler::Nearest)
+				// 	.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
+				// 	.depth_test(false);
 			}
 		}
 
@@ -67,7 +67,7 @@ impl UiPainter<'_> {
 	}
 }
 
-impl UiPainter<'_> {
+impl UiPainter {
 	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
 		self.set_paint_mode(UiPaintMode::ShapeUntextured);
 		self.buffer.draw_quad(geom, Aabb2::zero(), color);

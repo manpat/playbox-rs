@@ -36,7 +36,7 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 		{
 			let widget = widget_tree.widgets.get(&widget_id).unwrap();
 			layout_tree.widgets.push(ResolvedLayout {
-				config: widget.layout.clone(),
+				config: unsafe{ widget.layout.read() },
 				source_id: widget_id,
 
 				size: Vec2::zero(),

@@ -17,7 +17,7 @@ impl MainMenuScene {
 		ctx.input.set_capture_mouse(false);
 
 		ui::build(ctx, |ui| {
-			let mut widget = ui.begin_widget();
+			let widget = ui.begin_widget();
 			widget.layout.set_margins(10.0);
 			widget.layout.set_paddings(10.0);
 
@@ -28,7 +28,7 @@ impl MainMenuScene {
 			widget.draw_rect(Color::red());
 
 			{
-				let mut widget = ui.do_widget();
+				let widget = ui.do_widget();
 				widget.layout.horizontal.set_fixed_size(50.0);
 				widget.layout.vertical.set_fixed_size(100.0);
 
@@ -36,7 +36,7 @@ impl MainMenuScene {
 			}
 
 			{
-				let mut widget = ui.begin_widget();
+				let widget = ui.begin_widget();
 				widget.layout.horizontal.min = 50.0;
 				widget.layout.horizontal.max = 300.0;
 				widget.layout.horizontal.alignment = Some(ui::Alignment::End);
@@ -48,26 +48,26 @@ impl MainMenuScene {
 				widget.draw_rect(Color::green());
 
 				{
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.set_fixed_size([50.0, 50.0].into());
 					widget.draw_rect(Color::white());
 
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.vertical.set_fixed_size(50.0);
 					widget.draw_rect(Color::white());
 
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.horizontal.alignment = Some(ui::Alignment::Begin);
 					widget.layout.horizontal.set_fixed_size(50.0);
 					widget.layout.vertical.set_fixed_size(50.0);
 					widget.draw_rect(Color::white());
 
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.vertical.min = 20.0;
 					widget.layout.vertical.max = 200.0;
 					widget.draw_rect(Color::white());
 
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
 					widget.layout.horizontal.set_fixed_size(50.0);
 					widget.layout.vertical.set_fixed_size(50.0);
@@ -82,12 +82,12 @@ impl MainMenuScene {
 				ui.end_widget();
 			}
 			{
-				let mut widget = ui.begin_widget();
+				let widget = ui.begin_widget();
 				widget.layout.layout_type = ui::LayoutType::Stack;
 				widget.draw_rect(Color::grey_a(0.0, 0.5));
 
 				{
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.horizontal.min = 20.0;
 					widget.layout.horizontal.max = 300.0;
 					widget.layout.vertical.set_fixed_size(100.0);
@@ -99,7 +99,7 @@ impl MainMenuScene {
 				}
 
 				{
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.set_fixed_size(Vec2::splat(50.0));
 					widget.layout.horizontal.alignment = Some(ui::Alignment::Begin);
 					widget.layout.vertical.alignment = Some(ui::Alignment::End);
@@ -107,7 +107,7 @@ impl MainMenuScene {
 				}
 
 				{
-					let mut widget = ui.begin_widget();
+					let widget = ui.begin_widget();
 					widget.layout.set_fixed_size(Vec2::splat(50.0));
 					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
 					widget.layout.vertical.alignment = Some(ui::Alignment::Begin);
@@ -119,7 +119,7 @@ impl MainMenuScene {
 				}
 
 				{
-					let mut widget = ui.do_widget();
+					let widget = ui.do_widget();
 					widget.layout.set_fixed_size(Vec2::splat(50.0));
 					widget.layout.horizontal.alignment = Some(ui::Alignment::End);
 					widget.layout.vertical.alignment = Some(ui::Alignment::End);
