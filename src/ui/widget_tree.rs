@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::ui::*;
 
 use std::mem::MaybeUninit;
+use std::pin::Pin;
 
 pub struct Widget {
 	pub parent: WidgetId,
@@ -25,7 +26,7 @@ pub struct WidgetTree {
 	pub children: HashMap<WidgetId, SmallVec<[WidgetId; 4]>>,
 
 	// TODO(pat.m): some kind of dynamic structure/arena
-	pub layout_storage: Box<[MaybeUninit<WidgetLayout>]>,
+	pub layout_storage: Pin<Box<[MaybeUninit<WidgetLayout>]>>,
 	pub next_layout_index: usize,
 
 	pub submission_order: Vec<WidgetId>,
@@ -39,7 +40,7 @@ impl WidgetTree {
 			submission_order: default(),
 
 			// 10k widgets oughta be enough for anybody...
-			layout_storage: Box::new_uninit_slice(10000),
+			layout_storage: Pin::new(Box::new_uninit_slice(10000)),
 			next_layout_index: 0,
 		}
 	}

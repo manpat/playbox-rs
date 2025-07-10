@@ -11,48 +11,60 @@ pub enum UiPaintMode {
 	Text,
 }
 
-pub struct UiPainter {
-	pub buffer: UiPaintBuffer,
-	// pub encoder: gfx::CommandGroupEncoder<'gfx>,
+pub struct UiPaintCommand {
+	pub paint_mode: UiPaintMode,
+	// pub texture: gfx::ImageArgument,
 
-	pub f_text_shader: gfx::ShaderHandle,
-	pub font_atlas_image: gfx::ImageHandle,
+	pub vertex_offset: u32,
+	pub index_offset: u32,
+	pub element_count: u32,
+}
+
+pub struct UiPainter {
+	pub commands: Vec<UiPaintCommand>,
+
+	pub vertices: Vec<gfx::StandardVertex>,
+	pub indices: Vec<u32>,
+
+	pub base_vertex_count: u32,
+	pub base_index_count: u32,
 
 	pub paint_mode: UiPaintMode,
 }
 
 impl UiPainter {
+	pub fn new() -> UiPainter {
+		UiPainter {
+			commands: Vec::with_capacity(128),
+			vertices: Vec::with_capacity(8<<10),
+			indices: Vec::with_capacity(12<<10),
+
+			base_vertex_count: 0,
+			base_index_count: 0,
+
+			paint_mode: UiPaintMode::ShapeUntextured,
+		}
+	}
+
 	fn submit(&mut self) {
-		if self.buffer.is_empty() {
+		let total_element_count = self.indices.len() as u32;
+		if total_element_count == self.base_index_count {
 			return;
 		}
 
-		match self.paint_mode {
-			UiPaintMode::ShapeUntextured => {
-				// self.encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
-				// 	.elements(self.buffer.indices.len() as u32)
-				// 	.indexed(&self.buffer.indices)
-				// 	.ssbo(0, &self.buffer.vertices)
-				// 	.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
-				// 	.blend_mode(gfx::BlendMode::ALPHA)
-				// 	.depth_test(false);
-			}
+		self.commands.push(UiPaintCommand {
+			paint_mode: self.paint_mode,
 
-			UiPaintMode::Text => {
-				// self.encoder.draw(gfx::CommonShader::StandardVertex, self.f_text_shader)
-				// 	.elements(self.buffer.indices.len() as u32)
-				// 	.indexed(&self.buffer.indices)
-				// 	.ssbo(0, &self.buffer.vertices)
-				// 	.sampled_image(0, self.font_atlas_image, gfx::CommonSampler::Nearest)
-				// 	.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
-				// 	.depth_test(false);
-			}
-		}
+			vertex_offset: self.base_vertex_count,
+			index_offset: self.base_index_count,
+			element_count: total_element_count - self.base_index_count,
+		});
 
-		self.buffer.clear();
+		self.base_vertex_count = self.vertices.len() as u32;
+		self.base_index_count = total_element_count;
 	}
 
-	pub fn finish(mut self) {
+	pub fn finish(&mut self) {
 		self.submit();
 	}
 
@@ -68,43 +80,22 @@ impl UiPainter {
 }
 
 impl UiPainter {
-	pub fn rect(&mut self, geom: Aabb2, color: impl Into<Color>) {
+	pub fn fill_solid_quad(&mut self, geom: Aabb2, color: impl Into<Color>) {
 		self.set_paint_mode(UiPaintMode::ShapeUntextured);
-		self.buffer.draw_quad(geom, Aabb2::zero(), color);
+		self.add_quad(geom, Aabb2::zero(), color);
 	}
 
-	pub fn text_quad(&mut self, geom: Aabb2, uvs: Aabb2, color: impl Into<Color>) {
+	pub fn add_text_quad(&mut self, geom: Aabb2, uvs: Aabb2, color: impl Into<Color>) {
 		self.set_paint_mode(UiPaintMode::Text);
-		self.buffer.draw_quad(geom, uvs, color);
+		self.add_quad(geom, uvs, color);
 	}
 }
 
 
 
-pub struct UiPaintBuffer {
-	pub vertices: Vec<gfx::StandardVertex>,
-	pub indices: Vec<u32>,
-}
-
-impl UiPaintBuffer {
-	pub fn new() -> UiPaintBuffer {
-		UiPaintBuffer {
-			vertices: Vec::with_capacity(8<<10),
-			indices: Vec::with_capacity(12<<10),
-		}
-	}
-
-	pub fn clear(&mut self) {
-		self.vertices.clear();
-		self.indices.clear();
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.vertices.is_empty()
-	}
-
-	pub fn draw_quad(&mut self, geom: Aabb2, uvs: Aabb2, color: impl Into<Color>) {
-		let start_index = self.vertices.len() as u32;
+impl UiPainter {
+	pub fn add_quad(&mut self, geom: Aabb2, uvs: Aabb2, color: impl Into<Color>) {
+		let start_index = self.vertices.len() as u32 - self.base_vertex_count;
 		let indices = [0, 1, 2, 0, 2, 3].into_iter().map(|i| i + start_index);
 
 		let color = color.into();

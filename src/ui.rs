@@ -167,24 +167,7 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 
 	// Render pass
 	{
-		let projection = Mat4::ortho(0.0, screen_size.x, 0.0, screen_size.y, -1.0, 1.0);
-
-		let mut encoder = gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0));
-		encoder.bind_shared_ubo(0, &[projection]);
-
-		let painter = UiPainter {
-			buffer: UiPaintBuffer::new(),
-			// encoder,
-
-			// TODO(pat.m): THIS IS NOT ACTUALLY SOUND
-			// since mutable references to UiSystem will be made during `do_ui`, they are technically aliasing.
-			// But once I move UiPainter _into_ UiSystem this will no longer be necessary + these will never
-			// actually change so _is_ safe.
-			f_text_shader: ui_system.f_text_shader,
-			font_atlas_image: ui_system.glyph_cache.font_atlas,
-
-			paint_mode: UiPaintMode::ShapeUntextured,
-		};
+		let painter = UiPainter::new();
 
 		ui_ctx_impl.pass = UiPass::Render(painter);
 		ui_ctx_impl.widget_stack.clear();
@@ -196,8 +179,45 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 	assert!(ui_ctx_impl.ref_count == 0);
 	assert!(ui_ctx_impl.rw_lock == 0);
 
-	let UiPass::Render(painter) = ui_ctx_impl.pass else { panic!() };
+	let UiPass::Render(mut painter) = ui_ctx_impl.pass else { panic!() };
 	painter.finish();
+
+	let UiPainter{ vertices, indices, commands, .. } = painter;
+
+	let projection = Mat4::ortho(0.0, screen_size.x, 0.0, screen_size.y, -1.0, 1.0);
+
+	let mut encoder = gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0));
+	encoder.bind_shared_ubo(0, &[projection]);
+	encoder.bind_shared_ssbo(0, &vertices);
+
+	for &UiPaintCommand{ paint_mode, vertex_offset, index_offset, element_count }
+		in commands.iter()
+	{
+		// TODO(pat.m): would be good to not need to upload index ranges individually
+		let index_upload = encoder.upload(&indices[index_offset as usize..][..element_count as usize]);
+
+		match paint_mode {
+			UiPaintMode::ShapeUntextured => {
+				encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
+					.elements(element_count)
+					.indexed(index_upload)
+					.base_vertex(vertex_offset)
+					.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
+					.blend_mode(gfx::BlendMode::ALPHA)
+					.depth_test(false);
+			}
+
+			UiPaintMode::Text => {
+				encoder.draw(gfx::CommonShader::StandardVertex, ui_system.f_text_shader)
+					.elements(element_count)
+					.indexed(index_upload)
+					.base_vertex(vertex_offset)
+					.sampled_image(0, ui_system.glyph_cache.font_atlas, gfx::CommonSampler::Nearest)
+					.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
+					.depth_test(false);
+			}
+		}
+	}
 }
 
 
@@ -221,7 +241,7 @@ impl WidgetRef<'_> {
 
 	pub fn draw_rect(&self, color: impl Into<Color>) {
 		self.with_painter_and_rect(|painter, rect| {
-			painter.rect(rect, color.into());
+			painter.fill_solid_quad(rect, color.into());
 		});
 	}
 }
@@ -306,7 +326,7 @@ impl UiContext {
 		widget.with_painter_and_rect(|painter, rect| {
 			painter.set_paint_mode(UiPaintMode::Text);
 			for (geom, uvs) in text_layout {
-				painter.buffer.draw_quad(geom.translate(rect.min), uvs, Color::black());
+				painter.add_quad(geom.translate(rect.min), uvs, Color::black());
 			}
 		});
 	}
