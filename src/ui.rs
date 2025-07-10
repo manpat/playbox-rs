@@ -209,7 +209,6 @@ impl WidgetRef<'_> {
 	}
 }
 
-
 impl UiContext {
 	pub fn begin_widget(&self) -> WidgetRef {
 		let id = self.auto_id();
@@ -294,8 +293,17 @@ impl UiContext {
 		});
 	}
 
-	pub fn button(&self, text: impl AsRef<str>) {
+	pub fn button(&self, text: impl AsRef<str>) -> bool {
+		let button = self.begin_widget();
+		button.draw_rect(Color::magenta());
+		button.layout.set_paddings(4.0);
+		button.layout.vertical.set_fixed_size(16.0 + 8.0);
+
 		self.text(text);
+
+		self.end_widget();
+
+		false
 	}
 }
 

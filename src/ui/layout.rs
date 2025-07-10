@@ -255,6 +255,8 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 	// TODO(pat.m): if layout has overflow, then remaining_space can be infinite
 	let mut remaining_space = (available_space - total_min_size).max(0.0);
 	while remaining_space > 0.0 && num_children_wanting_expand > 0 {
+		let available_expansion_space = (remaining_space / num_children_wanting_expand as f32).max(0.0);
+
 		for &key in children {
 			let config = &widgets[key].config.axis(axis);
 			let size = length_mut(&mut widgets[key].size, axis);
@@ -265,7 +267,6 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 				continue;
 			}
 
-			let available_expansion_space = (remaining_space / num_children_wanting_expand as f32).max(0.0);
 			let claimed_expansion = available_expansion_space.min(allowed_expansion);
 
 			*size += claimed_expansion;
