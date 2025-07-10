@@ -14,6 +14,7 @@ pub enum UiPaintMode {
 pub struct UiPaintCommand {
 	pub paint_mode: UiPaintMode,
 	// pub texture: gfx::ImageArgument,
+	// TODO(pat.m): clip rect
 
 	pub vertex_offset: u32,
 	pub index_offset: u32,
@@ -33,41 +34,6 @@ pub struct UiPainter {
 }
 
 impl UiPainter {
-	pub fn new() -> UiPainter {
-		UiPainter {
-			commands: Vec::with_capacity(128),
-			vertices: Vec::with_capacity(8<<10),
-			indices: Vec::with_capacity(12<<10),
-
-			base_vertex_count: 0,
-			base_index_count: 0,
-
-			paint_mode: UiPaintMode::ShapeUntextured,
-		}
-	}
-
-	fn submit(&mut self) {
-		let total_element_count = self.indices.len() as u32;
-		if total_element_count == self.base_index_count {
-			return;
-		}
-
-		self.commands.push(UiPaintCommand {
-			paint_mode: self.paint_mode,
-
-			vertex_offset: self.base_vertex_count,
-			index_offset: self.base_index_count,
-			element_count: total_element_count - self.base_index_count,
-		});
-
-		self.base_vertex_count = self.vertices.len() as u32;
-		self.base_index_count = total_element_count;
-	}
-
-	pub fn finish(&mut self) {
-		self.submit();
-	}
-
 	pub fn set_paint_mode(&mut self, mode: UiPaintMode) {
 		if mode == self.paint_mode {
 			return;
@@ -109,5 +75,88 @@ impl UiPainter {
 
 		self.vertices.extend_from_slice(&vertices);
 		self.indices.extend(indices);
+	}
+}
+
+
+impl UiPainter {
+	pub fn new() -> UiPainter {
+		UiPainter {
+			commands: Vec::with_capacity(128),
+			vertices: Vec::with_capacity(8<<10),
+			indices: Vec::with_capacity(12<<10),
+
+			base_vertex_count: 0,
+			base_index_count: 0,
+
+			paint_mode: UiPaintMode::ShapeUntextured,
+		}
+	}
+
+	pub fn finish(&mut self, gfx: &mut gfx::System, ui_system: &mut ui::UiSystem, size: Vec2) {
+		self.submit();
+
+		let projection = Mat4::ortho(0.0, size.x, 0.0, size.y, -1.0, 1.0);
+
+		let mut encoder = gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0));
+		encoder.bind_shared_ubo(0, &[projection]);
+		encoder.bind_shared_ssbo(0, &self.vertices);
+
+		for &UiPaintCommand{ paint_mode, vertex_offset, index_offset, element_count }
+			in self.commands.iter()
+		{
+			// TODO(pat.m): would be good to not need to upload index ranges individually
+			let index_upload = encoder.upload(&self.indices[index_offset as usize..][..element_count as usize]);
+
+			match paint_mode {
+				UiPaintMode::ShapeUntextured => {
+					encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
+						.elements(element_count)
+						.indexed(index_upload)
+						.base_vertex(vertex_offset)
+						.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
+						.blend_mode(gfx::BlendMode::ALPHA)
+						.depth_test(false);
+				}
+
+				UiPaintMode::Text => {
+					encoder.draw(gfx::CommonShader::StandardVertex, ui_system.f_text_shader)
+						.elements(element_count)
+						.indexed(index_upload)
+						.base_vertex(vertex_offset)
+						.sampled_image(0, ui_system.glyph_cache.font_atlas, gfx::CommonSampler::Nearest)
+						.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
+						.depth_test(false);
+				}
+			}
+		}
+
+		self.reset();
+	}
+
+	fn reset(&mut self) {
+		self.commands.clear();
+		self.vertices.clear();
+		self.indices.clear();
+		self.base_vertex_count = 0;
+		self.base_index_count = 0;
+	}
+
+	fn submit(&mut self) {
+		let total_element_count = self.indices.len() as u32;
+		if total_element_count == self.base_index_count {
+			return;
+		}
+
+		self.commands.push(UiPaintCommand {
+			paint_mode: self.paint_mode,
+
+			vertex_offset: self.base_vertex_count,
+			index_offset: self.base_index_count,
+			element_count: total_element_count - self.base_index_count,
+		});
+
+		self.base_vertex_count = self.vertices.len() as u32;
+		self.base_index_count = total_element_count;
 	}
 }

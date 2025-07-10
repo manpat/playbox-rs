@@ -180,44 +180,7 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 	assert!(ui_ctx_impl.rw_lock == 0);
 
 	let UiPass::Render(mut painter) = ui_ctx_impl.pass else { panic!() };
-	painter.finish();
-
-	let UiPainter{ vertices, indices, commands, .. } = painter;
-
-	let projection = Mat4::ortho(0.0, screen_size.x, 0.0, screen_size.y, -1.0, 1.0);
-
-	let mut encoder = gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0));
-	encoder.bind_shared_ubo(0, &[projection]);
-	encoder.bind_shared_ssbo(0, &vertices);
-
-	for &UiPaintCommand{ paint_mode, vertex_offset, index_offset, element_count }
-		in commands.iter()
-	{
-		// TODO(pat.m): would be good to not need to upload index ranges individually
-		let index_upload = encoder.upload(&indices[index_offset as usize..][..element_count as usize]);
-
-		match paint_mode {
-			UiPaintMode::ShapeUntextured => {
-				encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
-					.elements(element_count)
-					.indexed(index_upload)
-					.base_vertex(vertex_offset)
-					.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
-					.blend_mode(gfx::BlendMode::ALPHA)
-					.depth_test(false);
-			}
-
-			UiPaintMode::Text => {
-				encoder.draw(gfx::CommonShader::StandardVertex, ui_system.f_text_shader)
-					.elements(element_count)
-					.indexed(index_upload)
-					.base_vertex(vertex_offset)
-					.sampled_image(0, ui_system.glyph_cache.font_atlas, gfx::CommonSampler::Nearest)
-					.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
-					.depth_test(false);
-			}
-		}
-	}
+	painter.finish(gfx, ui_system, screen_size);
 }
 
 
