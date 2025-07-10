@@ -27,6 +27,7 @@ impl MainMenuScene {
 			{
 				let widget = ui.begin_widget();
 				widget.layout.layout_type = ui::LayoutType::TopToBottom;
+				widget.layout.vertical.child_alignment = ui::Alignment::Center;
 				widget.layout.set_padding(10.0);
 				widget.draw_rect(Color::grey_a(0.0, 0.3));
 

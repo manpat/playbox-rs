@@ -289,19 +289,17 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 	let container_position = length(&container.position, axis);
 	let mut content_position = container_position + container_config.padding.start;
 
-	match container_config.child_alignment {
-		Alignment::Begin => {}
-
-		Alignment::Center => {
-			content_position += remaining_space / 2.0;
-		}
-
-		Alignment::End => {
-			content_position += remaining_space;
-		}
-	}
-
 	if reverse {
+		match container_config.child_alignment {
+			Alignment::Begin => {
+				content_position += remaining_space;
+			}
+			Alignment::Center => {
+				content_position += remaining_space / 2.0;
+			}
+			Alignment::End => {}
+		}
+
 		for &key in children.iter().rev() {
 			let config = &widgets[key].config.axis(axis);
 			let size = length(&widgets[key].size, axis);
@@ -312,6 +310,16 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 			content_position += size + config.margin.end + container_config.spacing;
 		}
 	} else {
+		match container_config.child_alignment {
+			Alignment::Begin => {}
+			Alignment::Center => {
+				content_position += remaining_space / 2.0;
+			}
+			Alignment::End => {
+				content_position += remaining_space;
+			}
+		}
+
 		for &key in children {
 			let config = &widgets[key].config.axis(axis);
 			let size = length(&widgets[key].size, axis);
