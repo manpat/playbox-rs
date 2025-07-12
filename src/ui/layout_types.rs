@@ -46,7 +46,7 @@ pub struct WidgetAxisLayout {
 bitflags! {
 	#[derive(Copy, Clone, Debug)]
 	pub struct WidgetLayoutFlags : u32 {
-		const SIZE_FROM_CONTENTS = 0b1;
+		const FIT_TO_CONTENTS = 0b1;
 	}
 }
 
@@ -88,8 +88,12 @@ impl WidgetAxisLayout {
 		self.alignment = Some(alignment);
 	}
 
-	pub fn set_size_from_contents(&mut self) {
-		self.flags.insert(WidgetLayoutFlags::SIZE_FROM_CONTENTS);
+	pub fn set_child_alignment(&mut self, alignment: Alignment) {
+		self.child_alignment = alignment;
+	}
+
+	pub fn fit_to_contents(&mut self) {
+		self.flags.insert(WidgetLayoutFlags::FIT_TO_CONTENTS);
 	}
 }
 
@@ -119,9 +123,9 @@ impl WidgetLayout {
 		[f(&self.horizontal), f(&self.vertical)]
 	}
 
-	pub fn set_size_from_contents(&mut self) {
-		self.horizontal.set_size_from_contents();
-		self.vertical.set_size_from_contents();
+	pub fn fit_to_contents(&mut self) {
+		self.horizontal.fit_to_contents();
+		self.vertical.fit_to_contents();
 	}
 
 	pub fn set_fixed_size(&mut self, size: Vec2) {
@@ -144,6 +148,11 @@ impl WidgetLayout {
 	pub fn set_alignment(&mut self, horizontal: Alignment, vertical: Alignment) {
 		self.horizontal.set_alignment(horizontal);
 		self.vertical.set_alignment(vertical);
+	}
+
+	pub fn set_child_alignment(&mut self, horizontal: Alignment, vertical: Alignment) {
+		self.horizontal.set_child_alignment(horizontal);
+		self.vertical.set_child_alignment(vertical);
 	}
 }
 

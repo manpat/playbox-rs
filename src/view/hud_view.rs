@@ -6,30 +6,46 @@ pub const HUD_FRAME_STAGE: gfx::FrameStage = gfx::FrameStage::Ui(0);
 
 pub struct HudView {
 	_message_bus: MessageBus,
-	// painter: ui::UiPainter,
 }
 
 impl HudView {
 	pub fn new(gfx: &mut gfx::System, message_bus: MessageBus) -> anyhow::Result<Self> {
 		Ok(HudView {
 			_message_bus: message_bus,
-			// painter: ui::UiPainter::new(gfx, HUD_FRAME_STAGE),
 		})
 	}
 
-	pub fn draw(&mut self, gfx: &mut gfx::System, ui_system: &mut ui::UiSystem, model: &Model) {
-		// let screen_size = gfx.backbuffer_size().to_vec2();
-		// let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
+	pub fn do_ui(&mut self, ui: ui::UiContext, model: &Model) {
+		let safe_area_panel = ui.begin_widget();
+		safe_area_panel.layout.set_padding(8.0);
 
-		// let usable_area = screen_bounds.shrink(16.0);
+		if model.hud.in_dialog {
+			self.do_dialog_ui(ui.clone(), model);
+		} else {
+			self.do_playing_ui(ui.clone(), model);
+		}
 
-		// if model.hud.in_dialog {
-		// 	self.draw_dialog(usable_area, ui_shared, model);
-		// } else {
-		// 	self.draw_playing(usable_area, ui_shared, model);
-		// }
+		ui.end_widget();
+	}
 
-		// self.painter.submit(gfx, ui_shared, screen_bounds);
+	fn do_playing_ui(&mut self, ui: ui::UiContext, model: &Model) {
+		let stat_panel = ui.begin_widget();
+		stat_panel.layout.layout_type = ui::LayoutType::TopToBottom;
+		stat_panel.layout.set_padding(4.0);
+		stat_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
+		stat_panel.layout.horizontal.set_child_alignment(ui::Alignment::Begin);
+		stat_panel.layout.set_size_from_contents();
+		stat_panel.draw_rect(Color::black().with_alpha(0.5));
+
+		let Player { blood, salt, .. } = model.player;
+		ui.text(format!("Blood: {blood}"));
+		ui.text(format!("Salt: {salt}"));
+
+		ui.end_widget();
+	}
+
+	fn do_dialog_ui(&mut self, _ui: ui::UiContext, _model: &Model) {
+
 	}
 
 // 	fn draw_playing(&mut self, usable_area: Aabb2, ui_shared: &mut ui::UiShared, model: &Model) {

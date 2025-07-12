@@ -184,7 +184,7 @@ impl GameScene {
 	}
 
 	pub fn draw(&mut self, ctx: &mut Context<'_>) {
-		let Context{gfx, ui_system, delta_time, ..} = ctx;
+		let Context{gfx, delta_time, ..} = ctx;
 		let delta_time = *delta_time;
 
 		self.time += delta_time;
@@ -221,7 +221,6 @@ impl GameScene {
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 
 		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
-		self.hud_view.draw(gfx, ui_system, &self.model);
 
 
 		// {
@@ -245,11 +244,14 @@ impl GameScene {
 
 
 		ui::build(ctx, |ui| {
+			self.hud_view.do_ui(ui.clone(), &self.model);
+
 			{
 				let fps_panel = ui.begin_widget();
 				fps_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
-				fps_panel.layout.set_size_from_contents();
 				fps_panel.layout.set_padding(4.0);
+				fps_panel.layout.fit_to_contents();
+				fps_panel.draw_rect(Color::white());
 
 				let fps = 1.0 / delta_time;
 				ui.text(format!("dt: {:.2}ms ({fps:.0}fps)", delta_time * 1000.0));

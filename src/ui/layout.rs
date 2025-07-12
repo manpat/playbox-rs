@@ -187,7 +187,7 @@ fn adjust_container_constraints(container: &mut WidgetAxisLayout, contents: &Con
 	let initial_preferred = container.preferred;
 	let padding_total = container.padding.total();
 
-	if container.flags.contains(WidgetLayoutFlags::SIZE_FROM_CONTENTS) {
+	if container.flags.contains(WidgetLayoutFlags::FIT_TO_CONTENTS) {
 		container.max = contents.max_length + padding_total;
 	}
 
