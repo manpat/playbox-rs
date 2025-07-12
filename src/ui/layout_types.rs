@@ -39,12 +39,14 @@ pub struct WidgetAxisLayout {
 
 	pub child_alignment: Alignment,
 	pub alignment: Option<Alignment>,
+
+	pub flags: WidgetLayoutFlags,
 }
 
 bitflags! {
 	#[derive(Copy, Clone, Debug)]
 	pub struct WidgetLayoutFlags : u32 {
-
+		const SIZE_FROM_CONTENTS = 0b1;
 	}
 }
 
@@ -61,6 +63,8 @@ impl Default for WidgetAxisLayout {
 
 			child_alignment: Alignment::Center,
 			alignment: None,
+
+			flags: WidgetLayoutFlags::empty(),
 		}
 	}
 }
@@ -78,6 +82,10 @@ impl WidgetAxisLayout {
 
 	pub fn set_padding(&mut self, lengths: impl Into<AxisLengths>) {
 		self.padding = lengths.into();
+	}
+
+	pub fn set_size_from_contents(&mut self) {
+		self.flags.insert(WidgetLayoutFlags::SIZE_FROM_CONTENTS);
 	}
 }
 
@@ -105,6 +113,11 @@ impl WidgetLayout {
 
 	pub fn each<T>(&mut self, f: impl Fn(&WidgetAxisLayout) -> T) -> [T; 2] {
 		[f(&self.horizontal), f(&self.vertical)]
+	}
+
+	pub fn set_size_from_contents(&mut self) {
+		self.horizontal.set_size_from_contents();
+		self.vertical.set_size_from_contents();
 	}
 
 	pub fn set_fixed_size(&mut self, size: Vec2) {

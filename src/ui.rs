@@ -25,6 +25,7 @@ pub enum UiPass {
 
 struct UiContextImpl {
 	system: *mut UiSystem,
+	input: *mut input::System,
 	pass: UiPass,
 
 	ref_count: usize,
@@ -116,20 +117,26 @@ impl UiContext {
 		result
 	}
 
-	pub fn with_system_mut<R: 'static>(&self, f: impl FnOnce(&mut UiSystem) -> R) -> R {
+	pub fn with_ui_system_mut<R: 'static>(&self, f: impl FnOnce(&mut UiSystem) -> R) -> R {
 		self.write(move |ctx| unsafe {
 			f(ctx.system.as_mut().unwrap())
 		})
 	}
 
-	pub fn with_system<R: 'static>(&self, f: impl FnOnce(&UiSystem) -> R) -> R {
+	pub fn with_ui_system<R: 'static>(&self, f: impl FnOnce(&UiSystem) -> R) -> R {
 		self.read(move |ctx| unsafe {
 			f(ctx.system.as_ref().unwrap())
 		})
 	}
 
+	pub fn with_input_system<R: 'static>(&self, f: impl FnOnce(&input::System) -> R) -> R {
+		self.read(move |ctx| unsafe {
+			f(ctx.input.as_ref().unwrap())
+		})
+	}
+
 	pub fn with_widget_tree_mut<R: 'static>(&self, f: impl FnOnce(&mut WidgetTree) -> R) -> R {
-		self.with_system_mut(move |system| {
+		self.with_ui_system_mut(move |system| {
 			f(&mut system.widget_tree)
 		})
 	}
@@ -160,6 +167,7 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 	{
 		let mut ui_ctx_impl = UiContextImpl {
 			system: *ui_system,
+			input: *input,
 			pass: UiPass::Layout,
 
 			ref_count: 0,
@@ -181,6 +189,7 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 
 		let mut ui_ctx_impl = UiContextImpl {
 			system: *ui_system,
+			input: *input,
 			pass: UiPass::Render(painter),
 
 			ref_count: 0,
@@ -200,9 +209,10 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 
 pub struct WidgetRef<'ctx> {
 	pub ctx: UiContext,
+	pub id: WidgetId,
 
 	pub layout: &'ctx mut WidgetLayout,
-	pub rect: Option<Aabb2>,
+	pub rect: Aabb2,
 }
 
 impl WidgetRef<'_> {
@@ -210,15 +220,9 @@ impl WidgetRef<'_> {
 		self.ctx.with_painter(f);
 	}
 
-	pub fn with_painter_and_rect(&self, f: impl FnOnce(&mut UiPainter, Aabb2)) {
-		if let Some(rect) = self.rect {
-			self.ctx.with_painter(|painter| f(painter, rect));
-		}
-	}
-
 	pub fn draw_rect(&self, color: impl Into<Color>) {
-		self.with_painter_and_rect(|painter, rect| {
-			painter.fill_solid_quad(rect, color.into());
+		self.ctx.with_painter(|painter| {
+			painter.fill_solid_quad(self.rect, color.into());
 		});
 	}
 }
@@ -239,6 +243,7 @@ impl UiContext {
 
 		WidgetRef {
 			ctx: self.clone(),
+			id,
 
 			layout: unsafe { &mut *layout },
 			rect,
@@ -263,7 +268,7 @@ impl UiContext {
 	pub fn auto_id(&self) -> WidgetId {
 		let hasher = &mut DefaultHasher::new();
 
-		self.with_system(|system| {
+		self.with_ui_system(|system| {
 			let current_widget = system.widget_tree.submission_stack.last().unwrap();
 			current_widget.id.hash(hasher);
 			current_widget.num_children.hash(hasher);
@@ -279,20 +284,21 @@ impl UiContext {
 		let text = text.as_ref();
 		let font_size = 16;
 
-		self.with_system_mut(|system| {
+		self.with_ui_system_mut(|system| {
 			system.glyph_cache.layout(&system.font, font_size, text, |glyph_geom, glyph_uvs| {
 				text_layout.push((glyph_geom, glyph_uvs));
 			});
 		});
 
 		let widget = self.do_widget();
+
 		let text_rect = text_layout.iter().fold(Aabb2::zero(), |acc, &(rect, _)| acc.include_rect(rect));
 		widget.layout.set_fixed_size(text_rect.size());
 
-		widget.with_painter_and_rect(|painter, rect| {
+		self.with_painter(|painter| {
 			painter.set_paint_mode(UiPaintMode::Text);
 			for (geom, uvs) in text_layout {
-				painter.add_quad(geom.translate(rect.min), uvs, Color::black());
+				painter.add_quad(geom.translate(widget.rect.min), uvs, Color::black());
 			}
 		});
 	}

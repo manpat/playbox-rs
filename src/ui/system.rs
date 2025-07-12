@@ -44,7 +44,8 @@ impl UiSystem {
 	pub fn update(&mut self, gfx: &mut gfx::System) {
 		self.glyph_cache.update_atlas(gfx);
 
-		// self.widget_tree.garbage_collect()
+		let _collected_widgets = self.widget_tree.garbage_collect();
+		// TODO(pat.m): gc storage
 	}
 }
 

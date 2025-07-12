@@ -10,7 +10,7 @@ pub struct Widget {
 	pub layout: *mut WidgetLayout,
 
 	// Includes padding.
-	pub rect: Option<Aabb2>,
+	pub rect: Aabb2,
 
 	pub epoch: u8,
 }
@@ -41,6 +41,7 @@ pub struct WidgetTree {
 	pub submission_order: Vec<WidgetId>,
 	pub submission_stack: Vec<WidgetStackEntry>,
 
+	gc_epoch: u8,
 	epoch: u8,
 }
 
@@ -56,6 +57,7 @@ impl WidgetTree {
 			layout_storage: Pin::new(Box::new_uninit_slice(10000)),
 			next_layout_index: 0,
 
+			gc_epoch: 0,
 			epoch: 0,
 		}
 	}
@@ -71,6 +73,28 @@ impl WidgetTree {
 			ptr.write(default());
 			ptr
 		}
+	}
+
+	pub fn garbage_collect(&mut self) -> Vec<WidgetId> {
+		let mut removed_widgets = Vec::new();
+		self.widgets.retain(|&id, widget| {
+			let epoch_diff = widget.epoch.wrapping_sub(self.gc_epoch).cast_signed();
+			let has_expired = epoch_diff < 0;
+			if has_expired {
+				log::info!("WIDGET {id:?} GC'D");
+				removed_widgets.push(id);
+			}
+
+			!has_expired
+		});
+
+		for id in removed_widgets.iter() {
+			self.children.remove(id);
+		}
+
+		self.gc_epoch = self.epoch;
+
+		removed_widgets
 	}
 
 	pub fn reset(&mut self) {
@@ -121,7 +145,7 @@ impl WidgetTree {
 			Entry::Vacant(entry) => {
 				entry.insert(Widget {
 					parent: parent_id,
-					rect: None,
+					rect: Aabb2::zero(),
 					layout,
 					epoch: self.epoch
 				})

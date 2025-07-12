@@ -31,7 +31,9 @@ impl MainMenuScene {
 				widget.layout.set_padding(10.0);
 				widget.draw_rect(Color::grey_a(0.0, 0.3));
 
-				if ui.button("Play") {
+				let space_pressed = ui.with_input_system(|input| input.button_just_down(input::keys::Space));
+
+				if ui.button("Play") || space_pressed {
 					ctx.audio.trigger();
 					ctx.bus.emit(MenuCmd::Play("default".into()));
 				}

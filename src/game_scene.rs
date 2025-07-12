@@ -185,8 +185,9 @@ impl GameScene {
 
 	pub fn draw(&mut self, ctx: &mut Context<'_>) {
 		let Context{gfx, ui_system, delta_time, ..} = ctx;
+		let delta_time = *delta_time;
 
-		self.time += *delta_time;
+		self.time += delta_time;
 
 		let player = &self.model.player;
 
@@ -222,6 +223,7 @@ impl GameScene {
 		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
 		self.hud_view.draw(gfx, ui_system, &self.model);
 
+
 		// {
 		// 	let screen_size = gfx.backbuffer_size().to_vec2();
 		// 	let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
@@ -240,6 +242,21 @@ impl GameScene {
 		// self.sprites.draw(gfx);
 
 		self.dispatch_postprocess(gfx);
+
+
+		ui::build(ctx, |ui| {
+			{
+				let fps_panel = ui.begin_widget();
+				fps_panel.layout.horizontal.alignment = Some(ui::Alignment::Begin);
+				fps_panel.layout.vertical.alignment = Some(ui::Alignment::End);
+				fps_panel.layout.set_size_from_contents();
+
+				let fps = 1.0 / delta_time;
+				ui.text(format!("dt: {:.2}ms ({fps:.0}fps)", delta_time * 1000.0));
+
+				ui.end_widget();
+			}
+		});
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {

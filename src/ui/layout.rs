@@ -122,7 +122,7 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	// Write back into widget tree
 	for resolved_layout in layout_tree.widgets.iter() {
 		let widget = widget_tree.get_mut(resolved_layout.source_id);
-		widget.rect = Some(Aabb2::from_min_size(resolved_layout.position, resolved_layout.size));
+		widget.rect = Aabb2::from_min_size(resolved_layout.position, resolved_layout.size);
 	}
 }
 
