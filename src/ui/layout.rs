@@ -179,7 +179,7 @@ fn adjust_container_constraints(container: &mut WidgetAxisLayout, contents: &Con
 
 	if container.flags.contains(WidgetLayoutFlags::FIT_TO_CONTENTS) {
 		container.max = (contents.preferred_length + padding_total).clamp(container.min, container.max);
-		container.preferred = container.max;
+		container.preferred = container.min;
 	}
 
 	container.min = (contents.min_length + padding_total).clamp(container.min, container.max);

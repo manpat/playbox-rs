@@ -236,7 +236,7 @@ impl GameScene {
 				fps_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
 				fps_panel.layout.set_padding(4.0);
 				fps_panel.layout.fit_to_contents();
-				fps_panel.draw_rect(Color::white());
+				fps_panel.draw_rect(Color::black());
 
 				let fps = 1.0 / delta_time;
 				ui.text(format!("dt: {:.2}ms ({fps:.0}fps)", delta_time * 1000.0));

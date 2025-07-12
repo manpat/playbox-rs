@@ -297,7 +297,7 @@ impl UiContext {
 		self.with_painter(|painter| {
 			painter.set_paint_mode(UiPaintMode::Text);
 			for (geom, uvs) in text_layout {
-				painter.add_quad(geom.translate(widget.rect.min), uvs, Color::black());
+				painter.add_quad(geom.translate(widget.rect.min), uvs, Color::white());
 			}
 		});
 	}

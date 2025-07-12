@@ -46,7 +46,15 @@ pub struct WidgetAxisLayout {
 bitflags! {
 	#[derive(Copy, Clone, Debug)]
 	pub struct WidgetLayoutFlags : u32 {
-		const FIT_TO_CONTENTS = 0b1;
+		// Instead of expanding to fill all available space, constrain size to
+		// the preferred size of contents.
+		const FIT_TO_CONTENTS = 1 << 0;
+
+		// TODO(pat.m): ...
+		// // Allow children to expand beyond the size of the container.
+		// // E.g., scrollable areas.
+		// // Children won't grow beyond their preferred sizes.
+		// const OVERFLOW = 1 << 1;
 	}
 }
 
