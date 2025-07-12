@@ -16,10 +16,11 @@ use glyph_cache::GlyphCache;
 use widget_tree::WidgetTree;
 
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UiPass {
 	// Input,
 	Layout,
-	Render(UiPainter),
+	Render,
 }
 
 
@@ -142,10 +143,12 @@ impl UiContext {
 	}
 
 	pub fn with_painter(&self, f: impl FnOnce(&mut UiPainter)) {
-		self.write(move |ctx| {
-			if let UiPass::Render(painter) = &mut ctx.pass {
-				f(painter);
-			}
+		if self.read(|ctx| ctx.pass != UiPass::Render) {
+			return
+		}
+
+		self.with_ui_system_mut(move |system| {
+			f(&mut system.painter);
 		});
 	}
 }
@@ -185,12 +188,10 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 
 	// Render pass
 	{
-		let painter = UiPainter::new();
-
 		let mut ui_ctx_impl = UiContextImpl {
 			system: *ui_system,
 			input: *input,
-			pass: UiPass::Render(painter),
+			pass: UiPass::Render,
 
 			ref_count: 0,
 			rw_lock: 0,
@@ -199,11 +200,9 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 		do_ui(UiContext::new(&mut ui_ctx_impl));
 
 		ui_ctx_impl.assert_unused();
-
-		let UiPass::Render(painter) = &mut ui_ctx_impl.pass else { panic!() };
-		painter.finish(gfx, &ui_system, screen_size);
 	}
 
+	ui_system.painter.finish(gfx, &ui_system.text_rendering, screen_size);
 }
 
 
@@ -285,7 +284,7 @@ impl UiContext {
 		let font_size = 16;
 
 		self.with_ui_system_mut(|system| {
-			system.glyph_cache.layout(&system.font, font_size, text, |glyph_geom, glyph_uvs| {
+			system.text_rendering.glyph_cache.layout(&system.text_rendering.font, font_size, text, |glyph_geom, glyph_uvs| {
 				text_layout.push((glyph_geom, glyph_uvs));
 			});
 		});

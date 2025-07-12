@@ -93,7 +93,7 @@ impl UiPainter {
 		}
 	}
 
-	pub fn finish(&mut self, gfx: &mut gfx::System, ui_system: &ui::UiSystem, size: Vec2) {
+	pub fn finish(&mut self, gfx: &mut gfx::System, text_state: &ui::system::TextRendering, size: Vec2) {
 		self.submit();
 
 		let projection = Mat4::ortho(0.0, size.x, 0.0, size.y, -1.0, 1.0);
@@ -120,11 +120,11 @@ impl UiPainter {
 				}
 
 				UiPaintMode::Text => {
-					encoder.draw(gfx::CommonShader::StandardVertex, ui_system.f_text_shader)
+					encoder.draw(gfx::CommonShader::StandardVertex, text_state.f_text_shader)
 						.elements(element_count)
 						.indexed(index_upload)
 						.base_vertex(vertex_offset)
-						.sampled_image(0, ui_system.glyph_cache.font_atlas, gfx::CommonSampler::Nearest)
+						.sampled_image(0, text_state.glyph_cache.font_atlas, gfx::CommonSampler::Nearest)
 						.blend_mode(gfx::BlendMode::PREMULTIPLIED_DUAL_SOURCE_COVERAGE)
 						.depth_test(false);
 				}

@@ -34,7 +34,7 @@ impl HudView {
 		stat_panel.layout.set_padding(4.0);
 		stat_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
 		stat_panel.layout.horizontal.set_child_alignment(ui::Alignment::Begin);
-		stat_panel.layout.set_size_from_contents();
+		stat_panel.layout.fit_to_contents();
 		stat_panel.draw_rect(Color::black().with_alpha(0.5));
 
 		let Player { blood, salt, .. } = model.player;

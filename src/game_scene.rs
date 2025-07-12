@@ -222,21 +222,6 @@ impl GameScene {
 
 		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
 
-
-		// {
-		// 	let screen_size = gfx.backbuffer_size().to_vec2();
-		// 	let screen_bounds = Aabb2::from_min_size(Vec2::zero(), screen_size/2.0);
-
-		// 	let mut painter = self.debug_painter.with_shared(ui_system);
-
-		// 	let fps = 1.0 / *delta_time;
-
-		// 	let top_left = screen_bounds.shrink(16.0).min_max_corner();
-		// 	painter.text(top_left - Vec2::from_y(16.0), 16, format!("dt: {:.2}ms ({fps:.0}fps)", *delta_time * 1000.0), Color::white());
-
-		// 	self.debug_painter.submit(gfx, ui_system, screen_bounds);
-		// }
-
 		// self.toy_renderer.draw(gfx);
 		// self.sprites.draw(gfx);
 

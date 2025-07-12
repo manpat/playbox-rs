@@ -10,10 +10,8 @@ const FONT_DATA: &[u8] = include_bytes!("../../resource/fonts/Saga 8.ttf");
 // const FONT_DATA: &[u8] = include_bytes!("../resource/fonts/Outflank 9.ttf");
 
 pub struct UiSystem {
-	// Font rendering
-	pub font: fontdue::Font,
-	pub glyph_cache: GlyphCache,
-	pub f_text_shader: gfx::ShaderHandle,
+	pub text_rendering: TextRendering,
+	pub painter: UiPainter,
 
 	// Widget state
 	pub widget_tree: WidgetTree,
@@ -31,9 +29,13 @@ impl UiSystem {
 			.map_err(|err| anyhow::anyhow!("{err}"))?;
 
 		Ok(UiSystem {
-			font,
-			glyph_cache: GlyphCache::new(gfx),
-			f_text_shader: gfx.resource_manager.load_fragment_shader("shaders/text.fs.glsl"),
+			text_rendering: TextRendering {
+				font,
+				glyph_cache: GlyphCache::new(gfx),
+				f_text_shader: gfx.resource_manager.load_fragment_shader("shaders/text.fs.glsl"),
+			},
+
+			painter: UiPainter::new(),
 
 			widget_tree: WidgetTree::new(),
 
@@ -42,10 +44,16 @@ impl UiSystem {
 	}
 
 	pub fn update(&mut self, gfx: &mut gfx::System) {
-		self.glyph_cache.update_atlas(gfx);
+		self.text_rendering.glyph_cache.update_atlas(gfx);
 
 		let _collected_widgets = self.widget_tree.garbage_collect();
 		// TODO(pat.m): gc storage
 	}
 }
 
+
+pub struct TextRendering {
+	pub font: fontdue::Font,
+	pub glyph_cache: GlyphCache,
+	pub f_text_shader: gfx::ShaderHandle,
+}
