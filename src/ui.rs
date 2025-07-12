@@ -322,6 +322,7 @@ impl UiContext {
 
 		self.text(text);
 
+		// Hover state
 		if is_hot {
 			button.draw_rect(Color::grey_a(1.0, 0.12));
 		}

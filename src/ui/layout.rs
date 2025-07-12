@@ -129,13 +129,11 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 struct ContentsMeasurement {
 	min_length: f32,
 	preferred_length: f32,
-	max_length: f32,
 }
 
 fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis) -> ContentsMeasurement {
 	let mut min_length = 0.0f32;
 	let mut preferred_length = 0.0f32;
-	let mut max_length = 0.0f32;
 
 	for &key in children {
 		let config = widgets[key].config.axis(axis);
@@ -143,20 +141,17 @@ fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], 
 
 		min_length = min_length.max(config.min + margin_total);
 		preferred_length = preferred_length.max(config.preferred + margin_total);
-		max_length = max_length.max(config.max + margin_total);
 	}
 
 	ContentsMeasurement {
 		min_length,
 		preferred_length,
-		max_length,
 	}
 }
 
 fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis, spacing: f32) -> ContentsMeasurement {
 	let mut min_length = 0.0f32;
 	let mut preferred_length = 0.0f32;
-	let mut max_length = 0.0f32;
 
 	for &key in children {
 		let config = widgets[key].config.axis(axis);
@@ -165,35 +160,31 @@ fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis:
 		// TODO(pat.m): collapse margins
 		min_length += config.min + margin_total;
 		preferred_length += config.preferred + margin_total;
-		max_length += config.max + margin_total;
 	}
 
 	if !children.is_empty() {
 		let spacing_contribution = children.len().saturating_sub(1) as f32 * spacing;
 		min_length += spacing_contribution;
 		preferred_length += spacing_contribution;
-		max_length += spacing_contribution;
 	}
 
 	ContentsMeasurement {
 		min_length,
 		preferred_length,
-		max_length,
 	}
 }
 
 fn adjust_container_constraints(container: &mut WidgetAxisLayout, contents: &ContentsMeasurement) {
-	let initial_min = container.min;
-	let initial_preferred = container.preferred;
 	let padding_total = container.padding.total();
 
 	if container.flags.contains(WidgetLayoutFlags::FIT_TO_CONTENTS) {
-		container.max = contents.max_length + padding_total;
+		container.max = (contents.preferred_length + padding_total).clamp(container.min, container.max);
+		container.preferred = container.max;
 	}
 
-	container.min = initial_min.max(contents.min_length + padding_total).min(container.max);
+	container.min = (contents.min_length + padding_total).clamp(container.min, container.max);
 
-	container.preferred = initial_preferred.max(contents.preferred_length + padding_total)
+	container.preferred = container.preferred.max(contents.preferred_length + padding_total)
 		.clamp(container.min, container.max);
 }
 

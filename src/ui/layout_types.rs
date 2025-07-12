@@ -29,7 +29,7 @@ pub enum LayoutType {
 #[derive(Clone)]
 pub struct WidgetAxisLayout {
 	pub min: f32,
-	pub preferred: f32, // TODO(pat.m): do I actually need this?
+	pub preferred: f32,
 	pub max: f32,
 
 	pub padding: AxisLengths,
