@@ -11,6 +11,8 @@ pub struct Widget {
 
 	// Includes padding.
 	pub rect: Option<Aabb2>,
+
+	pub epoch: u8,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -30,6 +32,8 @@ pub struct WidgetTree {
 	pub next_layout_index: usize,
 
 	pub submission_order: Vec<WidgetId>,
+
+	epoch: u8,
 }
 
 impl WidgetTree {
@@ -42,6 +46,8 @@ impl WidgetTree {
 			// 10k widgets oughta be enough for anybody...
 			layout_storage: Pin::new(Box::new_uninit_slice(10000)),
 			next_layout_index: 0,
+
+			epoch: 0,
 		}
 	}
 
@@ -58,57 +64,69 @@ impl WidgetTree {
 		}
 	}
 
-	pub fn clear(&mut self) {
-		self.widgets.clear();
-		self.children.clear();
+	pub fn reset(&mut self) {
 		self.submission_order.clear();
 
 		self.next_layout_index = 0;
+		self.epoch = self.epoch.wrapping_add(1);
+
+		self.track_widget(WidgetId::ROOT, WidgetId::ROOT);
 	}
 
-	pub fn make_root(&mut self) -> &mut Widget {
+	pub fn track_widget(&mut self, id: WidgetId, parent: WidgetId) -> &mut Widget {
 		use std::collections::hash_map::Entry;
-
-		let layout = self.alloc_layout();
-
-		self.submission_order.push(WidgetId::ROOT);
-
-		match self.widgets.entry(WidgetId::ROOT) {
-			Entry::Occupied(_) => panic!("Root already exists!"),
-			Entry::Vacant(entry) => {
-				entry.insert(Widget {
-					parent: WidgetId::ROOT,
-					rect: None,
-					layout,
-				})
-			}
-		}
-	}
-
-	pub fn get_mut(&mut self, id: WidgetId) -> &mut Widget {
-		self.widgets.get_mut(&id).expect("Requesting widget not submitted in layout pass")
-	}
-
-	pub fn insert(&mut self, id: WidgetId, parent: WidgetId) -> &mut Widget {
-		use std::collections::hash_map::Entry;
-
-		assert!(id != WidgetId::ROOT);
 
 		let layout = self.alloc_layout();
 		self.submission_order.push(id);
-		self.children.entry(parent)
+
+		if id != WidgetId::ROOT {
+			self.children.entry(parent)
+				.or_default()
+				.push(id);
+		}
+
+		self.children.entry(id)
 			.or_default()
-			.push(id);
+			.clear();
 
 		match self.widgets.entry(id) {
-			Entry::Occupied(_) => panic!("Conflicting id! {id:?}"),
+			Entry::Occupied(entry) => {
+				let widget = entry.into_mut();
+				assert!(widget.epoch != self.epoch, "Id conflict!");
+				widget.parent = parent;
+				widget.layout = layout;
+				widget.epoch = self.epoch;
+				widget
+			},
+
 			Entry::Vacant(entry) => {
 				entry.insert(Widget {
 					parent,
 					rect: None,
 					layout,
+					epoch: self.epoch
 				})
 			}
 		}
+	}
+
+	pub fn widget_count(&self) -> usize {
+		self.widgets.len()
+	}
+
+	pub fn get_layout(&self, id: WidgetId) -> WidgetLayout {
+		match self.widgets.get(&id) {
+			Some(widget) if widget.epoch == self.epoch => unsafe{ widget.layout.read() },
+			_ => default(),
+		}
+	}
+
+	pub fn get_children(&self, id: WidgetId) -> &[WidgetId] {
+		self.children.get(&id)
+			.map_or(&[], |v| v)
+	}
+
+	pub fn get_mut(&mut self, id: WidgetId) -> &mut Widget {
+		self.widgets.get_mut(&id).expect("Requesting widget not yet submitted")
 	}
 }

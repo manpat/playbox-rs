@@ -133,7 +133,7 @@ impl UiContext {
 
 
 pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
-	let Context{ gfx, ui_system, .. } = ctx;
+	let Context{ gfx, input, ui_system, .. } = ctx;
 
 	let screen_size = gfx.backbuffer_size().to_vec2() * ui_system.global_scale;
 
@@ -149,7 +149,9 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 	};
 
 
-	let root_widget = ui_ctx_impl.tree.make_root();
+	ui_ctx_impl.tree.reset();
+
+	let root_widget = ui_ctx_impl.tree.get_mut(WidgetId::ROOT);
 	unsafe {
 		(*root_widget.layout).set_fixed_size(screen_size);
 	}
@@ -164,6 +166,8 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 	}
 
 	layout::layout_widget_tree(&mut ui_ctx_impl.tree);
+
+	ui_ctx_impl.tree.reset();
 
 	// Render pass
 	{
@@ -224,11 +228,7 @@ impl UiContext {
 			prev.num_children += 1;
 
 			ctx.widget_stack.push(WidgetStackEntry{ id, num_children: 0 });
-
-			let widget = match ctx.pass {
-				UiPass::Layout => ctx.tree.insert(id, parent),
-				UiPass::Render(_) => ctx.tree.get_mut(id),
-			};
+			let widget = ctx.tree.track_widget(id, parent);
 
 			(widget.rect, widget.layout)
 		});

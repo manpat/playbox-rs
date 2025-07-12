@@ -23,8 +23,8 @@ struct LayoutTree {
 
 pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	let mut layout_tree = LayoutTree {
-		widgets: Vec::with_capacity(widget_tree.widgets.len()),
-		children: vec![const{ SmallVec::new_const() }; widget_tree.widgets.len()],
+		widgets: Vec::with_capacity(widget_tree.widget_count()),
+		children: vec![const{ SmallVec::new_const() }; widget_tree.widget_count()],
 
 		widget_to_layout: HashMap::default(),
 	};
@@ -33,22 +33,17 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	for &widget_id in widget_tree.submission_order.iter().rev() {
 		let layout_key = layout_tree.widgets.len();
 
-		{
-			let widget = widget_tree.widgets.get(&widget_id).unwrap();
-			layout_tree.widgets.push(ResolvedLayout {
-				config: unsafe{ widget.layout.read() },
-				source_id: widget_id,
+		layout_tree.widgets.push(ResolvedLayout {
+			config: widget_tree.get_layout(widget_id),
+			source_id: widget_id,
 
-				size: Vec2::zero(),
-				position: Vec2::zero(),
-			});
+			size: Vec2::zero(),
+			position: Vec2::zero(),
+		});
 
-			layout_tree.widget_to_layout.insert(widget_id, layout_key);
-		}
+		layout_tree.widget_to_layout.insert(widget_id, layout_key);
 
-		let Some(children) = widget_tree.children.get(&widget_id)
-			else { continue };
-
+		let children = widget_tree.get_children(widget_id);
 		if children.is_empty() {
 			continue;
 		}

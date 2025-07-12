@@ -1,5 +1,8 @@
 use crate::prelude::*;
-use super::glyph_cache::GlyphCache;
+
+use ui::glyph_cache::GlyphCache;
+use ui::widget_tree::WidgetTree;
+use ui::ui_painter::UiPainter;
 
 // const FONT_DATA: &[u8] = include_bytes!("../resource/fonts/Tuffy.otf");
 // const FONT_DATA: &[u8] = include_bytes!("../resource/fonts/Quicksand-Light.ttf");
