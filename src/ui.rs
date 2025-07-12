@@ -304,17 +304,31 @@ impl UiContext {
 
 	pub fn button(&self, text: impl AsRef<str>) -> bool {
 		let button = self.begin_widget();
-		button.draw_rect(Color::magenta());
 		button.layout.set_type(LayoutType::LeftToRight);
 		button.layout.set_child_alignment(Alignment::Center, Alignment::Center);
 		button.layout.set_padding(4.0);
 		button.layout.vertical.set_fixed_size(16.0 + 8.0);
+		button.draw_rect(Color::magenta());
+
+		let ui_scale = self.with_ui_system(|system| system.global_scale);
+
+		// TODO(pat.m): hotness should be calculated ahead of time so occlusion can be taken into account
+		// + so we can handle stuff like dragging
+		let (is_hot, is_clicked) = self.with_input_system(|input| {
+			let Some(position) = input.mouse_position_pixels() else { return (false, false) };
+			let is_hot = button.rect.contains_point(position * ui_scale);
+			(is_hot, is_hot && input.button_just_up(input::MouseButton::Left))
+		});
 
 		self.text(text);
 
+		if is_hot {
+			button.draw_rect(Color::grey_a(1.0, 0.12));
+		}
+
 		self.end_widget();
 
-		false
+		is_clicked
 	}
 }
 
