@@ -289,6 +289,8 @@ fn layout_axis_linear(widgets: &mut [ResolvedLayout], children: &[LayoutKey], ax
 	let container_position = length(&container.position, axis);
 	let mut content_position = container_position + container_config.padding.start;
 
+	// TODO(pat.m): config.alignment
+
 	if reverse {
 		match container_config.child_alignment {
 			Alignment::Begin => {
