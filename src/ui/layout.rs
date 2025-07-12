@@ -126,14 +126,16 @@ pub fn layout_widget_tree(widget_tree: &mut WidgetTree) {
 	}
 }
 
-struct ContainerMeasurement {
+struct ContentsMeasurement {
 	min_length: f32,
 	preferred_length: f32,
+	max_length: f32,
 }
 
-fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis) -> ContainerMeasurement {
+fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis) -> ContentsMeasurement {
 	let mut min_length = 0.0f32;
 	let mut preferred_length = 0.0f32;
+	let mut max_length = 0.0f32;
 
 	for &key in children {
 		let config = widgets[key].config.axis(axis);
@@ -141,17 +143,20 @@ fn measure_axis_overlapping(widgets: &[ResolvedLayout], children: &[LayoutKey], 
 
 		min_length = min_length.max(config.min + margin_total);
 		preferred_length = preferred_length.max(config.preferred + margin_total);
+		max_length = max_length.max(config.max + margin_total);
 	}
 
-	ContainerMeasurement {
+	ContentsMeasurement {
 		min_length,
 		preferred_length,
+		max_length,
 	}
 }
 
-fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis, spacing: f32) -> ContainerMeasurement {
+fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis: Axis, spacing: f32) -> ContentsMeasurement {
 	let mut min_length = 0.0f32;
 	let mut preferred_length = 0.0f32;
+	let mut max_length = 0.0f32;
 
 	for &key in children {
 		let config = widgets[key].config.axis(axis);
@@ -160,29 +165,36 @@ fn measure_axis_linear(widgets: &[ResolvedLayout], children: &[LayoutKey], axis:
 		// TODO(pat.m): collapse margins
 		min_length += config.min + margin_total;
 		preferred_length += config.preferred + margin_total;
+		max_length += config.max + margin_total;
 	}
 
 	if !children.is_empty() {
 		let spacing_contribution = children.len().saturating_sub(1) as f32 * spacing;
 		min_length += spacing_contribution;
 		preferred_length += spacing_contribution;
+		max_length += spacing_contribution;
 	}
 
-	ContainerMeasurement {
+	ContentsMeasurement {
 		min_length,
 		preferred_length,
+		max_length,
 	}
 }
 
-fn adjust_container_constraints(constraints: &mut WidgetAxisLayout, measurement: &ContainerMeasurement) {
-	let initial_min = constraints.min;
-	let initial_preferred = constraints.preferred;
-	let padding_total = constraints.padding.total();
+fn adjust_container_constraints(container: &mut WidgetAxisLayout, contents: &ContentsMeasurement) {
+	let initial_min = container.min;
+	let initial_preferred = container.preferred;
+	let padding_total = container.padding.total();
 
-	constraints.min = initial_min.max(measurement.min_length + padding_total).min(constraints.max);
+	if container.flags.contains(WidgetLayoutFlags::SIZE_FROM_CONTENTS) {
+		container.max = contents.max_length + padding_total;
+	}
 
-	constraints.preferred = initial_preferred.max(measurement.preferred_length + padding_total)
-		.clamp(constraints.min, constraints.max);
+	container.min = initial_min.max(contents.min_length + padding_total).min(container.max);
+
+	container.preferred = initial_preferred.max(contents.preferred_length + padding_total)
+		.clamp(container.min, container.max);
 }
 
 fn layout_axis_overlapping(widgets: &mut [ResolvedLayout], children: &[LayoutKey], axis: Axis, container: &ResolvedLayout) {

@@ -247,9 +247,9 @@ impl GameScene {
 		ui::build(ctx, |ui| {
 			{
 				let fps_panel = ui.begin_widget();
-				fps_panel.layout.horizontal.alignment = Some(ui::Alignment::Begin);
-				fps_panel.layout.vertical.alignment = Some(ui::Alignment::End);
+				fps_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
 				fps_panel.layout.set_size_from_contents();
+				fps_panel.layout.set_padding(4.0);
 
 				let fps = 1.0 / delta_time;
 				ui.text(format!("dt: {:.2}ms ({fps:.0}fps)", delta_time * 1000.0));

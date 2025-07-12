@@ -84,6 +84,10 @@ impl WidgetAxisLayout {
 		self.padding = lengths.into();
 	}
 
+	pub fn set_alignment(&mut self, alignment: Alignment) {
+		self.alignment = Some(alignment);
+	}
+
 	pub fn set_size_from_contents(&mut self) {
 		self.flags.insert(WidgetLayoutFlags::SIZE_FROM_CONTENTS);
 	}
@@ -135,6 +139,11 @@ impl WidgetLayout {
 		let padding = padding.into();
 		self.horizontal.set_padding(padding.horizontal);
 		self.vertical.set_padding(padding.vertical);
+	}
+
+	pub fn set_alignment(&mut self, horizontal: Alignment, vertical: Alignment) {
+		self.horizontal.set_alignment(horizontal);
+		self.vertical.set_alignment(vertical);
 	}
 }
 
