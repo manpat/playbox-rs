@@ -22,21 +22,22 @@ pub enum UiPass {
 	Render(UiPainter),
 }
 
-struct WidgetStackEntry {
-	id: WidgetId,
-	num_children: u32,
-}
 
 struct UiContextImpl {
 	system: *mut UiSystem,
 	pass: UiPass,
 
-	tree: WidgetTree,
-	widget_stack: Vec<WidgetStackEntry>,
-
 	ref_count: usize,
 	rw_lock: i32,
 }
+
+impl UiContextImpl {
+	fn assert_unused(&self) {
+		assert!(self.ref_count == 0);
+		assert!(self.rw_lock == 0);
+	}
+}
+
 
 pub struct UiContext(*mut UiContextImpl);
 
@@ -115,18 +116,29 @@ impl UiContext {
 		result
 	}
 
+	pub fn with_system_mut<R: 'static>(&self, f: impl FnOnce(&mut UiSystem) -> R) -> R {
+		self.write(move |ctx| unsafe {
+			f(ctx.system.as_mut().unwrap())
+		})
+	}
+
+	pub fn with_system<R: 'static>(&self, f: impl FnOnce(&UiSystem) -> R) -> R {
+		self.read(move |ctx| unsafe {
+			f(ctx.system.as_ref().unwrap())
+		})
+	}
+
+	pub fn with_widget_tree_mut<R: 'static>(&self, f: impl FnOnce(&mut WidgetTree) -> R) -> R {
+		self.with_system_mut(move |system| {
+			f(&mut system.widget_tree)
+		})
+	}
+
 	pub fn with_painter(&self, f: impl FnOnce(&mut UiPainter)) {
 		self.write(move |ctx| {
 			if let UiPass::Render(painter) = &mut ctx.pass {
 				f(painter);
 			}
-		});
-	}
-
-	pub fn with_system(&self, f: impl FnOnce(&mut UiSystem)) {
-		// TODO(pat.m): NOT SAFE if we ever independently borrow parts of UiSystem
-		self.write(move |ctx| unsafe {
-			f(ctx.system.as_mut().unwrap());
 		});
 	}
 }
@@ -137,54 +149,52 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 
 	let screen_size = gfx.backbuffer_size().to_vec2() * ui_system.global_scale;
 
-	let mut ui_ctx_impl = UiContextImpl {
-		system: *ui_system,
-		pass: UiPass::Layout,
+	ui_system.widget_tree.reset();
 
-		tree: WidgetTree::new(),
-		widget_stack: Vec::with_capacity(16),
-
-		ref_count: 0,
-		rw_lock: 0,
-	};
-
-
-	ui_ctx_impl.tree.reset();
-
-	let root_widget = ui_ctx_impl.tree.get_mut(WidgetId::ROOT);
+	let root_widget = ui_system.widget_tree.get_mut(WidgetId::ROOT);
 	unsafe {
 		(*root_widget.layout).set_fixed_size(screen_size);
 	}
 
 	// Layout pass
 	{
-		ui_ctx_impl.pass = UiPass::Layout;
-		ui_ctx_impl.widget_stack.clear();
-		ui_ctx_impl.widget_stack.push(WidgetStackEntry{ id: WidgetId::ROOT, num_children: 0 });
+		let mut ui_ctx_impl = UiContextImpl {
+			system: *ui_system,
+			pass: UiPass::Layout,
+
+			ref_count: 0,
+			rw_lock: 0,
+		};
 
 		do_ui(UiContext::new(&mut ui_ctx_impl));
+
+		ui_ctx_impl.assert_unused();
 	}
 
-	layout::layout_widget_tree(&mut ui_ctx_impl.tree);
+	layout::layout_widget_tree(&mut ui_system.widget_tree);
 
-	ui_ctx_impl.tree.reset();
+	ui_system.widget_tree.reset();
 
 	// Render pass
 	{
 		let painter = UiPainter::new();
 
-		ui_ctx_impl.pass = UiPass::Render(painter);
-		ui_ctx_impl.widget_stack.clear();
-		ui_ctx_impl.widget_stack.push(WidgetStackEntry{ id: WidgetId::ROOT, num_children: 0 });
+		let mut ui_ctx_impl = UiContextImpl {
+			system: *ui_system,
+			pass: UiPass::Render(painter),
+
+			ref_count: 0,
+			rw_lock: 0,
+		};
 
 		do_ui(UiContext::new(&mut ui_ctx_impl));
+
+		ui_ctx_impl.assert_unused();
+
+		let UiPass::Render(painter) = &mut ui_ctx_impl.pass else { panic!() };
+		painter.finish(gfx, &ui_system, screen_size);
 	}
 
-	assert!(ui_ctx_impl.ref_count == 0);
-	assert!(ui_ctx_impl.rw_lock == 0);
-
-	let UiPass::Render(mut painter) = ui_ctx_impl.pass else { panic!() };
-	painter.finish(gfx, ui_system, screen_size);
 }
 
 
@@ -222,14 +232,8 @@ impl UiContext {
 	pub fn begin_widget_with_id(&self, id: impl Into<WidgetId>) -> WidgetRef {
 		let id = id.into();
 
-		let (rect, layout) = self.write(|ctx| {
-			let prev = ctx.widget_stack.last_mut().unwrap();
-			let parent = prev.id;
-			prev.num_children += 1;
-
-			ctx.widget_stack.push(WidgetStackEntry{ id, num_children: 0 });
-			let widget = ctx.tree.track_widget(id, parent);
-
+		let (rect, layout) = self.with_widget_tree_mut(|widget_tree| {
+			let widget = widget_tree.track_widget_start(id);
 			(widget.rect, widget.layout)
 		});
 
@@ -242,7 +246,7 @@ impl UiContext {
 	}
 
 	pub fn end_widget(&self) {
-		self.write(|ctx| ctx.widget_stack.pop());
+		self.with_widget_tree_mut(|widget_tree| widget_tree.track_widget_end());
 	}
 
 	pub fn do_widget(&self) -> WidgetRef {
@@ -259,8 +263,8 @@ impl UiContext {
 	pub fn auto_id(&self) -> WidgetId {
 		let hasher = &mut DefaultHasher::new();
 
-		self.read(|ctx| {
-			let current_widget = ctx.widget_stack.last().unwrap();
+		self.with_system(|system| {
+			let current_widget = system.widget_tree.submission_stack.last().unwrap();
 			current_widget.id.hash(hasher);
 			current_widget.num_children.hash(hasher);
 		});
@@ -275,7 +279,7 @@ impl UiContext {
 		let text = text.as_ref();
 		let font_size = 16;
 
-		self.with_system(|system| {
+		self.with_system_mut(|system| {
 			system.glyph_cache.layout(&system.font, font_size, text, |glyph_geom, glyph_uvs| {
 				text_layout.push((glyph_geom, glyph_uvs));
 			});

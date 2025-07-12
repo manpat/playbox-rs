@@ -13,8 +13,10 @@ pub struct UiSystem {
 	// Font rendering
 	pub font: fontdue::Font,
 	pub glyph_cache: GlyphCache,
-
 	pub f_text_shader: gfx::ShaderHandle,
+
+	// Widget state
+	pub widget_tree: WidgetTree,
 
 	// Storage
 	// TODO(pat.m): ...
@@ -31,8 +33,9 @@ impl UiSystem {
 		Ok(UiSystem {
 			font,
 			glyph_cache: GlyphCache::new(gfx),
-
 			f_text_shader: gfx.resource_manager.load_fragment_shader("shaders/text.fs.glsl"),
+
+			widget_tree: WidgetTree::new(),
 
 			global_scale: 0.5,
 		})
@@ -40,5 +43,12 @@ impl UiSystem {
 
 	pub fn update(&mut self, gfx: &mut gfx::System) {
 		self.glyph_cache.update_atlas(gfx);
+
+		// self.widget_tree.garbage_collect()
 	}
+}
+
+
+
+pub struct FontRenderingState {
 }

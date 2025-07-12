@@ -93,7 +93,7 @@ impl UiPainter {
 		}
 	}
 
-	pub fn finish(&mut self, gfx: &mut gfx::System, ui_system: &mut ui::UiSystem, size: Vec2) {
+	pub fn finish(&mut self, gfx: &mut gfx::System, ui_system: &ui::UiSystem, size: Vec2) {
 		self.submit();
 
 		let projection = Mat4::ortho(0.0, size.x, 0.0, size.y, -1.0, 1.0);

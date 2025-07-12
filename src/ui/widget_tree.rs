@@ -23,6 +23,13 @@ impl WidgetId {
 }
 
 
+
+pub struct WidgetStackEntry {
+	pub id: WidgetId,
+	pub num_children: u32,
+}
+
+
 pub struct WidgetTree {
 	pub widgets: HashMap<WidgetId, Widget>,
 	pub children: HashMap<WidgetId, SmallVec<[WidgetId; 4]>>,
@@ -32,6 +39,7 @@ pub struct WidgetTree {
 	pub next_layout_index: usize,
 
 	pub submission_order: Vec<WidgetId>,
+	pub submission_stack: Vec<WidgetStackEntry>,
 
 	epoch: u8,
 }
@@ -42,6 +50,7 @@ impl WidgetTree {
 			widgets: default(),
 			children: default(),
 			submission_order: default(),
+			submission_stack: default(),
 
 			// 10k widgets oughta be enough for anybody...
 			layout_storage: Pin::new(Box::new_uninit_slice(10000)),
@@ -66,24 +75,34 @@ impl WidgetTree {
 
 	pub fn reset(&mut self) {
 		self.submission_order.clear();
+		self.submission_stack.clear();
 
 		self.next_layout_index = 0;
 		self.epoch = self.epoch.wrapping_add(1);
 
-		self.track_widget(WidgetId::ROOT, WidgetId::ROOT);
+		self.track_widget_start(WidgetId::ROOT);
 	}
 
-	pub fn track_widget(&mut self, id: WidgetId, parent: WidgetId) -> &mut Widget {
+	pub fn track_widget_start(&mut self, id: WidgetId) -> &mut Widget {
 		use std::collections::hash_map::Entry;
 
 		let layout = self.alloc_layout();
-		self.submission_order.push(id);
+		let parent_id;
 
 		if id != WidgetId::ROOT {
-			self.children.entry(parent)
+			let parent_entry = self.submission_stack.last_mut().unwrap();
+			parent_entry.num_children += 1;
+			parent_id = parent_entry.id;
+
+			self.children.entry(parent_id)
 				.or_default()
 				.push(id);
+		} else {
+			parent_id = WidgetId::ROOT;
 		}
+
+		self.submission_order.push(id);
+		self.submission_stack.push(WidgetStackEntry{ id, num_children: 0 });
 
 		self.children.entry(id)
 			.or_default()
@@ -93,7 +112,7 @@ impl WidgetTree {
 			Entry::Occupied(entry) => {
 				let widget = entry.into_mut();
 				assert!(widget.epoch != self.epoch, "Id conflict!");
-				widget.parent = parent;
+				widget.parent = parent_id;
 				widget.layout = layout;
 				widget.epoch = self.epoch;
 				widget
@@ -101,13 +120,17 @@ impl WidgetTree {
 
 			Entry::Vacant(entry) => {
 				entry.insert(Widget {
-					parent,
+					parent: parent_id,
 					rect: None,
 					layout,
 					epoch: self.epoch
 				})
 			}
 		}
+	}
+
+	pub fn track_widget_end(&mut self) {
+		self.submission_stack.pop();
 	}
 
 	pub fn widget_count(&self) -> usize {
