@@ -305,6 +305,8 @@ impl UiContext {
 	pub fn button(&self, text: impl AsRef<str>) -> bool {
 		let button = self.begin_widget();
 		button.draw_rect(Color::magenta());
+		button.layout.set_type(LayoutType::LeftToRight);
+		button.layout.set_child_alignment(Alignment::Center, Alignment::Center);
 		button.layout.set_padding(4.0);
 		button.layout.vertical.set_fixed_size(16.0 + 8.0);
 

@@ -123,6 +123,10 @@ impl WidgetLayout {
 		[f(&self.horizontal), f(&self.vertical)]
 	}
 
+	pub fn set_type(&mut self, ty: LayoutType) {
+		self.layout_type = ty;
+	}
+
 	pub fn fit_to_contents(&mut self) {
 		self.horizontal.fit_to_contents();
 		self.vertical.fit_to_contents();

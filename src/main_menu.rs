@@ -18,16 +18,16 @@ impl MainMenuScene {
 
 		ui::build(ctx, |ui| {
 			let widget = ui.begin_widget();
-			widget.layout.layout_type = ui::LayoutType::LeftToRight;
+			widget.layout.set_type(ui::LayoutType::LeftToRight);
 			widget.layout.set_margin(10.0);
 			widget.layout.set_padding(10.0);
-			widget.layout.horizontal.child_alignment = ui::Alignment::Begin;
-			widget.layout.vertical.child_alignment = ui::Alignment::Center;
+			widget.layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Center);
 
 			{
 				let widget = ui.begin_widget();
-				widget.layout.layout_type = ui::LayoutType::TopToBottom;
-				widget.layout.vertical.child_alignment = ui::Alignment::Center;
+				widget.layout.set_type(ui::LayoutType::TopToBottom);
+				widget.layout.fit_to_contents();
+				widget.layout.vertical.set_child_alignment(ui::Alignment::Center);
 				widget.layout.set_padding(10.0);
 				widget.draw_rect(Color::grey_a(0.0, 0.3));
 
