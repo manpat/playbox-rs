@@ -49,7 +49,3 @@ impl UiSystem {
 	}
 }
 
-
-
-pub struct FontRenderingState {
-}
