@@ -14,7 +14,7 @@ impl HudView {
 
 	pub fn do_ui(&mut self, ui: ui::UiContext, model: &Model) {
 		let safe_area_panel = ui.begin_widget();
-		safe_area_panel.layout.set_padding(8.0);
+		safe_area_panel.with_layout(|layout| layout.set_padding(8.0));
 
 		if model.hud.in_dialog {
 			self.do_dialog_ui(ui.clone(), model);
@@ -26,15 +26,18 @@ impl HudView {
 	}
 
 	fn do_playing_ui(&mut self, ui: ui::UiContext, model: &Model) {
-		ui.vertical_layout(|layout| {
-			layout.layout.set_padding(4.0);
-			layout.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
-			layout.draw_rect(Color::black().with_alpha(0.5));
+		ui.vertical_layout(|widget| {
+			widget.with_layout(|layout| {
+				layout.set_padding(4.0);
+				layout.set_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
+			});
+
+			widget.draw_rect(Color::black().with_alpha(0.5));
 
 			let Player { blood, salt, .. } = model.player;
 			ui.text(format!("Blood: {blood}"));
 			ui.text(format!("Salt: {salt}"));
-		})
+		});
 	}
 
 	fn do_dialog_ui(&mut self, _ui: ui::UiContext, _model: &Model) {

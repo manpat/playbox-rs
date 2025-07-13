@@ -15,6 +15,7 @@ use crate::prelude::*;
 use glyph_cache::GlyphCache;
 use widget_tree::WidgetTree;
 
+use std::marker::PhantomData;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UiPass {
@@ -213,12 +214,15 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 }
 
 
+#[derive(Clone)]
 pub struct WidgetRef<'ctx> {
 	pub ctx: UiContext,
 	pub id: WidgetId,
 
-	pub layout: &'ctx mut WidgetLayout,
+	layout: *mut WidgetLayout,
 	pub rect: Aabb2,
+
+	_phantom: PhantomData<&'ctx ()>,
 }
 
 impl WidgetRef<'_> {
@@ -230,6 +234,10 @@ impl WidgetRef<'_> {
 		self.ctx.with_painter(|painter| {
 			painter.fill_solid_quad(self.rect, color.into());
 		});
+	}
+
+	pub fn with_layout(&self, f: impl FnOnce(&mut WidgetLayout)) {
+		f(unsafe{ &mut *self.layout });
 	}
 }
 
@@ -251,8 +259,10 @@ impl UiContext {
 			ctx: self.clone(),
 			id,
 
-			layout: unsafe { &mut *layout },
+			layout,
 			rect,
+
+			_phantom: PhantomData,
 		}
 	}
 
@@ -285,35 +295,45 @@ impl UiContext {
 }
 
 impl UiContext {
-	pub fn with_layout(&self, ty: LayoutType, f: impl FnOnce(WidgetRef)) {
-		let layout = self.begin_widget();
-		layout.layout.set_type(ty);
-
-		f(layout);
-
-		self.end_widget()
-	}
-
-	pub fn horizontal_layout(&self, f: impl FnOnce(WidgetRef)) {
+	pub fn with_layout(&self, ty: LayoutType, do_contents: impl FnOnce(WidgetRef)) -> WidgetRef {
 		let widget = self.begin_widget();
-		widget.layout.set_type(LayoutType::LeftToRight);
-		widget.layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Center);
-		widget.layout.fit_to_contents();
+		widget.with_layout(|layout| layout.set_type(ty));
 
-		f(widget);
+		do_contents(widget.clone());
 
 		self.end_widget();
+
+		widget
 	}
 
-	pub fn vertical_layout(&self, f: impl FnOnce(WidgetRef)) {
+	pub fn horizontal_layout(&self, do_contents: impl FnOnce(WidgetRef)) -> WidgetRef {
 		let widget = self.begin_widget();
-		widget.layout.set_type(LayoutType::TopToBottom);
-		widget.layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
-		widget.layout.fit_to_contents();
+		widget.with_layout(|layout| {
+			layout.set_type(LayoutType::LeftToRight);
+			layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Center);
+			layout.fit_to_contents();
+		});
 
-		f(widget);
+		do_contents(widget.clone());
 
 		self.end_widget();
+
+		widget
+	}
+
+	pub fn vertical_layout(&self, do_contents: impl FnOnce(WidgetRef)) -> WidgetRef {
+		let widget = self.begin_widget();
+		widget.with_layout(|layout| {
+			layout.set_type(LayoutType::TopToBottom);
+			layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
+			layout.fit_to_contents();
+		});
+
+		do_contents(widget.clone());
+
+		self.end_widget();
+
+		widget
 	}
 }
 
@@ -332,7 +352,7 @@ impl UiContext {
 		let widget = self.do_widget();
 
 		let text_rect = text_layout.iter().fold(Aabb2::zero(), |acc, &(rect, _)| acc.include_rect(rect));
-		widget.layout.set_fixed_size(text_rect.size());
+		widget.with_layout(|layout| layout.set_fixed_size(text_rect.size()));
 
 		self.with_painter(|painter| {
 			painter.set_paint_mode(UiPaintMode::Text);
@@ -342,12 +362,14 @@ impl UiContext {
 		});
 	}
 
-	pub fn button(&self, text: impl AsRef<str>) -> bool {
+	pub fn build_button(&self, do_contents: impl FnOnce(WidgetRef)) -> bool {
 		let button = self.begin_widget();
-		button.layout.set_type(LayoutType::LeftToRight);
-		button.layout.set_child_alignment(Alignment::Center, Alignment::Center);
-		button.layout.set_padding(4.0);
-		button.layout.vertical.set_fixed_size(16.0 + 8.0);
+		button.with_layout(|layout| {
+			layout.set_type(LayoutType::LeftToRight);
+			layout.set_child_alignment(Alignment::Center, Alignment::Center);
+			layout.set_padding(4.0);
+			layout.vertical.set_fixed_size(16.0 + 8.0);
+		});
 		button.draw_rect(Color::magenta());
 
 		let ui_scale = self.with_ui_system(|system| system.global_scale);
@@ -360,7 +382,7 @@ impl UiContext {
 			(is_hot, is_hot && input.button_just_up(input::MouseButton::Left))
 		});
 
-		self.text(text);
+		do_contents(button.clone());
 
 		// Hover state
 		if is_hot {
@@ -370,6 +392,12 @@ impl UiContext {
 		self.end_widget();
 
 		is_clicked
+	}
+
+	pub fn button(&self, text: impl AsRef<str>) -> bool {
+		self.build_button(|_| {
+			self.text(text);
+		})
 	}
 }
 

@@ -239,8 +239,10 @@ impl GameScene {
 			self.hud_view.do_ui(ui.clone(), &self.model);
 
 			ui.vertical_layout(|widget| {
-				widget.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
-				widget.layout.set_padding(4.0);
+				widget.with_layout(|layout| {
+					layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
+					layout.set_padding(4.0);
+				});
 				widget.draw_rect(Color::black());
 
 				let fps = 1.0 / delta_time;
