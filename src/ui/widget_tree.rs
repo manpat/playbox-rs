@@ -81,7 +81,6 @@ impl WidgetTree {
 			let epoch_diff = widget.epoch.wrapping_sub(self.gc_epoch).cast_signed();
 			let has_expired = epoch_diff < 0;
 			if has_expired {
-				log::info!("WIDGET {id:?} GC'D");
 				removed_widgets.push(id);
 			}
 

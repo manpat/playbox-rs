@@ -21,7 +21,7 @@ pub mod prelude {
 
 	pub use crate::audio::MyAudioSystem;
 	pub use crate::game_scene::GameScene;
-	pub use crate::main_menu::{MainMenuScene, MenuCmd, PauseMenuScene};
+	pub use crate::main_menu::MenuCmd;
 	pub use crate::sprites::Sprites;
 	pub use crate::toy_draw::ToyRenderer;
 	pub use crate::ui;
@@ -47,6 +47,7 @@ pub mod prelude {
 	}
 }
 
+use crate::main_menu::{do_main_menu_ui, do_pause_menu_ui};
 use std::time::{Instant, Duration};
 
 use prelude::*;
@@ -62,6 +63,7 @@ fn main() -> anyhow::Result<()> {
 
 
 
+#[derive(Eq, PartialEq)]
 pub enum ActiveScene {
 	MainMenu,
 
@@ -71,9 +73,6 @@ pub enum ActiveScene {
 
 struct App {
 	active_scene: ActiveScene,
-
-	main_menu: MainMenuScene,
-	pause_menu: PauseMenuScene,
 	game_scene: Option<GameScene>,
 
 	menu_cmd_subscription: Subscription<MenuCmd>,
@@ -122,8 +121,6 @@ impl App {
 
 		Ok(App {
 			active_scene,
-			main_menu: MainMenuScene::new(ctx)?,
-			pause_menu: PauseMenuScene::new(ctx)?,
 			game_scene,
 
 			menu_cmd_subscription,
@@ -164,30 +161,22 @@ impl toybox::App for App {
 			self.active_scene = ActiveScene::MainMenu;
 		}
 
-		match self.active_scene {
-			ActiveScene::MainMenu => {
-				self.main_menu.update(&mut Context::new(ctx, &mut self.shared));
-			}
+		if let Some(game_scene) = self.game_scene.as_mut() {
+			let mut ctx = Context::new(ctx, &mut self.shared);
 
-			ActiveScene::Game => {
-				let game_scene = self.game_scene.as_mut().unwrap();
-
-				if ctx.input.button_just_down(input::keys::Escape) {
-					self.active_scene = ActiveScene::PauseMenu;
-				}
-
-				let mut ctx = Context::new(ctx, &mut self.shared);
+			if self.active_scene == ActiveScene::Game {
 				game_scene.update(&mut ctx);
-				game_scene.draw(&mut ctx);
 			}
 
-			ActiveScene::PauseMenu => {
-				let game_scene = self.game_scene.as_mut().unwrap();
+			game_scene.draw(&mut ctx);
 
-				let mut ctx = Context::new(ctx, &mut self.shared);
-				self.pause_menu.update(&mut ctx);
-				game_scene.draw(&mut ctx);
+			if self.active_scene == ActiveScene::Game {
+				game_scene.do_ui(&mut ctx);
+			} else {
+				do_pause_menu_ui(&mut ctx);
 			}
+		} else {
+			do_main_menu_ui(&mut Context::new(ctx, &mut self.shared));
 		}
 
 		for menu_msg in ctx.bus.poll_consume(&self.menu_cmd_subscription) {
@@ -223,6 +212,12 @@ impl toybox::App for App {
 				MenuCmd::Resume => {
 					if self.game_scene.is_some() {
 						self.active_scene = ActiveScene::Game;
+					}
+				}
+
+				MenuCmd::Pause => {
+					if self.game_scene.is_some() {
+						self.active_scene = ActiveScene::PauseMenu;
 					}
 				}
 

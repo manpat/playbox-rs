@@ -27,6 +27,7 @@ pub enum UiPass {
 struct UiContextImpl {
 	system: *mut UiSystem,
 	input: *mut input::System,
+	bus: bus::MessageBus,
 	pass: UiPass,
 
 	ref_count: usize,
@@ -118,6 +119,10 @@ impl UiContext {
 		result
 	}
 
+	pub fn message_bus(&self) -> bus::MessageBus {
+		self.read(|ctx| ctx.bus.clone())
+	}
+
 	pub fn with_ui_system_mut<R: 'static>(&self, f: impl FnOnce(&mut UiSystem) -> R) -> R {
 		self.write(move |ctx| unsafe {
 			f(ctx.system.as_mut().unwrap())
@@ -155,7 +160,7 @@ impl UiContext {
 
 
 pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
-	let Context{ gfx, input, ui_system, .. } = ctx;
+	let Context{ gfx, input, ui_system, bus, .. } = ctx;
 
 	let screen_size = gfx.backbuffer_size().to_vec2() * ui_system.global_scale;
 
@@ -171,6 +176,7 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 		let mut ui_ctx_impl = UiContextImpl {
 			system: *ui_system,
 			input: *input,
+			bus: bus.clone(),
 			pass: UiPass::Layout,
 
 			ref_count: 0,
@@ -191,6 +197,7 @@ pub fn build(ctx: &mut Context, mut do_ui: impl FnMut(UiContext)) {
 		let mut ui_ctx_impl = UiContextImpl {
 			system: *ui_system,
 			input: *input,
+			bus: bus.clone(),
 			pass: UiPass::Render,
 
 			ref_count: 0,

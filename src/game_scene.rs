@@ -226,7 +226,14 @@ impl GameScene {
 		// self.sprites.draw(gfx);
 
 		self.dispatch_postprocess(gfx);
+	}
 
+	pub fn do_ui(&mut self, ctx: &mut Context) {
+		if ctx.input.button_just_down(input::keys::Escape) {
+			ctx.bus.emit(MenuCmd::Pause);
+		}
+
+		let delta_time = ctx.delta_time;
 
 		ui::build(ctx, |ui| {
 			self.hud_view.do_ui(ui.clone(), &self.model);
