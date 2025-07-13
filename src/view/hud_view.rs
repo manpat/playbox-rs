@@ -1,9 +1,6 @@
 use crate::prelude::*;
 use model::*;
 
-pub const HUD_FRAME_STAGE: gfx::FrameStage = gfx::FrameStage::Ui(0);
-
-
 pub struct HudView {
 	_message_bus: MessageBus,
 }
@@ -29,19 +26,15 @@ impl HudView {
 	}
 
 	fn do_playing_ui(&mut self, ui: ui::UiContext, model: &Model) {
-		let stat_panel = ui.begin_widget();
-		stat_panel.layout.layout_type = ui::LayoutType::TopToBottom;
-		stat_panel.layout.set_padding(4.0);
-		stat_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
-		stat_panel.layout.horizontal.set_child_alignment(ui::Alignment::Begin);
-		stat_panel.layout.fit_to_contents();
-		stat_panel.draw_rect(Color::black().with_alpha(0.5));
+		ui.vertical_layout(|layout| {
+			layout.layout.set_padding(4.0);
+			layout.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
+			layout.draw_rect(Color::black().with_alpha(0.5));
 
-		let Player { blood, salt, .. } = model.player;
-		ui.text(format!("Blood: {blood}"));
-		ui.text(format!("Salt: {salt}"));
-
-		ui.end_widget();
+			let Player { blood, salt, .. } = model.player;
+			ui.text(format!("Blood: {blood}"));
+			ui.text(format!("Salt: {salt}"));
+		})
 	}
 
 	fn do_dialog_ui(&mut self, _ui: ui::UiContext, _model: &Model) {

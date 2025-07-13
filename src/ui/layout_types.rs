@@ -103,6 +103,10 @@ impl WidgetAxisLayout {
 	pub fn fit_to_contents(&mut self) {
 		self.flags.insert(WidgetLayoutFlags::FIT_TO_CONTENTS);
 	}
+
+	pub fn expand_to_fill(&mut self) {
+		self.flags.remove(WidgetLayoutFlags::FIT_TO_CONTENTS);
+	}
 }
 
 #[derive(Default, Clone)]
@@ -138,6 +142,11 @@ impl WidgetLayout {
 	pub fn fit_to_contents(&mut self) {
 		self.horizontal.fit_to_contents();
 		self.vertical.fit_to_contents();
+	}
+
+	pub fn expand_to_fill(&mut self) {
+		self.horizontal.expand_to_fill();
+		self.vertical.expand_to_fill();
 	}
 
 	pub fn set_fixed_size(&mut self, size: Vec2) {

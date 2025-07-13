@@ -285,6 +285,39 @@ impl UiContext {
 }
 
 impl UiContext {
+	pub fn with_layout(&self, ty: LayoutType, f: impl FnOnce(WidgetRef)) {
+		let layout = self.begin_widget();
+		layout.layout.set_type(ty);
+
+		f(layout);
+
+		self.end_widget()
+	}
+
+	pub fn horizontal_layout(&self, f: impl FnOnce(WidgetRef)) {
+		let widget = self.begin_widget();
+		widget.layout.set_type(LayoutType::LeftToRight);
+		widget.layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Center);
+		widget.layout.fit_to_contents();
+
+		f(widget);
+
+		self.end_widget();
+	}
+
+	pub fn vertical_layout(&self, f: impl FnOnce(WidgetRef)) {
+		let widget = self.begin_widget();
+		widget.layout.set_type(LayoutType::TopToBottom);
+		widget.layout.set_child_alignment(ui::Alignment::Begin, ui::Alignment::Begin);
+		widget.layout.fit_to_contents();
+
+		f(widget);
+
+		self.end_widget();
+	}
+}
+
+impl UiContext {
 	pub fn text(&self, text: impl AsRef<str>) {
 		let mut text_layout = SmallVec::<[(Aabb2, Aabb2); 16]>::new();
 		let text = text.as_ref();

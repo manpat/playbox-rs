@@ -238,18 +238,14 @@ impl GameScene {
 		ui::build(ctx, |ui| {
 			self.hud_view.do_ui(ui.clone(), &self.model);
 
-			{
-				let fps_panel = ui.begin_widget();
-				fps_panel.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
-				fps_panel.layout.set_padding(4.0);
-				fps_panel.layout.fit_to_contents();
-				fps_panel.draw_rect(Color::black());
+			ui.vertical_layout(|widget| {
+				widget.layout.set_alignment(ui::Alignment::Begin, ui::Alignment::End);
+				widget.layout.set_padding(4.0);
+				widget.draw_rect(Color::black());
 
 				let fps = 1.0 / delta_time;
 				ui.text(format!("dt: {:.2}ms ({fps:.0}fps)", delta_time * 1000.0));
-
-				ui.end_widget();
-			}
+			});
 		});
 	}
 
