@@ -475,15 +475,15 @@ impl Transaction<'_> {
 		Ok(())
 	}
 
-	pub fn update_geometry(&mut self, edit: impl FnOnce(&SourceModel, &mut WorldGeometry) -> anyhow::Result<()>) -> anyhow::Result<()> {
+	pub fn update_geometry<T>(&mut self, edit: impl FnOnce(&SourceModel, &mut WorldGeometry) -> anyhow::Result<T>) -> anyhow::Result<T> {
 		let before = self.model.world.geometry.clone();
 		let mut after = self.model.world.geometry.clone();
 
-		edit(&self.model, &mut after)?;
+		let result = edit(&self.model, &mut after)?;
 
 		self.group.push(UndoEntry::UpdateGeometry {before, after});
 
-		Ok(())
+		Ok(result)
 	}
 }
 

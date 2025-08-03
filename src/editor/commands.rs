@@ -322,19 +322,37 @@ fn handle_world_edit_cmd(_state: &mut InnerState, transaction: &mut Transaction<
 			anyhow::ensure!(source_wall_id.is_valid(geometry));
 			anyhow::ensure!(target_wall_id.is_valid(geometry));
 
-			let room = source_wall_id.room(geometry);
+			let source_room = source_wall_id.room(geometry);
+			let room_objects: SmallVec<[(ObjectId, Vec2); 4]> = transaction.model().world.objects.iter()
+				.filter_map(|(id, object)| (object.placement.room_id == source_room).then_some((id, object.placement.position)))
+				.collect();
 
-			transaction.describe(format!("Split {room:?} by {source_wall_id:?} -> {target_wall_id:?}"));
-			transaction.update_geometry(|_, geometry| {
+			transaction.describe(format!("Split {source_room:?} by {source_wall_id:?} -> {target_wall_id:?}"));
+
+			let (new_room, objects_to_move) = transaction.update_geometry(move |_, geometry| {
 				let new_loop_connecting_wall = geometry.split_room(source_wall_id, target_wall_id)?;
 
 				// Make sure walls in the source model all have unique vertices.
 				geometry.make_wall_vertex_unique(new_loop_connecting_wall)?;
 				geometry.make_wall_vertex_unique(new_loop_connecting_wall.next_wall(geometry))?;
-				Ok(())
+
+				let new_room = new_loop_connecting_wall.room(geometry);
+
+				let objects_to_move: SmallVec<[ObjectId; 4]> = room_objects.into_iter()
+					.filter_map(|(id, position)| {
+						geometry.room_contains_point(new_room, position).then_some(id)
+					})
+					.collect();
+
+				Ok((new_room, objects_to_move))
 			})?;
 
-			// TODO(pat.m): make sure objects in original room end up in the correct room!
+			for object_id in objects_to_move {
+				transaction.update_object(object_id, |_, object| {
+					object.placement.room_id = new_room;
+					Ok(())
+				})?;
+			}
 
 			transaction.submit();
 		}

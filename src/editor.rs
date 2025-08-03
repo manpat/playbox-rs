@@ -66,6 +66,7 @@ struct InnerState {
 	selection: Option<Item>,
 
 	focused_room_id: Option<RoomId>,
+	hovering_rooms: Vec<RoomId>,
 
 	// Viewport settings
 	track_player: bool,
@@ -84,6 +85,8 @@ impl State {
 				selection: None,
 
 				focused_room_id: None,
+				hovering_rooms: Vec::new(),
+
 				track_player: false,
 				show_debug_labels: true,
 
