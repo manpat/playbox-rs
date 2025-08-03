@@ -166,7 +166,7 @@ impl GameScene {
 		// TODO(pat.m): needs to happen somewhere else, but has to happen after processed world update
 		{
 			// Make sure player doesn't suddenly end up in a room that no longer exists.
-			if !player.placement.room_id.is_valid(processed_world.geometry()) {
+			if !processed_world.geometry().is_placement_valid(&player.placement) {
 				player.placement = processed_world.to_processed_placement(source_world.player_spawn);
 			}
 		}

@@ -179,6 +179,11 @@ impl WorldGeometry {
 		true
 	}
 
+	pub fn is_placement_valid(&self, placement: &model::Placement) -> bool {
+		placement.room_id.is_valid(self)
+			&& self.room_contains_point(placement.room_id, placement.position)
+	}
+
 	pub fn room_vertices(&self, room_id: RoomId) -> impl Iterator<Item=VertexId> + DoubleEndedIterator + ExactSizeIterator + use<'_> {
 		self.room_walls(room_id)
 			.map(|wall_id| self.walls[wall_id].source_vertex)

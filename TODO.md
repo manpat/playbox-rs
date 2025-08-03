@@ -153,8 +153,6 @@ resource cleanup?
 	- resource scope?
 	- move resource creation out of gfx::Context into resources subobject
 
-builtin default shaders for provided vertex types
-
 future based helper for writing 'sketches'
 ```rust
 async {
