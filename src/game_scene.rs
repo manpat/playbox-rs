@@ -38,10 +38,10 @@ impl GameScene {
 		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
 
 		let rt_fraction = 4;
-		let hdr_color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction));
-		let depth_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction));
+		let hdr_color_rt = resource_manager.create_fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction);
+		let depth_rt = resource_manager.create_fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction);
 
-		let ldr_color_image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
+		let ldr_color_image = resource_manager.create_fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction);
 
 		let mut downsample_chain = Vec::new();
 		let mut upsample_chain = Vec::new();
@@ -49,12 +49,12 @@ impl GameScene {
 		let num_mips = 5;
 
 		for mip in 0..num_mips + 1 {
-			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
+			let image = resource_manager.create_fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1));
 			downsample_chain.push(image);
 		}
 
 		for mip in 0..num_mips {
-			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip));
+			let image = resource_manager.create_fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip);
 			upsample_chain.push(image);
 		}
 
