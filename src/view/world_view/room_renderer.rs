@@ -37,9 +37,9 @@ impl RoomRenderer {
 			vbo, ebo,
 			light_buffer,
 
-			v_shader: gfx.resource_manager.load_vertex_shader("shaders/room.vs.glsl"),
-			f_shader: gfx.resource_manager.load_fragment_shader("shaders/room.fs.glsl"),
-			texture: gfx.resource_manager.load_image_array("World Textures", &[
+			v_shader: gfx.resources.load_vertex_shader("shaders/room.vs.glsl"),
+			f_shader: gfx.resources.load_fragment_shader("shaders/room.fs.glsl"),
+			texture: gfx.resources.load_image_array("World Textures", &[
 				"images/dumb-brick.png",
 				"images/dumb-brick2.png",
 				"images/dumb-tile.png",
@@ -82,7 +82,7 @@ impl RoomRenderer {
 		self.instances.clear();
 	}
 
-	pub fn draw(&self, encoder: &mut gfx::FrameEncoder) {
+	pub fn draw(&self, encoder: &mut gfx::Frame) {
 		let index_size = std::mem::size_of::<u32>() as u32;
 
 		let mut group = encoder.command_group(gfx::FrameStage::Main);

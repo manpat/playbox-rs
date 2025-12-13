@@ -88,7 +88,7 @@ impl WorldView {
 			self.room_renderer.add_instance(room_id, transform, &planes)
 		}
 
-		self.room_renderer.draw(&mut gfx.frame_encoder);
+		self.room_renderer.draw(&mut gfx.frame);
 	}
 
 	#[instrument(skip_all, name="world_view build_visibility_graph")]

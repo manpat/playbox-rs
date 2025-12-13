@@ -18,7 +18,7 @@ impl Sprites {
 			vertices: Vec::new(),
 			indices: Vec::new(),
 
-			atlas: gfx::BlankImage::White.into(), //gfx.resource_manager.request(gfx::LoadImageRequest::from("images/coolcat.png")),
+			atlas: gfx::BlankImage::White.into(), //gfx.resources.request(gfx::LoadImageRequest::from("images/coolcat.png")),
 
 			up: Vec3::from_y(1.0),
 			right: Vec3::from_x(1.0),
@@ -30,7 +30,7 @@ impl Sprites {
 			return
 		}
 
-		gfx.frame_encoder.command_group(gfx::FrameStage::Main)
+		gfx.frame.command_group(gfx::FrameStage::Main)
 			.annotate("Sprites")
 			.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
 			.elements(self.indices.len() as u32)

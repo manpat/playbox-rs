@@ -16,7 +16,7 @@ pub struct ToyRenderer {
 }
 
 impl ToyRenderer {
-	pub fn new(core: &gfx::Core, _rm: &mut gfx::ResourceManager) -> ToyRenderer {
+	pub fn new(core: &gfx::Core, _rm: &mut gfx::Resources) -> ToyRenderer {
 		ToyRenderer {
 			texture: gfx::BlankImage::White.into(),
 			color_target: None,
@@ -51,7 +51,7 @@ impl ToyRenderer {
 
 	pub fn draw(&self, gfx: &mut gfx::System) {
 		if self.element_count > 0 {
-			let mut group = gfx.frame_encoder.command_group(self.framestage).annotate("Toy");
+			let mut group = gfx.frame.command_group(self.framestage).annotate("Toy");
 			let mut command = group.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment);
 
 			command.indexed(self.index_buffer)

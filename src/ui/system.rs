@@ -32,7 +32,7 @@ impl UiSystem {
 			text_rendering: TextRendering {
 				font,
 				glyph_cache: GlyphCache::new(gfx),
-				f_text_shader: gfx.resource_manager.load_fragment_shader("shaders/text.fs.glsl"),
+				f_text_shader: gfx.resources.load_fragment_shader("shaders/text.fs.glsl"),
 			},
 
 			painter: UiPainter::new(),

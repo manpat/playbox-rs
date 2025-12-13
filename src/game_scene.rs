@@ -35,13 +35,13 @@ pub struct GameScene {
 
 impl GameScene {
 	pub fn new(ctx: &mut Context<'_>, world: model::World) -> anyhow::Result<GameScene> {
-		let gfx::System{ resource_manager, .. } = &mut ctx.gfx;
+		let gfx::System{ resources, .. } = &mut ctx.gfx;
 
 		let rt_fraction = 4;
-		let hdr_color_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction));
-		let depth_rt = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction));
+		let hdr_color_rt = resources.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction));
+		let depth_rt = resources.request(gfx::CreateImageRequest::fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction));
 
-		let ldr_color_image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
+		let ldr_color_image = resources.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
 
 		let mut downsample_chain = Vec::new();
 		let mut upsample_chain = Vec::new();
@@ -49,21 +49,21 @@ impl GameScene {
 		let num_mips = 5;
 
 		for mip in 0..num_mips + 1 {
-			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
+			let image = resources.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
 			downsample_chain.push(image);
 		}
 
 		for mip in 0..num_mips {
-			let image = resource_manager.request(gfx::CreateImageRequest::fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip));
+			let image = resources.request(gfx::CreateImageRequest::fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip));
 			upsample_chain.push(image);
 		}
 
 		// let toy_renderer = {
-		// 	let project_path = resource_manager.resource_path("toys/basic.toy")?;
+		// 	let project_path = resources.resource_path("toys/basic.toy")?;
 		// 	let project_data = std::fs::read(&project_path)?;
 		// 	let project = toy::load(&project_data)?;
 
-		// 	let mut toy_renderer = ToyRenderer::new(&core, resource_manager);
+		// 	let mut toy_renderer = ToyRenderer::new(&core, resources);
 		// 	toy_renderer.set_color_target(hdr_color_rt);
 		// 	toy_renderer.set_depth_target(depth_rt);
 		// 	toy_renderer.update(&core, |builder| {
@@ -76,13 +76,13 @@ impl GameScene {
 		let processed_world = model::ProcessedWorld::new(&world, &ctx.bus);
 
 		Ok(GameScene {
-			fog_shader: resource_manager.load_compute_shader("shaders/fog.cs.glsl"),
-			hdr_to_ldr_shader: resource_manager.load_compute_shader("shaders/hdr_to_ldr.cs.glsl"),
-			repair_color_shader: resource_manager.load_compute_shader("shaders/repair.cs.glsl"),
+			fog_shader: resources.load_compute_shader("shaders/fog.cs.glsl"),
+			hdr_to_ldr_shader: resources.load_compute_shader("shaders/hdr_to_ldr.cs.glsl"),
+			repair_color_shader: resources.load_compute_shader("shaders/repair.cs.glsl"),
 
-			downsample_shader: resource_manager.load_compute_shader("shaders/downsample.cs.glsl"),
-			upsample_shader: resource_manager.load_compute_shader("shaders/upsample.cs.glsl"),
-			bloom_shader: resource_manager.load_compute_shader("shaders/bloom.cs.glsl"),
+			downsample_shader: resources.load_compute_shader("shaders/downsample.cs.glsl"),
+			upsample_shader: resources.load_compute_shader("shaders/upsample.cs.glsl"),
+			bloom_shader: resources.load_compute_shader("shaders/bloom.cs.glsl"),
 
 			hdr_color_rt,
 			depth_rt,
@@ -213,11 +213,11 @@ impl GameScene {
 
 		let inverse_projection = projection.inverse();
 
-		gfx.frame_encoder.backbuffer_color(self.model.processed_world.fog.color);
-		gfx.frame_encoder.bind_global_ubo(0, &[projection_view, inverse_projection]);
-		gfx.frame_encoder.bind_global_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
+		gfx.frame.backbuffer_color(self.model.processed_world.fog.color);
+		gfx.frame.bind_global_ubo(0, &[projection_view, inverse_projection]);
+		gfx.frame.bind_global_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
-		let mut main_group = gfx.frame_encoder.command_group(gfx::FrameStage::Main);
+		let mut main_group = gfx.frame.command_group(gfx::FrameStage::Main);
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 
 		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
@@ -252,9 +252,9 @@ impl GameScene {
 	}
 
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {
-		let gfx::System { frame_encoder, .. } = gfx;
+		let gfx::System { frame, .. } = gfx;
 
-		let mut group = frame_encoder.command_group(gfx::FrameStage::Postprocess);
+		let mut group = frame.command_group(gfx::FrameStage::Postprocess);
 
 		#[repr(C)]
 		#[derive(Copy, Clone)]

@@ -98,7 +98,7 @@ impl UiPainter {
 
 		let projection = Mat4::ortho(0.0, size.x, 0.0, size.y, -1.0, 1.0);
 
-		let mut encoder = gfx.frame_encoder.command_group(gfx::FrameStage::Ui(0));
+		let mut encoder = gfx.frame.command_group(gfx::FrameStage::Ui(0));
 		encoder.bind_shared_ubo(0, &[projection]);
 		encoder.bind_shared_ssbo(0, &self.vertices);
 

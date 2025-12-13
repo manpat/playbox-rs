@@ -20,7 +20,7 @@ impl GlyphCache {
 		let atlas_size = Vec2i::splat(512);
 		let format = gfx::ImageFormat::unorm8();
 
-		let font_atlas = gfx.resource_manager.request(
+		let font_atlas = gfx.resources.request(
 			gfx::CreateImageRequest::fixed_2d("Glyph Atlas", atlas_size, format));
 
 		GlyphCache {
@@ -37,7 +37,7 @@ impl GlyphCache {
 
 	#[instrument(skip_all, name="GlyphCache::update_atlas")]
 	pub fn update_atlas(&mut self, gfx: &mut gfx::System) {
-		let mut group = gfx.frame_encoder.command_group(gfx::FrameStage::Start).annotate("Update Font Atlas");
+		let mut group = gfx.frame.command_group(gfx::FrameStage::Start).annotate("Update Font Atlas");
 		let atlas_handle = self.font_atlas;
 
 		for insertion in self.to_insert.drain(..) {
