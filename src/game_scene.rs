@@ -38,10 +38,10 @@ impl GameScene {
 		let gfx::System{ resources, .. } = &mut ctx.gfx;
 
 		let rt_fraction = 4;
-		let hdr_color_rt = resources.request(gfx::CreateImageRequest::fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction));
-		let depth_rt = resources.request(gfx::CreateImageRequest::fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction));
+		let hdr_color_rt = resources.create_fractional_rendertarget("hdr rendertarget", gfx::ImageFormat::rgba16f(), rt_fraction);
+		let depth_rt = resources.create_fractional_rendertarget("depthbuffer", gfx::ImageFormat::Depth, rt_fraction);
 
-		let ldr_color_image = resources.request(gfx::CreateImageRequest::fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction));
+		let ldr_color_image = resources.create_fractional_rendertarget("ldr color image", gfx::ImageFormat::Srgba8, rt_fraction);
 
 		let mut downsample_chain = Vec::new();
 		let mut upsample_chain = Vec::new();
@@ -49,12 +49,12 @@ impl GameScene {
 		let num_mips = 5;
 
 		for mip in 0..num_mips + 1 {
-			let image = resources.request(gfx::CreateImageRequest::fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1)));
+			let image = resources.create_fractional_rendertarget(format!("downsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << (mip + 1));
 			downsample_chain.push(image);
 		}
 
 		for mip in 0..num_mips {
-			let image = resources.request(gfx::CreateImageRequest::fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip));
+			let image = resources.create_fractional_rendertarget(format!("upsample mip {mip}"), gfx::ImageFormat::rgba16f(), rt_fraction << mip);
 			upsample_chain.push(image);
 		}
 
@@ -161,13 +161,16 @@ impl GameScene {
 		let model::Model { processed_world, player, progress, interactions, environment, hud, .. } = &mut self.model;
 		let source_world = &self.source_model.world;
 
+		let player_source_placement = processed_world.to_source_placement(player.placement);
+
 		processed_world.update(source_world, &progress, ctx.bus);
 
 		// TODO(pat.m): needs to happen somewhere else, but has to happen after processed world update
 		{
 			// Make sure player doesn't suddenly end up in a room that no longer exists.
-			if !player.placement.room_id.is_valid(processed_world.geometry()) {
-				player.placement = processed_world.to_processed_placement(source_world.player_spawn);
+			if !processed_world.geometry().is_placement_valid(&player.placement) {
+			// if !player.placement.room_id.is_valid(processed_world.geometry()) {
+				player.placement = processed_world.to_processed_placement(player_source_placement);
 			}
 		}
 

@@ -394,6 +394,7 @@ impl Viewport<'_> {
 
 	fn handle_hover(&mut self, hover_pos_world: Vec2) {
 		self.editor_state.hovered = None;
+		self.editor_state.hovering_rooms.clear();
 
 		let mut min_distance = 0.3;
 
@@ -402,13 +403,21 @@ impl Viewport<'_> {
 				continue
 			}
 
+			let local_pos = room_to_world.inverse() * hover_pos_world;
+
 			let distance = shape.distance_to(hover_pos_world);
 			if distance < min_distance {
 				self.editor_state.hovered = *item;
 				self.viewport_state.hovered_item_transform = *room_to_world;
 				self.viewport_state.hovered_item_flags = *flags;
-				self.viewport_state.hovered_item_hover_pos = room_to_world.inverse() * hover_pos_world;
+				self.viewport_state.hovered_item_hover_pos = local_pos;
 				min_distance = distance;
+			}
+
+			if let &Some(Item::Room(room_id)) = item
+				&& self.world.geometry.room_contains_point(room_id, local_pos)
+			{
+				self.editor_state.hovering_rooms.push(room_id);
 			}
 		}
 	}

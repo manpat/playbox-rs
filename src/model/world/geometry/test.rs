@@ -33,3 +33,15 @@ fn split_wall() {
 	assert_eq!(new_wall.prev_wall(&geometry), first_wall);
 	assert_eq!(new_wall, first_wall.next_wall(&geometry));
 }
+
+#[test]
+fn simple_room_contains_point() {
+	let geometry = WorldGeometry::new_square(1.0);
+	let room = geometry.first_room();
+
+	assert!(geometry.room_contains_point(room, Vec2::zero()));
+	assert!(geometry.room_contains_point(room, Vec2::new(0.49, 0.49)));
+	assert!(geometry.room_contains_point(room, Vec2::new(-0.49, -0.49)));
+	assert!(!geometry.room_contains_point(room, Vec2::new(2.0, 0.0)));
+	assert!(!geometry.room_contains_point(room, Vec2::new(0.0, 2.0)));
+}

@@ -167,7 +167,7 @@ impl WorldGeometry {
 	}
 
 	// TODO(pat.m): only works for convex rooms.
-	pub fn room_contains_point(&self, room_id: RoomId, point: Vec2) -> bool {
+	pub fn room_contains_point_convex(&self, room_id: RoomId, point: Vec2) -> bool {
 		for wall in self.room_walls(room_id) {
 			let (start, end) = self.wall_vertices(wall);
 			let direction = end - start;
@@ -177,6 +177,45 @@ impl WorldGeometry {
 		}
 
 		true
+	}
+
+	pub fn room_contains_point(&self, room_id: RoomId, point: Vec2) -> bool {
+		let mut winding_num = 0;
+
+		// ray(tr) = point + <1,0> * tr
+		// seg(ts) = start + (end - start) * ts
+
+		// point + <tr,0> = start + (end - start) * ts
+
+		for wall in self.room_walls(room_id) {
+			let (start, end) = self.wall_vertices(wall);
+
+			if (end.y > point.y) == (start.y > point.y) {
+				// Entirely above or entirely below.
+				continue;
+			}
+
+			let wall_delta = end - start;
+			let start_from_point = point - start;
+
+			if start_from_point.x < wall_delta.x * start_from_point.y / wall_delta.y {
+				// No intersection to the right of point
+				continue;
+			}
+
+			if wall_delta.y > 0.0 {
+				winding_num += 1;
+			} else {
+				winding_num -= 1;
+			}
+		}
+
+		winding_num > 0
+	}
+
+	pub fn is_placement_valid(&self, placement: &model::Placement) -> bool {
+		placement.room_id.is_valid(self)
+			&& self.room_contains_point(placement.room_id, placement.position)
 	}
 
 	pub fn room_vertices(&self, room_id: RoomId) -> impl Iterator<Item=VertexId> + DoubleEndedIterator + ExactSizeIterator + use<'_> {

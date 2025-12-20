@@ -15,6 +15,13 @@ pub fn do_inspector(ui: &mut egui::Ui, ctx: &mut Context) {
 
 	ui.heading("Inspector");
 	draw_item_inspector(ui, ctx);
+
+	ui.separator();
+
+	ui.heading("Hovered rooms");
+	for &room in ctx.state.hovering_rooms.iter() {
+		ui.label(format!("{room:?}"));
+	}
 }
 
 fn draw_world_settings(ui: &mut egui::Ui, ctx: &mut Context) {
