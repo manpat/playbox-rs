@@ -30,10 +30,8 @@ impl Sprites {
 			return
 		}
 
-		gfx.frame.command_group(gfx::FrameStage::Main)
-			.annotate("Sprites")
+		gfx.frame.annotated_group(gfx::FrameStage::Main, "Sprites")
 			.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
-			.elements(self.indices.len() as u32)
 			.indexed(&self.indices)
 			.ssbo(0, &self.vertices)
 			.sampled_image(0, self.atlas, gfx::CommonSampler::Nearest);

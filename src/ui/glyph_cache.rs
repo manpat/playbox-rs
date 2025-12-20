@@ -37,7 +37,7 @@ impl GlyphCache {
 
 	#[instrument(skip_all, name="GlyphCache::update_atlas")]
 	pub fn update_atlas(&mut self, gfx: &mut gfx::System) {
-		let mut group = gfx.frame.command_group(gfx::FrameStage::Start).annotate("Update Font Atlas");
+		let mut group = gfx.frame.annotated_group(gfx::FrameStage::Start, "Update Font Atlas");
 		let atlas_handle = self.font_atlas;
 
 		for insertion in self.to_insert.drain(..) {

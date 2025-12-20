@@ -98,7 +98,7 @@ impl UiPainter {
 
 		let projection = Mat4::ortho(0.0, size.x, 0.0, size.y, -1.0, 1.0);
 
-		let mut encoder = gfx.frame.command_group(gfx::FrameStage::Ui(0));
+		let mut encoder = gfx.frame.group(gfx::FrameStage::Ui(0));
 		encoder.bind_shared_ubo(0, &[projection]);
 		encoder.bind_shared_ssbo(0, &self.vertices);
 
@@ -111,7 +111,6 @@ impl UiPainter {
 			match paint_mode {
 				UiPaintMode::ShapeUntextured => {
 					encoder.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment)
-						.elements(element_count)
 						.indexed(index_upload)
 						.base_vertex(vertex_offset)
 						.sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest)
@@ -121,7 +120,6 @@ impl UiPainter {
 
 				UiPaintMode::Text => {
 					encoder.draw(gfx::CommonShader::StandardVertex, text_state.f_text_shader)
-						.elements(element_count)
 						.indexed(index_upload)
 						.base_vertex(vertex_offset)
 						.sampled_image(0, text_state.glyph_cache.font_atlas, gfx::CommonSampler::Nearest)

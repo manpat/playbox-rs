@@ -213,11 +213,11 @@ impl GameScene {
 
 		let inverse_projection = projection.inverse();
 
-		gfx.frame.backbuffer_color(self.model.processed_world.fog.color);
+		gfx.frame.set_backbuffer_color(self.model.processed_world.fog.color);
 		gfx.frame.bind_global_ubo(0, &[projection_view, inverse_projection]);
 		gfx.frame.bind_global_sampled_image(0, gfx::BlankImage::White, gfx::CommonSampler::Nearest);
 
-		let mut main_group = gfx.frame.command_group(gfx::FrameStage::Main);
+		let mut main_group = gfx.frame.group(gfx::FrameStage::Main);
 		main_group.bind_rendertargets(&[self.hdr_color_rt, self.depth_rt]);
 
 		self.world_view.draw(gfx, &self.model.processed_world, player.placement);
@@ -254,7 +254,7 @@ impl GameScene {
 	fn dispatch_postprocess(&self, gfx: &mut gfx::System) {
 		let gfx::System { frame, .. } = gfx;
 
-		let mut group = frame.command_group(gfx::FrameStage::Postprocess);
+		let mut group = frame.group(gfx::FrameStage::Postprocess);
 
 		#[repr(C)]
 		#[derive(Copy, Clone)]

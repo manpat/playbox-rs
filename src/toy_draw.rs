@@ -51,13 +51,13 @@ impl ToyRenderer {
 
 	pub fn draw(&self, gfx: &mut gfx::System) {
 		if self.element_count > 0 {
-			let mut group = gfx.frame.command_group(self.framestage).annotate("Toy");
+			let mut group = gfx.frame.annotated_group(self.framestage, "Toy");
 			let mut command = group.draw(gfx::CommonShader::StandardVertex, gfx::CommonShader::FlatTexturedFragment);
 
 			command.indexed(self.index_buffer)
 				.ssbo(0, self.vertex_buffer)
 				.sampled_image(0, self.texture, gfx::CommonSampler::Nearest)
-				.elements(self.element_count);
+				.element_count(self.element_count);
 
 			match (self.color_target, self.depth_target) {
 				(Some(ct), Some(dt)) => { command.rendertargets(&[ct, dt]); }

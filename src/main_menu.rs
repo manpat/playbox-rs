@@ -15,7 +15,7 @@ pub enum MenuCmd {
 
 
 pub fn do_main_menu_ui(ctx: &mut Context<'_>) {
-	ctx.gfx.frame.backbuffer_color(Color::rgb(0.05, 0.01, 0.01));
+	ctx.gfx.frame.set_backbuffer_color(Color::rgb(0.05, 0.01, 0.01));
 
 	ctx.input.set_capture_mouse(false);
 

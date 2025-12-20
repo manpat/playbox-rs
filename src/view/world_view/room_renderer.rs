@@ -85,7 +85,7 @@ impl RoomRenderer {
 	pub fn draw(&self, encoder: &mut gfx::Frame) {
 		let index_size = std::mem::size_of::<u32>() as u32;
 
-		let mut group = encoder.command_group(gfx::FrameStage::Main);
+		let mut group = encoder.group(gfx::FrameStage::Main);
 
 		for (room_id, instance_list) in self.instances.iter() {
 			let mesh_info = &self.room_mesh_infos[room_id];
@@ -93,8 +93,7 @@ impl RoomRenderer {
 			let instance_data_upload = group.upload(instance_list);
 
 			group.draw(self.v_shader, self.f_shader)
-				.elements(mesh_info.num_elements)
-				.instances(instance_list.len() as u32)
+				.instance_count(instance_list.len() as u32)
 				.indexed(self.ebo.with_offset_size(
 					mesh_info.base_index * index_size,
 					mesh_info.num_elements * index_size
