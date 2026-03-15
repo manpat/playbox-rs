@@ -385,15 +385,12 @@ impl GameScene {
 				self.source_model.world = model::World::new();
 				self.model.player.placement = self.source_model.world.player_spawn;
 				ctx.bus.emit(model::WorldChangedEvent);
-
-				ui.close_menu();
 			}
 
 			if ui.button("Load World").clicked() {
 				// ctx.bus.emit(editor::EditorModalCmd::LoadWorld);
 
 				ctx.bus.emit(MenuCmd::Play("default".into()));
-				ui.close_menu();
 			}
 
 			if ui.button("Save World").clicked() {
@@ -404,8 +401,6 @@ impl GameScene {
 				if let Err(error) = ctx.vfs.save_json_resource(default_world_path, &self.source_model.world) {
 					log::error!("Failed to save world to '{default_world_path}': {error}");
 				}
-
-				ui.close_menu();
 			}
 
 			ui.separator();

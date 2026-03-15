@@ -14,11 +14,8 @@ pub fn do_world_editor(ui: &mut egui::Ui, ctx: &mut Context) {
 				if ui.button("Focus Player").clicked() {
 					ctx.state.selection = Some(Item::Room(ctx.source_player_placement.room_id));
 					// TODO(pat.m): recenter viewport
-					ui.close_menu();
 				}
-				if ui.checkbox(&mut ctx.state.track_player, "Track Player").changed() {
-					ui.close_menu();
-				}
+				ui.checkbox(&mut ctx.state.track_player, "Track Player");
 			});
 		});
 	});

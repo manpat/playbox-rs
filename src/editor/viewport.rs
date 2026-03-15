@@ -512,12 +512,10 @@ impl Viewport<'_> {
 								source_wall: wall_id,
 								room_to_world: self.viewport_state.hovered_item_transform,
 							});
-							ui.close_menu();
 						}
 
 						if ui.button("Disconnect").clicked() {
 							self.message_bus.emit(EditorWorldEditCmd::DisconnectWall(wall_id));
-							ui.close_menu();
 						}
 					} else {
 						if ui.button("Connect").clicked() {
@@ -525,7 +523,6 @@ impl Viewport<'_> {
 								source_wall: wall_id,
 								room_to_world: self.viewport_state.hovered_item_transform,
 							});
-							ui.close_menu();
 						}
 					}
 
@@ -542,7 +539,6 @@ impl Viewport<'_> {
 
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(wall_id, insert_pos));
 
-						ui.close_menu();
 					}
 
 					if ui.button("Split Room").clicked() {
@@ -551,7 +547,6 @@ impl Viewport<'_> {
 							room_to_world: self.viewport_state.hovered_item_transform,
 						});
 
-						ui.close_menu();
 					}
 
 					if ui.button("Extrude").clicked() {
@@ -565,7 +560,6 @@ impl Viewport<'_> {
 							room_to_world: self.viewport_state.hovered_item_transform,
 							click_to_confirm: true,
 						});
-						ui.close_menu();
 					}
 
 					if ui.button("Add Room").clicked() {
@@ -584,12 +578,10 @@ impl Viewport<'_> {
 				Item::Room(room_id) => {
 					if ui.button("Disconnect All").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::DisconnectRoom(room_id));
-						ui.close_menu();
 					}
 
 					if ui.button("Delete").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::RemoveRoom(room_id));
-						ui.close_menu();
 					}
 				}
 
@@ -600,8 +592,6 @@ impl Viewport<'_> {
 							source_wall: vertex_id.wall(&self.world.geometry),
 							room_to_world: self.viewport_state.hovered_item_transform,
 						});
-
-						ui.close_menu();
 					}
 
 					if ui.button("Bevel").clicked() {
@@ -628,15 +618,12 @@ impl Viewport<'_> {
 
 						// Split the _outgoing_ wall and place the new vertex at the end pos.
 						self.message_bus.emit(EditorWorldEditCmd::SplitWall(incoming_wall, start_vertex));
-
-						ui.close_menu();
 					}
 
 					ui.separator();
 
 					if ui.button("Delete Vertex").clicked() {
 						self.message_bus.emit(EditorWorldEditCmd::DeleteVertex(vertex_id));
-						ui.close_menu();
 					}
 				}
 
@@ -688,7 +675,7 @@ impl Viewport<'_> {
 						if item_hovered || item_selected {
 							self.painter.rect_filled(rect, 0.0, color);
 						} else {
-							self.painter.rect_stroke(rect, 0.0, (1.0, color));
+							self.painter.rect_stroke(rect, 0.0, (1.0, color), egui::StrokeKind::Inside);
 						}
 					}
 				}
